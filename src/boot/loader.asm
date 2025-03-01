@@ -1,106 +1,108 @@
-[ORG 0x7C00]
-
+[ORG 0x7c00]
 BITS 16
 
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
+
+global start
+
 start:
-  cli                                      ; Disable interrupts
-  xor ax, ax      
-  mov ds, ax
-  mov es, ax
-  mov ss, ax
-  mov sp, 0x7C00                           ; Define stack
+	mov si, msg_init
+	call print_str
 
-  mov si, msg_loading
-  call print_string
-
-  mov bx, 0x1000
-  mov dh, 0                                ; Drive 0 (boot)
-  call disk_load
-
-  call enter_protected_mode
-
-  hlt
-  jmp $
-
-print_string:
-  mov ah, 0x0E                             ; Print char func from BIOS
-.loop:
-  lodsb
-  or al, al
-  jz .done
-  int 0x10
-  jmp .loop
-.done:
-	ret
-
-msg_loading db "Loading kernel...", 0
-
-disk_load:
-  pusha
-  mov ah, 0x02                             ; disk reader service
-  mov al, 10
-  mov ch, 0
-  mov cl, 2
-  mov dh, 0
-  int 0x13
-  jc disk_error
-  popa
-  ret
-
-disk_error:
-  mov si, msg_disk_error
-  call print_string
-  hlt
-  jmp $
-
-msg_disk_error db "Disk read error!", 0
-
-enter_protected_mode:
-  cli
-  lgdt [gdt_descriptor]                    ; Load GDT
-
-  mov eax, cr0
-  or eax, 0x1                              ; Active PE (Protection Enable)
-  mov cr0, eax
-
-  jmp CODE_SEG:init_pm                     ; Jump to protected mode
-
-;  --Protected Mode--
-[BITS 32]
-init_pm:
-	mov ax, DATA_SEG                         ; Config data segments
-  mov ds, ax
+	cli
+	mov ax, 0x00
+	mov ds, ax
 	mov es, ax
-  mov fs, ax
-	mov gs, ax
-  mov ss, ax
-  mov esp, 0x90000                         ; Define stack in the top of RAM
+	mov ss, ax
+	mov sp, 0x7c00
+	sti
 
-  ; Call Kernel!!!!!!!!!!!
-  call 0x1000
-	mov si, msg_kernel_ok
+	mov si, msg_topm
+	call print_str
 
-	hlt
-  jmp $
+.load_pm:
+	cli
+	lgdt[gdt_descriptor]
+	mov eax, cr0
+	or eax, 0x1
+	mov cr0, eax
 
-msg_kernel_ok db "Kernel loaded!", 0
+	jmp CODE_SEG:init_pm
 
-; --GDT--
-gdt:
-  dq 0x0000000000000000                    ; Null segment
+; prints
+
+print_str:
+	mov ah, 0x0E
+.print_loop:
+	lodsb
+	or al, al
+	jz .print_done
+	int 0x10
+	jmp .print_loop
+.print_done:
+	ret
+msg_init: db "Initializing bootloader...", 0x0a, 0x0d, 0
+msg_topm: db "Entering protected mode...", 0x0a, 0x0d, 0
+
+; GTD
+
+gdt_start:
+gdt_null:
+	dd 0x0
+	dd 0x0
+
 gdt_code:
-  dq 0x00CF9A000000FFFF                    ; Code (Executável, Readable)
+	dw 0xffff
+	dw 0
+	db 0
+	db 0x9a
+	db 11001111b
+	db 0
+
 gdt_data:
-  dq 0x00CF92000000FFFF                    ; Data (Read/Write)
+	dw 0xffff
+	dw 0
+	db 0
+	db 0x92
+	db 11001111b
+	db 0
+
+gdt_end:
 
 gdt_descriptor:
-  dw gdt_descriptor - gdt - 1
-  dd gdt
+	dw gdt_end - gdt_start-1
+	dd gdt_start
 
-CODE_SEG equ gdt_code - gdt
-DATA_SEG equ gdt_data - gdt
+[BITS 32]
+init_pm:
+	mov ax, DATA_SEG
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
 
-;  --Boot assignature--
-times 510-($-$$) db 0
+	in al, 0x92
+	or al, 2
+	out 0x92, al
+
+	mov edi, 0xB8000
+	mov esi, msg_hello
+	mov ecx, 13
+	mov ah, 0x07
+
+.print_loop:
+	lodsb
+	stosw
+	loop .print_loop
+
+	jmp $ 
+
+msg_hello db "Hello, World!", 0
+
+	jmp $
+
+times 510-($ - $$) db 0
 dw 0xAA55
 
