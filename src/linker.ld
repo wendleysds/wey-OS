@@ -4,7 +4,6 @@ SECTIONS{
 	. = 0x1000;
 
 	.text : {
-		*(.text.kmain)
 		*(.text)
 	}
 
@@ -27,11 +26,9 @@ SECTIONS{
 		*(.bss)
 	}
 	
-	/*
 	/DISCARD/ : {
 		*(.fini_array*)
 		*(.comment)
 	}
-	*/
 }
 
