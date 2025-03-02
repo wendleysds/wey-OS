@@ -19,7 +19,7 @@ void vga_write(const char* message, unsigned char color) {
 	}
 }
 
-void kmain(void* muitiboot_structure, unsigned int magicnumber) {
+__attribute__((section(".text.kmain"))) void kmain() {
 	clear_screen();
 	vga_write("Hello World", 0x0F);
 	while (1);

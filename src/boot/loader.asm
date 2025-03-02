@@ -7,9 +7,6 @@ DATA_SEG equ gdt_data - gdt_start
 global start
 
 start:
-	mov si, msg_init
-	call print_str
-
 	cli
 	mov ax, 0x00
 	mov ds, ax
@@ -17,6 +14,19 @@ start:
 	mov ss, ax
 	mov sp, 0x7c00
 	sti
+
+	mov si, msg_init
+	call print_str
+
+	mov si, msg_disk_init
+	call print_str
+
+	mov bx, 0x1000
+	mov dh, 10
+	call disk_load
+
+	mov si, msg_disk_readed
+	call print_str
 
 	mov si, msg_topm
 	call print_str
@@ -32,6 +42,26 @@ start:
 
 ; prints
 
+disk_load:
+	pusha
+	mov ah, 0x02
+	mov al, 10
+	mov ch, 0
+	mov cl, 2
+	mov dh, 0
+	int 0x13
+	jc disk_error
+	popa
+	ret
+
+disk_error:
+	mov si, msg_disk_error
+	call print_str
+	hlt
+	jmp $
+
+; print
+
 print_str:
 	mov ah, 0x0E
 .print_loop:
@@ -42,7 +72,13 @@ print_str:
 	jmp .print_loop
 .print_done:
 	ret
+
+;print_str messages
+
 msg_init: db "Initializing bootloader...", 0x0a, 0x0d, 0
+msg_disk_init: db "Initializing disk...", 0x0a, 0x0d, 0
+msg_disk_readed: db "Disk readed successfuly.", 0x0a, 0x0d, 0
+msg_disk_error: db "Disk read error!", 0x0a, 0x0d, 0
 msg_topm: db "Entering protected mode...", 0x0a, 0x0d, 0
 
 ; GTD
@@ -87,20 +123,9 @@ init_pm:
 	or al, 2
 	out 0x92, al
 
-	mov edi, 0xB8000
-	mov esi, msg_hello
-	mov ecx, 13
-	mov ah, 0x07
+	jmp 0x1000
 
-.print_loop:
-	lodsb
-	stosw
-	loop .print_loop
-
-	jmp $ 
-
-msg_hello db "Hello, World!", 0
-
+	hlt
 	jmp $
 
 times 510-($ - $$) db 0
