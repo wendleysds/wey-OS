@@ -2,11 +2,6 @@
 
 #define VGA_MEMORY (volatile char*)0xB8000
 
-void kmain(){
-	clear_screen();
-	vga_write("Hello World!", 0x0F);
-	while(1);
-}
 
 void clear_screen() {
 	volatile char* videoMemory = VGA_MEMORY;
@@ -25,6 +20,12 @@ void vga_write(const char* message, unsigned char color) {
 		videoMemory[i * 2 + 1] = color;
 		i++;
 	}
+}
+
+void kmain(){
+	clear_screen();
+	vga_write("Hello World!", 0x0F);
+	while(1);
 }
 
 
