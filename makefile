@@ -65,15 +65,20 @@ $(KERNEL_ASM): $(SRC_DIR)/kernel.asm
 
 # Compile Objects
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	@echo "Compiling C..."
+	@echo "Compiling $< ..."
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm | $(OBJ_DIR)
-	@echo "Compiling ASM.."
+	@echo "Compiling $< ..."
+	@mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS) -f elf32 $< -o $@
 
 # Include dependency files
 -include $(C_OBJ_FILES:.o=.d)
+
+run:
+	qemu-system-i386 -drive format=raw,file=$(IMG_DIR)/$(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR)
