@@ -1,7 +1,4 @@
-#include "kernel.h"
-
 #define VGA_MEMORY (volatile char*)0xB8000
-
 
 void clear_screen() {
 	volatile char* videoMemory = VGA_MEMORY;
