@@ -58,7 +58,7 @@ $(KERNEL_BIN): $(KERNEL_ASM) $(C_OBJ_FILES) $(ASM_OBJ_FILES) | $(BIN_DIR)
 	@echo "Compiling kernel binary..."
 	@echo "C files: $(C_OBJ_FILES)"
 	@echo "ASM files: $(ASM_OBJ_FILES)"
-	$(LD) $(LDFLAGS) -T $(LINKER_FILE) -o $@ $^
+	$(LD) $(LDFLAGS) -T $(LINKER_FILE) -o $@ $^ --oformat binary
 
 $(KERNEL_ASM): $(SRC_DIR)/kernel.asm
 	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
