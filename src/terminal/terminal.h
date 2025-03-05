@@ -4,4 +4,4 @@
 void terminal_clear();
 void terminal_write(const char* message, unsigned char color);
 
-#endif // _TERMINAL_H
+#endif

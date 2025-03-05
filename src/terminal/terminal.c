@@ -1,4 +1,5 @@
 #include "terminal.h"
+#include "../io/io.h"
 #include <stdint.h>
 
 #define VGA_MEMORY (volatile char*)0xB8000
@@ -11,10 +12,6 @@ struct Cursor{
 
 static struct Cursor cursor;
 static volatile char* videoMemory = VGA_MEMORY;
-
-static inline void outb(uint16_t port, uint8_t value) {
-    asm volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
-}
 
 void update_cursor() {
     uint16_t pos = cursor.y * VGA_WIDTH + cursor.x;
@@ -85,6 +82,4 @@ void terminal_write(const char* chars, unsigned char color) {
 		terminal_putchar(chars[i], color);
 	}
 }
-
-
 
