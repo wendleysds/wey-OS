@@ -28,7 +28,7 @@ KERNEL_ASM = $(OBJ_DIR)/kernel.asm.o
 
 SRC_C_FILES = $(shell find $(SRC_DIR) -type f -name "*.c")
 
-EXCLUDE_ASM_FILES = $(SRC_DIR)/kernel.asm $(SRC_DIR)/boot/loader.asm
+EXCLUDE_ASM_FILES = $(SRC_DIR)/kernel/kernel.asm $(SRC_DIR)/boot/loader.asm
 SRC_ASM_FILES = $(filter-out $(EXCLUDE_ASM_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm"))
 
 # Object files
@@ -60,7 +60,7 @@ $(KERNEL_BIN): $(KERNEL_ASM) $(C_OBJ_FILES) $(ASM_OBJ_FILES) | $(BIN_DIR)
 	@echo "ASM files: $(ASM_OBJ_FILES)"
 	$(LD) $(LDFLAGS) -T $(LINKER_FILE) -o $@ $^ --oformat binary
 
-$(KERNEL_ASM): $(SRC_DIR)/kernel.asm
+$(KERNEL_ASM): $(SRC_DIR)/kernel/kernel.asm
 	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
 
 # Compile Objects
