@@ -6,14 +6,46 @@
 #define VGA_WIDTH 80
 #define VGA_HEIGTH 25
 
+#define CURSOR_START 6
+#define CURSOR_END 7
+
 struct Cursor{
 	uint8_t x, y;
+	uint8_t enabled;
 };
 
 static struct Cursor cursor;
 static volatile char* videoMemory = VGA_MEMORY;
 
+void terminal_init(){
+	cursor.y = 0;
+	cursor.x = 0;
+	cursor.enabled = 1;
+}
+
+void terminal_cursor_enable(){
+	terminal_cursor_enable(CURSOR_START, CURSOR_END);
+}
+
+void terminal_cursor_enable(uint8_t cursor_start, uint8_t cursor_end){
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
+
+	outb(0x3D4, 0x0B);
+	outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
+	cursor.enabled = 1;
+}
+
+void terminal_cursor_disable(){
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, 0x20);
+	cursor.enabled = 0;
+}
+
 void update_cursor() {
+	if(!cursor.enabled)
+		return;
+
     uint16_t pos = cursor.y * VGA_WIDTH + cursor.x;
 
     outb(0x3D4, 0x0F);
@@ -58,17 +90,18 @@ void terminal_clear() {
 }
 
 void terminal_backspace(){
-	if(cursor.x != 0 && cursor.y != 0){
-		if(cursor.x == 0){
-			cursor.y -= 1;
-			cursor.x = VGA_WIDTH;
-		}
-		
-		cursor.x -= 1;
-		terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
-		cursor.x -= 1;
-		update_cursor();
+	if(cursor.x == 0 && cursor.y != 0)
+		return;
+
+	if(cursor.x == 0){
+		cursor.y -= 1;
+		cursor.x = VGA_WIDTH;
 	}
+	
+	cursor.x -= 1;
+	terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
+	cursor.x -= 1;
+	update_cursor();
 }
 
 void terminal_putchar(char c, unsigned char color) {
