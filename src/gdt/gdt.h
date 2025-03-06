@@ -18,6 +18,6 @@ struct GDT_Structured{
 };
 
 void gdt_load(struct GDT* gdt, int size);
-void gdt_structured_to_gdt(struct GDT* gdt, struct GDT_structured* structured_gdt, int total_entires);
+void gdt_structured_to_gdt(struct GDT* gdt, struct GDT_Structured* structured_gdt, int total_entires);
 
 #endif
