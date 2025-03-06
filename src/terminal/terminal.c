@@ -122,12 +122,13 @@ void terminal_putchar(char c, unsigned char color) {
 	}
 	
 	scroll_terminal();
-	update_cursor();
 }
 
 void terminal_write(const char* chars, unsigned char color) {
 	for(int i = 0; chars[i] != '\0'; i++){
 		terminal_putchar(chars[i], color);
 	}
+	
+	update_cursor();
 }
 
