@@ -34,6 +34,7 @@ void terminal_cursor_enable(uint8_t cursor_start, uint8_t cursor_end){
 	outb(0x3D4, 0x0B);
 	outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
 	cursor.enabled = 1;
+	update_cursor();
 }
 
 void terminal_cursor_disable(){
