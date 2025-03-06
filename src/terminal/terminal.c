@@ -57,11 +57,25 @@ void terminal_clear() {
 	update_cursor();
 }
 
+void terminal_backspace(){
+	if(cursor.x != 0 && cursor.y != 0){
+		if(cursor.x == 0){
+			cursor.y -= 1;
+			cursor.x = VGA_WIDTH;
+		}
+		
+		cursor.x -= 1;
+		terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
+		cursor.x -= 1;
+		update_cursor();
+	}
+}
+
 void terminal_putchar(char c, unsigned char color) {
 	if (c == '\n') {
       cursor.y += 1;
       cursor.x = 0;
-  } else {
+	} else {
       int index = (cursor.y * VGA_WIDTH + cursor.x) * 2;
       videoMemory[index] = c;
       videoMemory[index + 1] = color;
@@ -70,11 +84,11 @@ void terminal_putchar(char c, unsigned char color) {
       if (cursor.x >= VGA_WIDTH) {
           cursor.y += 1;
           cursor.x = 0;
-      }
-  }
-
-  scroll_terminal();
-  update_cursor();
+		}
+	}
+	
+	scroll_terminal();
+	update_cursor();
 }
 
 void terminal_write(const char* chars, unsigned char color) {

@@ -5,5 +5,6 @@
 
 void terminal_clear();
 void terminal_write(const char* message, unsigned char color);
+void terminal_backspace();
 
 #endif
