@@ -23,11 +23,24 @@ void terminal_init(){
 	cursor.enabled = 1;
 }
 
-void terminal_cursor_enable(){
-	terminal_cursor_enable(DEFAULT_CURSOR_START, DEFAULT_CURSOR_END);
+void update_cursor() {
+	if(!cursor.enabled)
+		return;
+
+    uint16_t pos = cursor.y * VGA_WIDTH + cursor.x;
+
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
-void terminal_cursor_enable(uint8_t cursor_start, uint8_t cursor_end){
+void terminal_cursor_enable(){
+	terminal_cursor_enable_SE(DEFAULT_CURSOR_START, DEFAULT_CURSOR_END);
+}
+
+void terminal_cursor_enable_SE(uint8_t cursor_start, uint8_t cursor_end){
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
 
@@ -41,19 +54,6 @@ void terminal_cursor_disable(){
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, 0x20);
 	cursor.enabled = 0;
-}
-
-void update_cursor() {
-	if(!cursor.enabled)
-		return;
-
-    uint16_t pos = cursor.y * VGA_WIDTH + cursor.x;
-
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (uint8_t)(pos & 0xFF));
-
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
 void scroll_terminal(){
@@ -90,21 +90,6 @@ void terminal_clear() {
 	update_cursor();
 }
 
-void terminal_backspace(){
-	if(cursor.x == 0 && cursor.y != 0)
-		return;
-
-	if(cursor.x == 0){
-		cursor.y -= 1;
-		cursor.x = VGA_WIDTH;
-	}
-	
-	cursor.x -= 1;
-	terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
-	cursor.x -= 1;
-	update_cursor();
-}
-
 void terminal_putchar(char c, unsigned char color) {
 	if (c == '\n') {
       cursor.y += 1;
@@ -123,6 +108,22 @@ void terminal_putchar(char c, unsigned char color) {
 	
 	scroll_terminal();
 }
+
+void terminal_backspace(){
+	if(cursor.x == 0 && cursor.y != 0)
+		return;
+
+	if(cursor.x == 0){
+		cursor.y -= 1;
+		cursor.x = VGA_WIDTH;
+	}
+	
+	cursor.x -= 1;
+	terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
+	cursor.x -= 1;
+	update_cursor();
+}
+
 
 void terminal_write(const char* chars, unsigned char color) {
 	for(int i = 0; chars[i] != '\0'; i++){

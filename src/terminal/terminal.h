@@ -6,8 +6,8 @@
 
 void terminal_init();
 
+void terminal_cursor_enable_SE(uint8_t cursor_start, uint8_t cursor_end);
 void terminal_cursor_enable();
-void terminal_cursor_enable(uint8_t cursor_start, uint8_t cursor_end);
 void terminal_cursor_disable();
 
 void terminal_clear();
