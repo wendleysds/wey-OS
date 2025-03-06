@@ -6,8 +6,8 @@
 #define VGA_WIDTH 80
 #define VGA_HEIGTH 25
 
-#define CURSOR_START 6
-#define CURSOR_END 7
+#define DEFAULT_CURSOR_START 6
+#define DEFAULT_CURSOR_END 7
 
 struct Cursor{
 	uint8_t x, y;
@@ -24,7 +24,7 @@ void terminal_init(){
 }
 
 void terminal_cursor_enable(){
-	terminal_cursor_enable(CURSOR_START, CURSOR_END);
+	terminal_cursor_enable(DEFAULT_CURSOR_START, DEFAULT_CURSOR_END);
 }
 
 void terminal_cursor_enable(uint8_t cursor_start, uint8_t cursor_end){
