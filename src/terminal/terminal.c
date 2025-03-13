@@ -9,6 +9,7 @@
 #define DEFAULT_CURSOR_START 6
 #define DEFAULT_CURSOR_END 7
 
+#define DEFAULT_TAB_DISTANCE 4
 struct Cursor{
 	uint8_t x, y;
 	uint8_t enabled;
@@ -94,7 +95,11 @@ void terminal_putchar(char c, unsigned char color) {
 	if (c == '\n') {
       cursor.y += 1;
       cursor.x = 0;
-	} else {
+	}
+	else if(c == '\r'){
+		cursor.x = 0;
+	}
+	else {
       int index = (cursor.y * VGA_WIDTH + cursor.x) * 2;
       videoMemory[index] = c;
       videoMemory[index + 1] = color;
