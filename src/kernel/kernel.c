@@ -1,6 +1,7 @@
 #include "kernel.h"
 #include "../terminal/terminal.h"
 #include "../gdt/gdt.h"
+#include "../idt/idt.h"
 #include "../task/tss.h"
 #include "../memory/memory.h"
 
@@ -28,7 +29,9 @@ void init_kernel(){
 		gdt_load(gdt, sizeof(gdt) - 1);
 		terminal_write(" OK\n", 0x0A);
 
-		// init idt here
+		terminal_write("Loading Interrupt Descriptor Table (IDT)...", TERMINAL_DEFAULT_COLOR);
+		init_idt();
+		terminal_write(" OK\n", 0x0A);
 
 		// TSS Setup
 		memset(&tss, 0x00, sizeof(tss));
