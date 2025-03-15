@@ -3,14 +3,16 @@
 #include <stdint.h>
 
 void encode_gdt_entry(uint8_t* target, struct GDT_Structured source){
-    if ((source.limit > 65536) && ((source.limit & 0xFFF) != 0xFFF))
-    {
+    if ((source.limit > 65536) && ((source.limit & 0xFFF) != 0xFFF)){
         panic("encode_gdt_entry: Invalid argument\n");
     }
 
+		if (source.limit > 0xFFFFF){
+			panic("GDT cannot encode limits larger than 0xFFFFF");
+		}
+
     target[6] = 0x40;
-    if (source.limit > 65536)
-    {
+    if (source.limit > 65536){
         source.limit = source.limit >> 12;
         target[6] = 0xC0;
     }
