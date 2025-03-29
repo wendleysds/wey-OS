@@ -15,6 +15,7 @@ struct GDT_Structured{
     uint32_t base;
     uint32_t limit;
     uint8_t type;
+		uint8_t flags;
 }__attribute__((packed));
 
 void gdt_load(struct GDT* gdt, int size);

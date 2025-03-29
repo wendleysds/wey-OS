@@ -10,12 +10,12 @@
 struct TSS tss;
 struct GDT gdt[TOTAL_GDT_SEGMENTS];
 struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
-		{.base = 0x00, .limit = 0x00, .type = 0x00},                 // NULL Segment
-    {.base = 0x00, .limit = 0xffffffff, .type = 0x9a},           // Kernel code segment
-    {.base = 0x00, .limit = 0xffffffff, .type = 0x92},           // Kernel data segment
-    {.base = 0x00, .limit = 0xffffffff, .type = 0xf8},           // User code segment
-    {.base = 0x00, .limit = 0xffffffff, .type = 0xf2},           // User data segment
-    {.base = (uint32_t)&tss, .limit=sizeof(tss), .type = 0xE9}   // TSS Segment
+		{.base = 0x00, .limit = 0x00, .type = 0x00, .flags = 0x0},                     // NULL Segment
+    {.base = 0x00, .limit = 0xFFFFF, .type = 0x9a, .flags = 0xC},                  // Kernel code segment
+    {.base = 0x00, .limit = 0xFFFFF, .type = 0x92, .flags = 0xC},                  // Kernel data segment
+    {.base = 0x00, .limit = 0xFFFFF, .type = 0xf8, .flags = 0xC},                  // User code segment
+    {.base = 0x00, .limit = 0xFFFFF, .type = 0xf2, .flags = 0xC},                  // User data segment
+    {.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0x89, .flags = 0x0} // TSS Segment
 };
 
 void init_kernel(){

@@ -11,12 +11,6 @@ void encode_gdt_entry(uint8_t* target, struct GDT_Structured source){
 			panic("GDT cannot encode limits larger than 0xFFFFF");
 		}
 
-    target[6] = 0x40;
-    if (source.limit > 65536){
-        source.limit = source.limit >> 12;
-        target[6] = 0xC0;
-    }
-
     // Encodes the limit
     target[0] = source.limit & 0xFF;
     target[1] = (source.limit >> 8) & 0xFF;
@@ -30,6 +24,9 @@ void encode_gdt_entry(uint8_t* target, struct GDT_Structured source){
 
     // Set the type
     target[5] = source.type;
+
+		// Encode the flags
+		target[6] |= (source.flags << 4);
 }
 
 void gdt_structured_to_gdt(struct GDT *gdt, struct GDT_Structured *structured_gdt, int total_entires){
