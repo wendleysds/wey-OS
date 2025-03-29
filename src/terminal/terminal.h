@@ -12,6 +12,7 @@ void terminal_cursor_disable();
 
 void terminal_clear();
 void terminal_write(const char* message, unsigned char color);
+void terminal_writef(unsigned char color, const char* format, ...);
 void terminal_backspace();
 
 #endif

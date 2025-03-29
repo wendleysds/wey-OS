@@ -1,6 +1,7 @@
 #include "terminal.h"
 #include "../io/io.h"
 #include <stdint.h>
+#include <stdarg.h>
 
 #define VGA_MEMORY (volatile char*)0xB8000
 #define VGA_WIDTH 80
@@ -10,6 +11,7 @@
 #define DEFAULT_CURSOR_END 7
 
 #define DEFAULT_TAB_DISTANCE 4
+
 struct Cursor{
 	uint8_t x, y;
 	uint8_t enabled;
@@ -17,6 +19,28 @@ struct Cursor{
 
 static struct Cursor cursor;
 static volatile char* videoMemory = VGA_MEMORY;
+
+void itoa(int value, char* str, int base){
+	char* digits = "0123456789ABCDEF";
+	char buffer[32];
+	int i = 0, j = 0; 
+
+	if (value < 0 && base == 10){
+		str[j++] = '-';
+		value = -value;
+	}
+
+	do {
+		buffer[i++] = digits[value % base];
+		value /= base;
+	} while(value);
+
+	while(i > 0){
+		str[j++] = buffer[--i];
+	}
+
+	str[j] = '\0';
+}
 
 void terminal_init(){
 	cursor.y = 0;
@@ -66,7 +90,6 @@ void scroll_terminal(){
 
 				videoMemory[to] = videoMemory[from]; // Copy char
 				videoMemory[to + 1] = videoMemory[from + 1]; // Copy color
-
 			}
 		}
 
@@ -129,12 +152,51 @@ void terminal_backspace(){
 	update_cursor();
 }
 
-
 void terminal_write(const char* chars, unsigned char color) {
 	for(int i = 0; chars[i] != '\0'; i++){
 		terminal_putchar(chars[i], color);
 	}
 	
+	update_cursor();
+}
+
+void terminal_writef(unsigned char color, const char *format, ...){
+	va_list args;
+  va_start(args, format);
+
+  char buffer[32];
+  for (const char *ptr = format; *ptr; ptr++) {
+		if (*ptr == '%') {
+			ptr++;
+			switch (*ptr) {
+				case 'c':
+					terminal_putchar(va_arg(args, int), color);
+					break;
+				case 's':
+					for (char *s = va_arg(args, char*); *s; s++)
+						terminal_putchar(*s, color);
+					break;
+				case 'd':
+					itoa(va_arg(args, int), buffer, 10);
+					for (char *s = buffer; *s; s++)
+						terminal_putchar(*s, color);
+					break;
+				case 'x':
+					itoa(va_arg(args, int), buffer, 16);
+					for (char *s = buffer; *s; s++)
+						terminal_putchar(*s, color);
+					break;
+				default:
+					terminal_putchar('%', color);
+					terminal_putchar(*ptr, color);
+					break;
+			}
+		} else {
+			terminal_putchar(*ptr, color);
+		}
+	}
+	va_end(args);
+
 	update_cursor();
 }
 
