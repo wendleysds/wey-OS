@@ -5,6 +5,5 @@
 #define KERNEL_DATA_SELECTOR 0x10
 
 #define TOTAL_GDT_SEGMENTS 6
-#define TOTAL_INTERRUPTS 256
 
 #endif
