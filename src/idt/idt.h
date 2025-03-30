@@ -16,8 +16,9 @@ struct IDTr_ptr{
 	uint32_t base;
 }__attribute__((packed));
 
-
 void init_idt();
-void set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
+void set_idt(uint8_t interrupt_num, void* address);
+void enable_interrupts();
+void disable_interrupts();
 
 #endif
