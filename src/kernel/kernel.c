@@ -19,10 +19,6 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
   {.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
-int div(int a, int b){
-	return a / b;
-}
-
 void init_kernel(){
   terminal_write("\nInitializing kernel...\n", TERMINAL_DEFAULT_COLOR);
 
@@ -46,8 +42,6 @@ void init_kernel(){
 	terminal_write("Loading Task State Segment (TSS)...", TERMINAL_DEFAULT_COLOR);
 	tss_load(0x28);
 	terminal_write(" OK\n", 0x0A);
-
-	div(1, 0);
 
 	panic("Kernel not implemented alery!");
 }
