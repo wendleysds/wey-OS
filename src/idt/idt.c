@@ -7,14 +7,8 @@
 
 #include <stdint.h>
 
-#define TOTAL_ISR_INTERRUPTS 32 // 0  - 31
-
-struct _InterruptFrame {
-  uint32_t ds;
-  uint32_t edi, esi, ebp, kernelesp, ebx, edx, ecx, eax;
-  uint32_t int_no, err_code;
-  uint32_t eip, cs, eflags, useresp, ss;
-} __attribute__((packed));
+#define TOTAL_ISR_INTERRUPTS 32 // 0 - 31
+#define TOTAL_IRQ_INTERRUPTS 16 // 0 - 15
 
 const char* _exceptionMessages[TOTAL_ISR_INTERRUPTS] = {
   "Division By Zero",
@@ -52,7 +46,9 @@ const char* _exceptionMessages[TOTAL_ISR_INTERRUPTS] = {
 };
 
 extern void load_idt(struct IDTr_ptr* ptr);
+
 extern void* isr_pointer_table[TOTAL_ISR_INTERRUPTS];
+extern void* irq_pointer_table[TOTAL_IRQ_INTERRUPTS];
 
 struct InterruptDescriptor idt[TOTAL_INTERRUPTS];
 struct IDTr_ptr idtr_ptr;
@@ -67,7 +63,7 @@ void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint
 }
 
 void set_idt(uint8_t interrupt_num, void* address){
-	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0xEE);
+	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
 }
 
 void init_idt(){
@@ -75,15 +71,21 @@ void init_idt(){
 	idtr_ptr.limit = sizeof(idt) - 1;
 	idtr_ptr.base = (uintptr_t)&idt[0];
 
+  // 0 -> 31
 	for(int i = 0; i < TOTAL_ISR_INTERRUPTS; i++){
 		set_idt(i, isr_pointer_table[i]);
 	}
+
+  // 32 -> 47          32           i < 48                 16 + 32
+  for(int i = TOTAL_ISR_INTERRUPTS; i < (TOTAL_ISR_INTERRUPTS + TOTAL_IRQ_INTERRUPTS); i++){
+    set_idt(i, irq_pointer_table[i]);
+  }
 
 	load_idt(&idtr_ptr);
 	enable_interrupts();
 }
 
-void print_frame(struct _InterruptFrame* frame){
+void print_frame(struct InterruptFrame* frame){
   terminal_writef(TERMINAL_DEFAULT_COLOR, 
     "\nds 0x%x edi 0x%x esi 0x%x ebp 0x%x\n", 
     frame->ds, frame->edi, frame->esi, frame->ebp
@@ -102,7 +104,7 @@ void print_frame(struct _InterruptFrame* frame){
   );
 }
 
-void __attribute__((cdecl)) interrupt_handler(struct _InterruptFrame* frame){
+void isr_handler(struct InterruptFrame* frame){
 	
 	if(frame->int_no < 32)
 		terminal_writef(TERMINAL_DEFAULT_COLOR, 
@@ -120,4 +122,36 @@ void __attribute__((cdecl)) interrupt_handler(struct _InterruptFrame* frame){
 	terminal_write("System Halted!\n", TERMINAL_DEFAULT_COLOR);
 
 	while(1);
+}
+
+void *irq_handlers[TOTAL_IRQ_INTERRUPTS] = {0x0};
+
+void irq_add_handler (int irq, void (*handler)(struct InterruptRegisters *r)){
+  if(irq < TOTAL_IRQ_INTERRUPTS){
+    irq_handlers[irq] = handler;
+  }   
+}
+
+void irq_remove_handler(int irq){
+  if(irq < TOTAL_IRQ_INTERRUPTS){
+    irq_handlers[irq] = 0;
+  }   
+}
+
+void irq_handler(struct InterruptFrame* frame){
+  void (*handler)(struct InterruptFrame* frame);
+  handler = irq_handlers[frame->int_no - 32];
+
+  terminal_write("\nInterrupt Request:\n", TERMINAL_DEFAULT_COLOR);
+  print_frame(frame);
+
+  if (handler){
+    handler(frame);
+  }
+
+  if (frame->int_no >= 40){
+    outb(0xA0, 0x20);
+  }
+
+  outb(0x20, 0x20);
 }
