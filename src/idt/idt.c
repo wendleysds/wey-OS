@@ -127,20 +127,30 @@ void isr_handler(struct InterruptFrame* frame){
 void *irq_handlers[TOTAL_IRQ_INTERRUPTS] = {0x0};
 
 void irq_add_handler (int irq, void (*handler)(struct InterruptRegisters *r)){
-  if(irq < TOTAL_IRQ_INTERRUPTS){
+  if(irq < 0 || irq > (TOTAL_IRQ_INTERRUPTS - 1)){
     irq_handlers[irq] = handler;
   }   
 }
 
 void irq_remove_handler(int irq){
-  if(irq < TOTAL_IRQ_INTERRUPTS){
+  if(irq < 0 || irq > (TOTAL_IRQ_INTERRUPTS - 1)){
     irq_handlers[irq] = 0;
   }   
 }
 
 void irq_handler(struct InterruptFrame* frame){
   void (*handler)(struct InterruptFrame* frame);
-  handler = irq_handlers[frame->int_no - 32];
+
+  int handlerIqr = frame->int_no - 32;
+
+  if(handlerIqr < 0 || handlerIqr > (TOTAL_IRQ_INTERRUPTS - 1)){
+    terminal_writef(TERMINAL_DEFAULT_COLOR, "\nInvalid Interrupt Request: '%d'\n", handlerIqr);
+    print_frame(frame);
+    outb(0x20, 0x20);
+    return;
+  }
+
+  handler = irq_handlers[handlerIqr];
 
   terminal_write("\nInterrupt Request:\n", TERMINAL_DEFAULT_COLOR);
   print_frame(frame);
