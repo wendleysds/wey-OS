@@ -23,9 +23,12 @@ struct InterruptFrame {
   uint32_t eip, cs, eflags, useresp, ss;
 } __attribute__((packed));
 
+typedef void(*INTERRUPT_CALLBACK_FUNCTION)(struct InterruptFrame* frame);
+
 void init_idt();
 void set_idt(uint8_t interrupt_num, void* address);
 void enable_interrupts();
 void disable_interrupts();
+void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback);
 
 #endif
