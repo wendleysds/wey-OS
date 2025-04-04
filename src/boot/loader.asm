@@ -18,15 +18,7 @@ start:
 	mov si, msg_init
 	call print_str
 
-	mov si, msg_disk_init
-	call print_str
-
-	mov bx, 0x1000
-	mov dh, 10
 	call disk_load
-
-	mov si, msg_disk_readed
-	call print_str
 
 	mov si, msg_topm
 	call print_str
@@ -40,18 +32,27 @@ start:
 
 	jmp CODE_SEG:init_pm
 
-; prints
-
 disk_load:
+	mov si, msg_disk_init
+	call print_str
 	pusha
+
 	mov ah, 0x02
-	mov al, 10
+	mov al, 20
 	mov ch, 0
 	mov cl, 2
 	mov dh, 0
+
+	xor bx, bx
+	mov es, bx
+	mov bx, 0x1000
 	int 0x13
+
 	jc disk_error
 	popa
+
+	mov si, msg_disk_readed
+	call print_str
 	ret
 
 disk_error:
