@@ -1,0 +1,11 @@
+CompileFlags:
+  Add: [
+    -Wall, 
+    -Wextra, 
+    -Isrc/include]
+    -ffreestanding, 
+    -nostdinc, 
+    -nostdlibinc, 
+    -fno-builtin
+  ]
+

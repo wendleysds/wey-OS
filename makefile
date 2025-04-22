@@ -2,7 +2,7 @@ TARGET = kernel.img
 
 # Compilers
 CC = i686-elf-gcc
-CFLAGS = -m32 -ffreestanding -nostdlib -Werror
+CFLAGS = -Isrc/include -m32 -ffreestanding -nostdlib -Werror
 
 ASM = nasm
 ASMFLAGS =
@@ -24,11 +24,11 @@ LINKER_FILE = $(SRC_DIR)/linker.ld
 BOOTLOADER_BIN = $(BIN_DIR)/bootloader.bin
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 
-KERNEL_ASM = $(OBJ_DIR)/kernel.asm.o
+KERNEL_ASM = $(OBJ_DIR)/core/kernel.asm.o
 
 SRC_C_FILES = $(shell find $(SRC_DIR) -type f -name "*.c")
 
-EXCLUDE_ASM_FILES = $(SRC_DIR)/kernel/kernel.asm $(SRC_DIR)/boot/loader.asm
+EXCLUDE_ASM_FILES = $(SRC_DIR)/core/kernel.asm $(SRC_DIR)/boot/loader.asm
 SRC_ASM_FILES = $(filter-out $(EXCLUDE_ASM_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm"))
 
 # Object files
@@ -60,7 +60,8 @@ $(KERNEL_BIN): $(KERNEL_ASM) $(C_OBJ_FILES) $(ASM_OBJ_FILES) | $(BIN_DIR)
 	@echo "ASM files: $(ASM_OBJ_FILES)"
 	$(LD) $(LDFLAGS) -T $(LINKER_FILE) -o $@ $^ --oformat binary
 
-$(KERNEL_ASM): $(SRC_DIR)/kernel/kernel.asm
+$(KERNEL_ASM): $(SRC_DIR)/core/kernel.asm
+	@mkdir -p $(OBJ_DIR)/core
 	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
 
 # Compile Objects
