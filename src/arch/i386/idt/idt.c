@@ -1,9 +1,9 @@
-#include "idt.h"
-#include "../terminal/terminal.h"
-#include "../config.h"
-#include "../io/io.h"
-#include "../memory/memory.h"
-#include "../kernel/kernel.h"
+#include <arch/i386/idt.h>
+#include <drivers/terminal.h>
+#include <config/config.h>
+#include <arch/io.h>
+#include <lib/mem.h>
+#include <core/kernel.h>
 
 #include <stdint.h>
 

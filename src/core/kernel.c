@@ -1,11 +1,11 @@
-#include "kernel.h"
-#include "../terminal/terminal.h"
-#include "../gdt/gdt.h"
-#include "../idt/idt.h"
-#include "../task/tss.h"
-#include "../memory/memory.h"
+#include <core/kernel.h>
+#include <drivers/terminal.h>
+#include <arch/i386/gdt.h>
+#include <arch/i386/idt.h>
+#include <arch/i386/tss.h>
+#include <lib/mem.h>
 
-#include "../config.h"
+#include <config/config.h>
 
 struct TSS tss;
 struct GDT gdt[TOTAL_GDT_SEGMENTS];

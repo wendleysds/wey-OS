@@ -2,7 +2,7 @@ TARGET = kernel.img
 
 # Compilers
 CC = i686-elf-gcc
-CFLAGS = -Isrc/include -m32 -ffreestanding -nostdlib -Werror
+CFLAGS = -Isrc/include -m32 -ffreestanding -nostdlib -Wall -Werror
 
 ASM = nasm
 ASMFLAGS =
@@ -20,7 +20,7 @@ IMG_DIR = $(BUILD_DIR)/img
 BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR)
 
 # Files
-LINKER_FILE = $(SRC_DIR)/linker.ld
+LINKER_FILE = linker.ld
 BOOTLOADER_BIN = $(BIN_DIR)/bootloader.bin
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 

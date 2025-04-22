@@ -1,5 +1,5 @@
-#include "terminal/terminal.h"
-#include "kernel/kernel.h"
+#include <drivers/terminal.h>
+#include <core/kernel.h>
 
 void kmain(){
 	terminal_init();

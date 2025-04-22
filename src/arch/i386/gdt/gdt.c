@@ -1,5 +1,5 @@
-#include "gdt.h"
-#include "../kernel/kernel.h"
+#include <arch/i386/gdt.h>
+#include <core/kernel.h>
 #include <stdint.h>
 
 void encode_gdt_entry(uint8_t* target, struct GDT_Structured source){

@@ -1,5 +1,5 @@
-#include "terminal.h"
-#include "../io/io.h"
+#include <drivers/terminal.h>
+#include <arch/io.h>
 #include <stdint.h>
 #include <stdarg.h>
 
