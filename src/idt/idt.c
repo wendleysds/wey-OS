@@ -63,7 +63,7 @@ void set_idt(uint8_t interrupt_num, void* address){
 	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
 }
 
-void _idt_clock(){
+void _idt_clock(struct InterruptFrame* frame){
 	terminal_write("\n\nTimer (PIT)\n", TERMINAL_DEFAULT_COLOR);
 	outb(0x20, 0x20);
 }
@@ -77,10 +77,10 @@ void init_idt(){
 		set_idt(i, interrupt_pointer_table[i]);
 	}
 
-	set_idt(0x20, _idt_clock);
-
 	load_idt(&idtr_ptr);
 	enable_interrupts();
+
+	set_idt(0x20, _idt_clock);
 }
 
 void _print_frame(struct InterruptFrame* frame){
@@ -120,15 +120,17 @@ void interrupt_handler(struct InterruptFrame* frame){
 	else{
 		if(frame->int_no < 32){
 			terminal_writef(TERMINAL_DEFAULT_COLOR, 
-					"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x",
+					"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
 					frame->int_no, frame->int_no, _exceptionMessages[frame->int_no], frame->eip);
 
-			terminal_write("\n\nSystem Halted!\n", TERMINAL_DEFAULT_COLOR);
+			_print_frame(frame);
+
+			terminal_write("System Halted!\n", TERMINAL_DEFAULT_COLOR);
 			while(1);
 		}
 		else{
 			terminal_writef(TERMINAL_DEFAULT_COLOR, 
-					"\n\nUnhandled Interrupt %d <0x%x> : '%s' at 0x%x",
+					"\n\nUnhandled Interrupt %d <0x%x> : '%s' at 0x%x\n",
 					frame->int_no, frame->int_no, _exceptionMessages[frame->int_no], frame->eip);
 		}
 
