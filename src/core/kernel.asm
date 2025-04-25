@@ -33,9 +33,11 @@ _start:
   ; End remap of the master PIC
 
 	call kmain
-
 	hlt
-	jmp $
+.halt_kernel:
+	cli
+	hlt
+	jmp .halt_kernel
 
 kernel_registers:
   mov ax, DATA_SEG
@@ -44,3 +46,5 @@ kernel_registers:
   mov gs, ax
   mov fs, ax
   ret
+
+times	512-($ - $$) db 0

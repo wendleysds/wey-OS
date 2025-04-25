@@ -1,4 +1,5 @@
 #include <drivers/terminal.h>
+#include <lib/utils.h>
 #include <arch/io.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -19,28 +20,6 @@ struct Cursor{
 
 static struct Cursor cursor;
 static volatile char* videoMemory = VGA_MEMORY;
-
-void itoa(int value, char* str, int base){
-	char* digits = "0123456789ABCDEF";
-	char buffer[32];
-	int i = 0, j = 0; 
-
-	if (value < 0 && base == 10){
-		str[j++] = '-';
-		value = -value;
-	}
-
-	do {
-		buffer[i++] = digits[value % base];
-		value /= base;
-	} while(value);
-
-	while(i > 0){
-		str[j++] = buffer[--i];
-	}
-
-	str[j] = '\0';
-}
 
 void terminal_init(){
 	cursor.y = 0;
@@ -152,15 +131,7 @@ void terminal_backspace(){
 	update_cursor();
 }
 
-void terminal_write(const char* chars, unsigned char color) {
-	for(int i = 0; chars[i] != '\0'; i++){
-		terminal_putchar(chars[i], color);
-	}
-	
-	update_cursor();
-}
-
-void terminal_writef(unsigned char color, const char *format, ...){
+void terminal_write(unsigned char color, const char *format, ...){
 	va_list args;
   va_start(args, format);
 
