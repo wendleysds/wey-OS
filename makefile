@@ -79,6 +79,7 @@ $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm | $(OBJ_DIR)
 -include $(C_OBJ_FILES:.o=.d)
 
 all:
+	make clean
 	make
 	make kernel.img
 

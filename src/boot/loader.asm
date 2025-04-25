@@ -1,4 +1,4 @@
-[ORG 0x7c00]
+ORG 0x7c00
 BITS 16
 
 CODE_SEG equ gdt_code - gdt_start
@@ -12,75 +12,20 @@ start:
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
+	mov fs, ax
+	mov es, ax
+
 	mov sp, 0x7c00
 	sti
-
-	mov si, msg_init
-	call print_str
-
-	call disk_load
-
-	mov si, msg_topm
-	call print_str
 
 .load_pm:
 	cli
 	lgdt[gdt_descriptor]
 	mov eax, cr0
-	or al, 0x1
+	or eax, 0x1
 	mov cr0, eax
 
 	jmp CODE_SEG:init_pm
-
-disk_load:
-	mov si, msg_disk_init
-	call print_str
-	pusha
-
-	mov ah, 0x02
-	mov al, 20
-	mov ch, 0
-	mov cl, 2
-	mov dh, 0
-
-	xor bx, bx
-	mov es, bx
-	mov bx, 0x1000
-	int 0x13
-
-	jc disk_error
-	popa
-
-	mov si, msg_disk_readed
-	call print_str
-	ret
-
-disk_error:
-	mov si, msg_disk_error
-	call print_str
-	hlt
-	jmp $
-
-; print
-
-print_str:
-	mov ah, 0x0E
-.print_loop:
-	lodsb
-	or al, al
-	jz .print_done
-	int 0x10
-	jmp .print_loop
-.print_done:
-	ret
-
-;print_str messages
-
-msg_init: db "Initializing bootloader...", 0x0a, 0x0d, 0
-msg_disk_init: db "Initializing disk...", 0x0a, 0x0d, 0
-msg_disk_readed: db "Disk readed successfuly.", 0x0a, 0x0d, 0
-msg_disk_error: db "Disk read error!", 0x0a, 0x0d, 0
-msg_topm: db "Entering protected mode...", 0x0a, 0x0d, 0
 
 ; GTD
 
@@ -108,7 +53,7 @@ gdt_data:
 gdt_end:
 
 gdt_descriptor:
-	dw gdt_end - gdt_start-1
+	dw gdt_end - gdt_start - 1
 	dd gdt_start
 
 [BITS 32]
@@ -124,11 +69,65 @@ init_pm:
 	or al, 2
 	out 0x92, al
 
-	jmp 0x1000
+	; ATA LBA args
+	mov eax, 1
+	mov ecx, 100
+	mov edi, 0x0100000
+	call ata_lba_read
 
-	hlt
-	jmp $
+	jmp CODE_SEG:0x0100000
+
+ata_lba_read:
+  mov ebx, eax, ; Backup the LBA
+	
+  ; Send the highest 8 bits of the lba to hard disk controller
+  shr eax, 24
+  or eax, 0xE0 ; Select the master drive
+  mov dx, 0x1F6
+  out dx, al
+
+  ; Send the total sectors to read
+  mov eax, ecx
+  mov dx, 0x1F2
+  out dx, al
+
+  ; Send bits of the LBA
+  mov eax, ebx ; Restore the backup LBA
+  mov dx, 0x1F3
+  out dx, al
+
+  ; Send more bits of the LBA
+  mov dx, 0x1F4
+  mov eax, ebx
+  shr eax, 8
+  out dx, al
+
+  ; Send upper 16 bits of the LBA
+  mov dx, 0x1F5
+  mov eax, ebx
+  shr eax, 16
+  out dx, al
+
+  mov dx, 0x1f7
+  mov al, 0x20
+  out dx, al
+
+  ; Read all sectors into memory
+.next_sector:
+  push ecx
+
+.try_again:
+  mov dx, 0x1f7
+  in al, dx
+  test al, 8
+  jz .try_again
+
+  mov ecx, 256 ; 256 words at time
+  mov dx, 0x1F0
+  rep insw
+  pop ecx
+  loop .next_sector
+  ret
 
 times 510-($ - $$) db 0
 dw 0xAA55
-
