@@ -24,28 +24,17 @@ disable_interrupts:
 	cli
 	ret
 
-int_common_stub:
-	pushad
-
-	xor eax, eax
-	mov ax, ds
-	push eax
-
-	push esp
-	call interrupt_handler
-	add esp, 8
-
-	pop eax
-	popad
-	iret
 
 %macro interrupt 1
 	global int%1
 	int%1:
-		push 0
-		push %1
-		jmp int_common_stub
-		ret
+		pushad
+		push esp
+		push dword %1
+		call interrupt_handler
+		add esp, 8
+		popad
+		iret
 %endmacro
 
 %assign i 0

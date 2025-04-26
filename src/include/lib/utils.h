@@ -2,5 +2,6 @@
 #define _UTILS_H
 
 void itoa(int value, char* result, int base);
+void sleep(int cycles);
 
 #endif

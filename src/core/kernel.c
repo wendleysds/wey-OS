@@ -1,5 +1,6 @@
 #include <core/kernel.h>
 #include <drivers/terminal.h>
+#include <drivers/keyboard.h>
 #include <arch/i386/gdt.h>
 #include <arch/i386/idt.h>
 #include <arch/i386/tss.h>
@@ -34,21 +35,11 @@ void init_kernel(){
 	init_idt();
 	terminal_write(0x0A, " OK\n");
 
-	terminal_write(TERMINAL_DEFAULT_COLOR, "Initializing PIT...");
-	terminal_write(0x0A, " OK\n");
+	terminal_write(0x0A, "\nKERNEL READY!\n\n");
 
-	/*
-	// TSS Setup
-	memset(&tss, 0x00, sizeof(tss));
-	tss.esp0 = 0x6000000;
-	tss.ss0 = KERNEL_DATA_SELECTOR;
-
-	terminal_write(TERMINAL_DEFAULT_COLOR, "Loading Task State Segment (TSS)...");
-	tss_load(0x28);
-	terminal_write(0x0A, " OK\n");
-	*/
-
-	panic("Kernel no implemented!");
+	while(1){
+		__asm__ volatile ("hlt");
+	}
 }
 
 void panic(const char* msg){

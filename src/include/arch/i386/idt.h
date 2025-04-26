@@ -17,10 +17,8 @@ struct IDTr_ptr{
 }__attribute__((packed));
 
 struct InterruptFrame {
-  uint32_t ds;
   uint32_t edi, esi, ebp, kernelesp, ebx, edx, ecx, eax;
-  uint32_t int_no, err_code;
-  uint32_t eip, cs, eflags, useresp, ss;
+  uint32_t ip, cs, eflags, useresp, ss;
 } __attribute__((packed));
 
 typedef void(*INTERRUPT_CALLBACK_FUNCTION)(struct InterruptFrame* frame);

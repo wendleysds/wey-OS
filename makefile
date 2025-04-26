@@ -44,7 +44,7 @@ $(BUILD_DIRS):
 $(TARGET): $(BOOTLOADER_BIN) $(KERNEL_BIN)
 	@echo "Creating os image..."
 	mkdir -p $(IMG_DIR)
-	dd if=/dev/zero of=$(IMG_DIR)/$@ bs=512 count=2880
+	dd if=/dev/zero of=$(IMG_DIR)/$@ bs=1048576 count=16
 	dd if=$(BOOTLOADER_BIN) of=$(IMG_DIR)/$@ conv=notrunc
 	dd if=$(KERNEL_BIN) of=$(IMG_DIR)/$@ bs=512 seek=1 conv=notrunc
 	@echo "Created img in $(IMG_DIR)/$@"
@@ -88,3 +88,7 @@ run:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+disassembly-img:
+	i686-elf-objdump -D -b binary -m i386 -M intel build/img/kernel.img | less
+
