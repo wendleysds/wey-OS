@@ -66,7 +66,6 @@ void _set_idt(uint8_t interrupt_num, void* address){
 }
 
 void _PIC_clock(struct InterruptFrame* frame){
-	terminal_write(TERMINAL_DEFAULT_COLOR, "[PIC TIMER] ");
 	outb(0x20, 0x20);
 }
 

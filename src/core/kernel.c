@@ -35,6 +35,9 @@ void init_kernel(){
 	init_idt();
 	terminal_write(0x0A, " OK\n");
 
+	init_keyboard();
+	terminal_cursor_enable();
+
 	terminal_write(0x0A, "\nKERNEL READY!\n\n");
 
 	while(1){
