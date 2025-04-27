@@ -8,8 +8,8 @@
 #define VGA_WIDTH 80
 #define VGA_HEIGTH 25
 
-#define DEFAULT_CURSOR_START 6
-#define DEFAULT_CURSOR_END 7
+#define DEFAULT_CURSOR_START 11
+#define DEFAULT_CURSOR_END 12
 
 #define DEFAULT_TAB_DISTANCE 4
 
@@ -45,11 +45,18 @@ void terminal_cursor_enable(){
 }
 
 void terminal_cursor_enable_SE(uint8_t cursor_start, uint8_t cursor_end){
+	if(cursor_start > cursor_end){
+		terminal_write(0x04, "error enabling cursor!\n   ");
+		terminal_write(TERMINAL_DEFAULT_COLOR, "'cursor_start' must be greater than 'cursor_end'");
+		return;
+	}
+
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
 
 	outb(0x3D4, 0x0B);
 	outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
+
 	cursor.enabled = 1;
 	update_cursor();
 }
