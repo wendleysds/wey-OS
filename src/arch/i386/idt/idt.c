@@ -1,6 +1,6 @@
 #include <arch/i386/idt.h>
 #include <drivers/terminal.h>
-#include <config/config.h>
+#include <def/config.h>
 #include <arch/io.h>
 #include <lib/mem.h>
 #include <core/kernel.h>

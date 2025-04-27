@@ -1,12 +1,17 @@
 #include <core/kernel.h>
+
 #include <drivers/terminal.h>
 #include <drivers/keyboard.h>
+
 #include <arch/i386/gdt.h>
 #include <arch/i386/idt.h>
 #include <arch/i386/tss.h>
+
 #include <lib/mem.h>
 
-#include <config/config.h>
+#include <memory/kheap.h>
+
+#include <def/config.h>
 
 struct TSS tss;
 struct GDT gdt[TOTAL_GDT_SEGMENTS];
@@ -20,8 +25,14 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
   {.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
+void init_log(const char* msg, void (*init_method)(void)){
+	terminal_write(TERMINAL_DEFAULT_COLOR, msg);
+	init_method();
+	terminal_write(0x0A, " OK\n");
+}
+
 void init_kernel(){
-  terminal_write(TERMINAL_DEFAULT_COLOR, "\nInitializing kernel...\n");
+  terminal_write(0x0A, "\nINITIALIZING KERNEL...\n\n");
 
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));
@@ -31,9 +42,9 @@ void init_kernel(){
 	gdt_load(gdt, sizeof(gdt) - 1);
 	terminal_write(0x0A, " OK\n");
 
-	terminal_write(TERMINAL_DEFAULT_COLOR, "Initializing Interrupt Descriptor Table (IDT)...");
-	init_idt();
-	terminal_write(0x0A, " OK\n");
+	init_log("Initializing kernel heap...", init_kheap);
+
+	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
 
 	init_keyboard();
 	terminal_cursor_enable();
@@ -45,8 +56,16 @@ void init_kernel(){
 	}
 }
 
-void panic(const char* msg){
-	terminal_write(TERMINAL_DEFAULT_COLOR, "\nPanic!\n  %s", msg);
-	while (1);
+void panic(const char* fmt, ...){
+	terminal_write(TERMINAL_DEFAULT_COLOR, "\nPanic!\n  ");
+
+	va_list args;
+  va_start(args, fmt);
+  terminal_vwrite(TERMINAL_DEFAULT_COLOR, fmt, args);
+  va_end(args);
+
+	while(1){
+		__asm__ volatile ("hlt");
+	}
 }
 
