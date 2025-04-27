@@ -131,43 +131,47 @@ void terminal_backspace(){
 	update_cursor();
 }
 
-void terminal_write(unsigned char color, const char *format, ...){
-	va_list args;
-  va_start(args, format);
-
+void terminal_vwrite(unsigned char color, const char *format, va_list args) {
   char buffer[32];
+
   for (const char *ptr = format; *ptr; ptr++) {
 		if (*ptr == '%') {
 			ptr++;
 			switch (*ptr) {
 				case 'c':
 					terminal_putchar(va_arg(args, int), color);
-					break;
-				case 's':
-					for (char *s = va_arg(args, char*); *s; s++)
+          break;
+        case 's':
+        	for (char *s = va_arg(args, char*); *s; s++)
 						terminal_putchar(*s, color);
-					break;
-				case 'd':
-					itoa(va_arg(args, int), buffer, 10);
-					for (char *s = buffer; *s; s++)
-						terminal_putchar(*s, color);
-					break;
-				case 'x':
-					itoa(va_arg(args, int), buffer, 16);
-					for (char *s = buffer; *s; s++)
-						terminal_putchar(*s, color);
-					break;
-				default:
-					terminal_putchar('%', color);
-					terminal_putchar(*ptr, color);
-					break;
+          break;
+        case 'd':
+          itoa(va_arg(args, int), buffer, 10);
+          for (char *s = buffer; *s; s++)
+            terminal_putchar(*s, color);
+          break;
+        case 'x':
+          itoa(va_arg(args, int), buffer, 16);
+          for (char *s = buffer; *s; s++)
+            terminal_putchar(*s, color);
+          break;
+        default:
+          terminal_putchar('%', color);
+          terminal_putchar(*ptr, color);
+          break;
 			}
 		} else {
 			terminal_putchar(*ptr, color);
-		}
-	}
-	va_end(args);
+    }
+  }
 
 	update_cursor();
+}
+
+void terminal_write(unsigned char color, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  terminal_vwrite(color, format, args);
+  va_end(args);
 }
 
