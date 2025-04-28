@@ -4,6 +4,7 @@
 #include <drivers/terminal.h>
 #include <core/kernel.h>
 #include <def/config.h>
+#include <lib/mem.h>
 
 #include <stdint.h>
 
@@ -20,3 +21,17 @@ void init_kheap(){
 		panic("Failed to create kernel heap! STATUS CODE: %d", status);
 	}
 }
+
+void* kmalloc(size_t size){
+	return hmalloc(&kernelHeap, size);
+}
+
+void* kcalloc(size_t size){
+	return hcalloc(&kernelHeap, size);
+
+}
+
+void kfree(void *ptr){
+	hfree(&kernelHeap, ptr);
+}
+
