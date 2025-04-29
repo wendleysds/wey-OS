@@ -108,6 +108,15 @@ void terminal_putchar(char c, unsigned char color) {
 	else if(c == '\r'){
 		cursor.x = 0;
 	}
+	else if(c == '\b'){
+		if(cursor.x == 0){
+			return;
+		}
+
+		cursor.x--;
+		terminal_putchar(' ', color);
+		cursor.x--;
+	}
 	else {
       int index = (cursor.y * VGA_WIDTH + cursor.x) * 2;
       videoMemory[index] = c;

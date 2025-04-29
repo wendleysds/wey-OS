@@ -4,62 +4,67 @@
 #include <io.h>
 #include <stdint.h>
 
-char scancode_to_ascii[128] = {
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', // 0x00 - 0x09
-    '9', '0', '-', '=', '\b', // Backspace
-    '\t', // Tab
-    'q', 'w', 'e', 'r', // 0x10 - 0x13
-    't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', // Enter key
-    0, // Controle esquerdo (Ctrl)
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', // 0x1E - 0x29
-    0, // Shift esquerdo
-    '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 
-    0, // Shift direito
-    '*',
-    0,  // Alt esquerdo
-    ' ', // Espaço
-    0,  // CapsLock
-    // Teclas de função (F1 - F10)
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, // NumLock
-    0, // Scroll Lock
-    // Home, seta para cima, PageUp
-    0, // Home
-    0, // seta para cima
-    0, // Page Up
-    '-',
-    0, // seta para esquerda
-    0,
-    0, // seta para direita
-    '+',
-    0, // End
-    0, // seta para baixo
-    0, // Page Down
-    0, // Insert
-    0, // Delete
-    0, 0, 0,
-    0, // F11
-    0, // F12
-    0, // Tudo além é 0 por enquanto
+#define _PS2_PORT 0x64
+#define _PS2_KEYBOARD_ENABLE 0xAE
+
+#define _IQR_KEYBOARD_INTERRUPT 0x21
+
+#define _KEYBOARD_INPUT_PORT 0x60
+#define _KEYBOARD_CAPSLOCK 0x3A
+#define _KEYBOARD_KEY_RELEASED 0x80
+
+static char _scancode_to_ascii[128] = {
+    0x00, 0x1B, '1', '2', '3', '4', '5',
+    '6', '7', '8', '9', '0', '-', '=',
+    '\b', '\t', 'Q', 'W', 'E', 'R', 'T',
+    'Y', 'U', 'I', 'O', 'P', '[', ']',
+    '\n', 0x00, 'A', 'S', 'D', 'F', 'G',
+    'H', 'J', 'K', 'L', ';', '\'', '`', 
+    0x00, '\\', 'Z', 'X', 'C', 'V', 'B',
+    'N', 'M', ',', '.', '/', 0x00, '*',
+    0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, '7', '8', '9', '-', '4', '5',
+    '6', '+', '1', '2', '3', '0', '.',
+		'0'
 };
 
+static uint8_t capslock = 0;
 
-void _iqr_keyboard_handler(struct InterruptFrame* frame){
-	uint8_t scanCode = inb(0x60);
-
-	/*if(!(scanCode & 0x60)){
-		terminal_write(TERMINAL_DEFAULT_COLOR, "Scancode: 0x%x\n", scanCode);
-	}*/
-
-	if(scanCode < 128){
-		char c = scancode_to_ascii[scanCode];
-		terminal_write(TERMINAL_DEFAULT_COLOR, "%c", c);
+static char _handle_scancode(uint8_t scanCode){
+	if(scanCode > 128){
+		return 0x0;
 	}
 
+	char c = _scancode_to_ascii[scanCode];
+	if(!capslock){
+		if(c >= 'A' && c <= 'Z'){
+			c += 32;
+		}
+	}
+
+	return c;
+}
+
+void _iqr_keyboard_handler(struct InterruptFrame* frame){
+	uint8_t scanCode = inb(_KEYBOARD_INPUT_PORT);
+
+	if(!(scanCode & _KEYBOARD_KEY_RELEASED)){
+		if(scanCode == _KEYBOARD_CAPSLOCK){
+			capslock = !capslock;
+		}
+
+		char c = _handle_scancode(scanCode);
+		if(c != 0){
+			terminal_write(TERMINAL_DEFAULT_COLOR, "%c", c);
+		}
+	}
+	
 	outb(0x20, 0x20);
 }
 
 void init_keyboard(){
-	idt_register_callback(0x21, _iqr_keyboard_handler);
-	outb(0x64, 0xAE);
+	idt_register_callback(_IQR_KEYBOARD_INTERRUPT, _iqr_keyboard_handler);
+	outb(_PS2_PORT, _PS2_KEYBOARD_ENABLE);
 }
+
