@@ -1,6 +1,6 @@
 #include <drivers/terminal.h>
 #include <lib/utils.h>
-#include <arch/io.h>
+#include <io.h>
 #include <stdint.h>
 #include <stdarg.h>
 

@@ -1,7 +1,7 @@
 #include <drivers/keyboard.h>
 #include <drivers/terminal.h>
 #include <arch/i386/idt.h>
-#include <arch/io.h>
+#include <io.h>
 #include <stdint.h>
 
 char scancode_to_ascii[128] = {

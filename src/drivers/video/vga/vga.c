@@ -1,5 +1,5 @@
 #include <drivers/video/vga.h>
-#include <arch/io.h>
+#include <io.h>
 
 #define VGA_MEMORY (volatile char*)0xB8000
 #define VGA_WIDTH 80
