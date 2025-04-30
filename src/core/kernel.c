@@ -10,8 +10,12 @@
 #include <lib/mem.h>
 
 #include <memory/kheap.h>
+#include <memory/paging.h>
 
 #include <def/config.h>
+#include <stdint.h>
+
+static struct PagingDirectory* kernel_directory = 0x0;
 
 struct TSS tss;
 struct GDT gdt[TOTAL_GDT_SEGMENTS];
@@ -42,9 +46,33 @@ void init_kernel(){
 	gdt_load(gdt, sizeof(gdt) - 1);
 	terminal_write(0x0A, " OK\n");
 
+	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
+
 	init_log("Initializing kernel heap...", init_kheap);
 
-	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
+	terminal_write(TERMINAL_DEFAULT_COLOR, "Initializing paging...");
+
+	uint32_t tableAmount = 10;
+	kernel_directory = paging_new_directory(tableAmount, FPAGING_RW | FPAGING_P);
+
+	if(!kernel_directory){
+		terminal_write(0x0F, "\n");
+		panic("Failed to initializing paging!");
+	}else{
+		if(kernel_directory->tableCount != tableAmount){
+			terminal_write(0x0E, " WARNIG\n");
+			terminal_write(TERMINAL_DEFAULT_COLOR, 
+				"tables amount is diferent: %d to %d tables\n", 
+				tableAmount, kernel_directory->tableCount
+			);
+		}
+		else{
+			terminal_write(0x0A, " OK\n");
+		}
+
+		paging_switch(kernel_directory);
+		enable_paging();
+	}
 
 	init_keyboard();
 	terminal_cursor_enable();
