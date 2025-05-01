@@ -23,7 +23,7 @@ For studies and also to understand how an operating system works "under the hood
 - Basic terminal interface
 - Modular organization with support for future extensions
 
-## Estrutura de Diretórios
+## Directory Structure
 
 ```
 .
