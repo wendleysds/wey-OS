@@ -4,6 +4,15 @@
 #include <def/status.h>
 #include <stdint.h>
 
+/*
+ * Basic heap memory manager. 
+ *
+ * It uses a table of fixed-size blocks to manage memory allocations manually, without 
+ * relying on the system's malloc or similar functions. 
+ *
+ * The goal is to allocate, free, and reallocate memory using a custom heap structure.
+ */
+
 //flags
 
 #define _FBLOCK_USED 0x01
@@ -12,6 +21,7 @@
 #define _FBLOCK_HAS_NEXT 0x08
 #define _FBLOCK_IS_FIRST 0x04
 
+// Checks if the number of blocks in the heap table matches the actual memory region size
 static uint8_t _validate_table(struct HeapTable *table, void *ptr, void *end)
 {
   size_t size = (size_t)(end - ptr);
@@ -25,22 +35,27 @@ static uint8_t _validate_table(struct HeapTable *table, void *ptr, void *end)
   return SUCCESS;
 }
 
+// Verifies if a pointer is aligned to the HEAP_BLOCK_SIZE
 static uint8_t _is_aligned(void *ptr)
 {
   return ((uintptr_t)ptr % HEAP_BLOCK_SIZE) == 0;
 }
 
+// Rounds up a value to the nearest multiple of HEAP_BLOCK_SIZE
 // Optimization if the HEAP_BLOCK_SIZE is a multiple of 2 (2, 4, 8, 16, ...)
 static uint32_t _align_value_to_block_size(uint32_t val)
 {
   return (val + HEAP_BLOCK_SIZE - 1) & ~(HEAP_BLOCK_SIZE - 1);
 }
 
-static int _get_block_status_flag(uint8_t entry)
+// Get the entry flags (used/free)
+static int _get_block_entry_flag(uint8_t entry)
 {
   return entry & 0x0F;
 }
 
+// Finds a sequence of contiguous free blocks in the heap large 
+// enough to satisfy an allocation request
 int _get_start_block(struct Heap *heap, uint32_t totalBlocks)
 {
   struct HeapTable *table = heap->table;
@@ -49,14 +64,14 @@ int _get_start_block(struct Heap *heap, uint32_t totalBlocks)
 
   for (size_t i = 0; i < table->total; i++)
   {
-    if (_get_block_status_flag(table->blockEntries[i]) == _FBLOCK_FREE)
+    if (_get_block_entry_flag(table->blockEntries[i]) == _FBLOCK_FREE) // Verify if current block is free
     {
-      if (startIndex == -1)
+      if (startIndex == -1) // if this is the first block
         startIndex = i;
 
-      consecutiveFreeBlocks++;
+      consecutiveFreeBlocks++; 
 
-      if (consecutiveFreeBlocks == totalBlocks)
+      if (consecutiveFreeBlocks == totalBlocks) 
       {
         return startIndex;
       }
@@ -116,11 +131,12 @@ int _address_to_block(struct Heap *heap, void *address)
   return ((int)(address - heap->startAddress)) / HEAP_BLOCK_SIZE;
 }
 
+// Finds free blocks and marks them as allocated, returning a pointer to the memory
 void *_malloc_blocks(struct Heap *heap, uint32_t totalBlocks)
 {
   void *address = 0;
 
-  int start_block = _get_start_block(heap, totalBlocks);
+  int start_block = _get_start_block(heap, totalBlocks); // Get free area
   if (start_block < 0)
   {
     return 0x0;
@@ -172,7 +188,10 @@ void *hcalloc(struct Heap *heap, size_t size)
   return ptr;
 }
 
-// Poor realloc
+// A basic and inefficient version of realloc
+//
+// Avoid using it!! 
+//  -> Always allocates new memory and copies over the old data.
 void *hrealloc(struct Heap *heap, void *ptr, size_t newSize)
 {
   if (!ptr)

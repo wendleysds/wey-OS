@@ -8,6 +8,7 @@
 #include <arch/i386/tss.h>
 
 #include <lib/mem.h>
+#include <lib/utils.h>
 
 #include <memory/kheap.h>
 #include <memory/paging.h>
@@ -15,11 +16,17 @@
 #include <def/config.h>
 #include <stdint.h>
 
+/*
+ * Kernel entry
+ */ 
+
+// Kernel Page
 static struct PagingDirectory* kernel_directory = 0x0;
 
 struct TSS tss;
 struct GDT gdt[TOTAL_GDT_SEGMENTS];
 
+// Global Descriptor Table config
 struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
 	{.base = 0x00, .limit = 0x00, .type = 0x00, .flags = 0x0},                     // NULL Segment
   {.base = 0x00, .limit = 0xFFFFF, .type = 0x9a, .flags = 0xC},                  // Kernel code segment
@@ -55,30 +62,25 @@ void init_kernel(){
 	uint32_t tableAmount = 10;
 	kernel_directory = paging_new_directory(tableAmount, FPAGING_RW | FPAGING_P);
 
-	if(!kernel_directory){
+	// Test if the kernel page directory is allocated correctly 
+	if(!kernel_directory || kernel_directory->tableCount != tableAmount){
 		terminal_write(0x0F, "\n");
 		panic("Failed to initializing paging!");
 	}else{
-		if(kernel_directory->tableCount != tableAmount){
-			terminal_write(0x0E, " WARNIG\n");
-			terminal_write(TERMINAL_DEFAULT_COLOR, 
-				"tables amount is diferent: %d to %d tables\n", 
-				tableAmount, kernel_directory->tableCount
-			);
-		}
-		else{
-			terminal_write(0x0A, " OK\n");
-		}
-
+		terminal_write(0x0A, " OK\n");
 		paging_switch(kernel_directory);
 		enable_paging();
 	}
 
+	// Start drivrers
 	init_keyboard();
+
+	terminal_clear();
+
+	terminal_write(0x0A, "KERNEL READY\n\n");
 	terminal_cursor_enable();
 
-	terminal_write(0x0A, "\nKERNEL READY!\n\n");
-
+	// Main loop
 	while(1){
 		__asm__ volatile ("hlt");
 	}

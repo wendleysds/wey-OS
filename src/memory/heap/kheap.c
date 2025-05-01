@@ -6,6 +6,10 @@
 #include <def/config.h>
 #include <lib/mem.h>
 
+/*
+ * Kernel heap manager
+ */
+
 #include <stdint.h>
 
 static struct Heap kernelHeap;

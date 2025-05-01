@@ -2,6 +2,10 @@
 #include <core/kernel.h>
 #include <stdint.h>
 
+/*
+ * Global Descriptor Table Entry Configurator and Loader
+ */
+
 void encode_gdt_entry(uint8_t* target, struct GDT_Structured source){
     if ((source.limit > 65536) && ((source.limit & 0xFFF) != 0xFFF)){
         panic("encode_gdt_entry: Invalid argument\n");

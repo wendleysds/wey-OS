@@ -1,6 +1,11 @@
 #include <drivers/terminal.h>
 #include <core/kernel.h>
 
+/*
+ * Main Protect Mode entry module 
+ * 
+ * */
+
 void kmain(){
 	terminal_init();
 	terminal_cursor_disable();

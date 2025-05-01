@@ -4,6 +4,10 @@
 #include <io.h>
 #include <stdint.h>
 
+/*
+ * Simple PS/2 keyboard driver
+ */
+
 #define _PS2_PORT 0x64
 #define _PS2_KEYBOARD_ENABLE 0xAE
 

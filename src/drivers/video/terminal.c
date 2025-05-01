@@ -4,6 +4,21 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+/*
+ * Main output module
+ *
+ * TODO: Rewrite to be a "Wrapper" VGA and VESA methods
+ *
+ * like:
+ *
+ * #ifdef USE_VGA
+ * 	#define terminal_putchar(c, x, y, color) vga_putchar(c, x, y, color)
+ * #else
+ *	#define terminal_putchar(c, x, y, color) vesa_putchar(c, x, y, color)
+ * #endif
+ *
+ */
+
 #define VGA_MEMORY (volatile char*)0xB8000
 #define VGA_WIDTH 80
 #define VGA_HEIGTH 25
