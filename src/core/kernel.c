@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 /*
- * Kernel entry
+ * 32 bit Kernel entry
  */ 
 
 // Kernel Page
@@ -42,8 +42,10 @@ void init_log(const char* msg, void (*init_method)(void)){
 	terminal_write(0x0A, " OK\n");
 }
 
-void init_kernel(){
-  terminal_write(0x0A, "\nINITIALIZING KERNEL...\n\n");
+void kmain(){
+	terminal_init();
+  terminal_cursor_disable();
+	terminal_clear();
 
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));
