@@ -16,8 +16,8 @@
 #include <def/config.h>
 #include <stdint.h>
 
-/*
- * 32 bit Kernel entry
+/* 
+ * Main module for the protected-mode kernel code
  */ 
 
 // Kernel Page

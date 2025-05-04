@@ -1,6 +1,20 @@
-extern void load_pm();
+/*
+ * Main module for the real-mode kernel code
+ */
 
+extern void go_to_protect_mode();
+
+// TODO: Implement missing
 void main(){
-	load_pm();
+
+	// Check CPU
+
+	// Check Memory
+
+	// Check Video(modes, support)
+	
+	// Set Video
+
+	go_to_protect_mode();
 }
 

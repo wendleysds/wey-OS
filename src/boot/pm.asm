@@ -3,9 +3,9 @@
 CODE_SEG equ gdt_code - gdt_start
 DATA_SEG equ gdt_data - gdt_start
 
-global load_pm
+global go_to_protect_mode
 
-load_pm:
+go_to_protect_mode:
 	cli
 	lgdt[gdt_descriptor]
 	mov eax, cr0
