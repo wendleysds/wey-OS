@@ -1,6 +1,6 @@
 [BITS 32]
 
-global _start
+global entry32
 global kernel_registers
 
 extern kmain
@@ -8,7 +8,7 @@ extern kmain
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
 
-_start:
+entry32:
 	mov ax, DATA_SEG
   mov ds, ax
   mov es, ax
@@ -40,7 +40,7 @@ _start:
 	out 0xA1, al
 
 	call kmain
-	hlt
+
 .halt_kernel:
 	cli
 	hlt

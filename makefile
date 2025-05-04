@@ -2,7 +2,7 @@ TARGET = kernel.img
 
 # Compilers
 CC = i686-elf-gcc
-CFLAGS = -Isrc/include -m32 -ffreestanding -nostdlib -Wall -Werror
+CFLAGS = -Isrc/include -ffreestanding -nostdlib -Wall -Werror
 
 ASM = nasm
 ASMFLAGS =
@@ -24,15 +24,19 @@ LINKER_FILE = linker.ld
 BOOTLOADER_BIN = $(BIN_DIR)/bootloader.bin
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 
-KERNEL_ASM = $(OBJ_DIR)/core/kernel.asm.o
+KERNEL_ENTRY = $(OBJ_DIR)/boot/entry16.asm.o
 
-SRC_C_FILES = $(shell find $(SRC_DIR) -type f -name "*.c")
+SRC_C16_FILES = $(shell find $(SRC_DIR)/boot/ -type f -name "*.c")
+SRC_C32_FILES = $(shell find $(SRC_DIR) -type f -name "*.c" ! -path "$(SRC_DIR)/boot/*")
 
-EXCLUDE_ASM_FILES = $(SRC_DIR)/core/kernel.asm $(SRC_DIR)/boot/loader.asm
+EXCLUDE_ASM_FILES = $(SRC_DIR)/boot/entry16.asm $(SRC_DIR)/boot/loader.asm
 SRC_ASM_FILES = $(filter-out $(EXCLUDE_ASM_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm"))
 
 # Object files
-C_OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C_FILES))
+OBJ_C16_FILES = $(patsubst $(SRC_DIR)/boot/%.c, $(OBJ_DIR)/%.o, $(SRC_C16_FILES))
+OBJ_C32_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C32_FILES))
+
+C_OBJ_FILES = $(OBJ_C16_FILES) $(OBJ_C32_FILES)
 ASM_OBJ_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_ASM_FILES))
 
 # Create directories
@@ -54,21 +58,26 @@ $(BOOTLOADER_BIN): $(SRC_DIR)/boot/loader.asm
 	@echo "Compiling bootloader..."
 	$(ASM) $(ASMFLAGS) -f bin $^ -o $(BOOTLOADER_BIN)
 
-$(KERNEL_BIN): $(KERNEL_ASM) $(C_OBJ_FILES) $(ASM_OBJ_FILES) | $(BIN_DIR)
+$(KERNEL_BIN): $(KERNEL_ENTRY) $(C_OBJ_FILES) $(ASM_OBJ_FILES) | $(BIN_DIR)
 	@echo "Compiling kernel binary..."
 	@echo "C files: $(C_OBJ_FILES)"
 	@echo "ASM files: $(ASM_OBJ_FILES)"
 	$(LD) $(LDFLAGS) -T $(LINKER_FILE) -o $@ $^ --oformat binary
 
-$(KERNEL_ASM): $(SRC_DIR)/core/kernel.asm
-	@mkdir -p $(OBJ_DIR)/core
+$(KERNEL_ENTRY): $(SRC_DIR)/boot/entry16.asm
+	@mkdir -p $(OBJ_DIR)/boot
 	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
 
 # Compile Objects
+$(OBJ_DIR)/%.o: $(SRC_DIR)/boot/%.c | $(OBJ_DIR)
+	@echo "Compiling $< ..."
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -m16 -c $< -o $@
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	@echo "Compiling $< ..."
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -m32 -c $< -o $@
 
 $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm | $(OBJ_DIR)
 	@echo "Compiling $< ..."
