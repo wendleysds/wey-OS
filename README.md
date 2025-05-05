@@ -33,7 +33,7 @@ For studies and also to understand how an operating system works "under the hood
 ├── README.md      # Project documentation
 └── src/           # Operating system source code
     ├── arch/      # Architecture-specific code
-    ├── boot/      # Bootloader and initialization
+    ├── boot/      # Bootloader and initialization (16 bit code)
     ├── core/      # System core (scheduling, syscalls, etc.)
     ├── drivers/   # Device drivers (keyboard, video, etc.)
     ├── include/   # Header files (.h)
