@@ -13,7 +13,7 @@ struct VbeInfoBlock {
   uint8_t  Reserved[492];
 } __attribute__((packed));
 
-struct vbe_mode_info_structure {
+struct VbeInfoMode {
 	uint16_t attributes;
 	uint8_t window_a;
 	uint8_t window_b;
