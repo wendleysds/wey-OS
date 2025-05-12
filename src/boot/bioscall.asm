@@ -26,8 +26,9 @@ bios_putchar:
 		mov bx, [si+2]
 		mov cx, [si+4]
 		mov dx, [si+6]
-		mov di, [si+8]
-		mov es, [si+10]
+		mov ah, [si+8]
+		mov di, [si+10]
+		mov es, [si+12]
 
 		int 0x%1
 
@@ -35,8 +36,9 @@ bios_putchar:
 		mov [si+2], bx
 		mov [si+4], cx
 		mov [si+6], dx
-		mov [si+8], di
-		mov [si+10], es
+		mov [si+8], ah
+		mov [si+10], di
+		mov [si+12], es
 
 		pop bp
 		ret

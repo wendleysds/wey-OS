@@ -5,7 +5,7 @@
 
 struct biosreg{
 	uint16_t ax, bx, cx, dx; 
-	uint16_t di, es;
+	uint16_t ah, di, es;
 } __attribute__((packed));
 
 // bioscall.c

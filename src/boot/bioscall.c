@@ -16,6 +16,7 @@ void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outRe
 	temp.bx = inReg->bx;
 	temp.cx = inReg->cx;
 	temp.dx = inReg->dx;
+	temp.ah = inReg->ah;
 	temp.di = inReg->di;
 	temp.es = inReg->es;
 
@@ -39,6 +40,7 @@ void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outRe
 	outReg->bx = temp.bx;
 	outReg->cx = temp.cx;
 	outReg->dx = temp.dx;
+	outReg->ah = temp.ah;
 	outReg->di = temp.di;
 	outReg->es = temp.es;
 }

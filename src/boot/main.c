@@ -17,7 +17,7 @@ void main(){
 
 	struct VbeInfoBlock infoBlock;
 	struct biosreg oreg;
-	struct biosreg ireg = { .ax=0x4F00, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
+	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
 	
 	bios_intcall(0x10, &ireg, &oreg);
 
