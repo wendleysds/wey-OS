@@ -8,8 +8,8 @@ struct biosreg{
 	uint16_t di, es;
 } __attribute__((packed));
 
-// bioscall.asm
-void bios_int10h(const struct biosreg *inReg);
+// bioscall.c
+void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg* outReg);
 
 // biosutils.c
 void bios_printf(const char* fmt, ...);

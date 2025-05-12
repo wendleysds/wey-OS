@@ -43,4 +43,6 @@ bios_putchar:
 %endmacro
 
 intcall 10
-	
+intcall 13
+intcall 15
+intcall 16

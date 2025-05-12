@@ -16,35 +16,45 @@ void main(){
 	// Check Memory
 
 	struct VbeInfoBlock infoBlock;
-	struct biosreg reg = { .ax=0x4F00, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
+	struct biosreg oreg;
+	struct biosreg ireg = { .ax=0x4F00, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
+	
+	bios_intcall(0x10, &ireg, &oreg);
 
-	bios_int10h(&reg);
-
-	if(reg.ax == 0x004f){
-		bios_printf("\nVesa Detected, Displaying video... \r\n\n");
+	if(oreg.ax == 0x004f){
+		bios_printf("\nVesa Detected, Displaying info... \r\n\n");
 
 		bios_printf("Signature: %s\r\n", infoBlock.VbeSignature);
 		bios_printf("Version: 0x%x\r\n", infoBlock.VbeVersion);
 		bios_printf("Total Memory: %d\r\n", infoBlock.TotalMemory);
-
+		
 		bios_printf("\nSupported Modes\r\n\n");
 
 		struct VbeInfoMode infoMode;
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
 
-		int i;
+		ireg.ax = 0x4F01;
+		ireg.es = SEG((uint32_t)&infoMode);
+		ireg.di = OFF((uint32_t)&infoMode);
+
+		int i, j = 0;
 		for(i = 0; modes[i] != 0xFFFF; i++){
-			reg.ax = 0x4F01;
-			reg.cx = modes[i];
-			reg.es = SEG((uint32_t)&infoMode);
-			reg.di = OFF((uint32_t)&infoMode);
-			bios_int10h(&reg);
-			if(reg.ax != 0x004F) continue;
+			ireg.cx = modes[i];
+			bios_intcall(0x10, &ireg, &oreg);
+			if(oreg.ax != 0x004F) continue;
 
-			bios_printf("%dx%d\r\n", infoMode.width, infoMode.height);
+			bios_printf("{0x%x - %dx%d %d}",
+					modes[i], 
+					infoMode.width, 
+					infoMode.height, 
+					infoMode.bpp
+			);
+
+			if(j % 3 == 0)
+				bios_printf("\r\n");
+
+			j++;
 		}
-
-		bios_printf("\nTotal Modes: %d\r\n", i);
 	}
 	else{
 		bios_printf("%s\r\n", "Vesa Not Detected");
