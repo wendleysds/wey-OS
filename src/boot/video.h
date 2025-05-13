@@ -56,7 +56,7 @@ struct VideoStructPtr{
 
 	uint16_t width;
 	uint16_t height;
-	uint16_t bpp;
+	uint8_t bpp;
 
 	uint32_t framebuffer_physical;	
 	uint32_t framebuffer_virtual; // Setted in Protect Mode (BITS 32)
@@ -66,7 +66,6 @@ struct VideoStructPtr{
 	uint8_t isVesa;
 } __attribute__ ((packed));
 
-int check_video();
-void set_video();
+void setup_video();
 
 #endif

@@ -35,6 +35,8 @@ void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outRe
 			break;
 	}
 
+	if(!outReg) return;
+
 	// Save result in outReg
 	outReg->ax = temp.ax;
 	outReg->bx = temp.bx;
