@@ -1,6 +1,6 @@
 [BITS 32]
 
-global entry32
+global _entry32
 global kernel_registers
 
 extern kmain
@@ -8,7 +8,7 @@ extern kmain
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
 
-entry32:
+_entry32:
 	mov ax, DATA_SEG
   mov ds, ax
   mov es, ax

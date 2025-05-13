@@ -1,7 +1,7 @@
 [BITS 16]
 
-global _start
+global _entry16
 extern main
 
-_start:
+_entry16:
 	jmp main
