@@ -12,6 +12,8 @@ go_to_protect_mode:
 	or eax, 0x1
 	mov cr0, eax
 
+	mov ebx, dword [0x8000] ; Backup VideoStruct
+	
 	jmp CODE_SEG:init_pm
 
 ; GTD
@@ -57,12 +59,14 @@ init_pm:
 	or al, 2
 	out 0x92, al
 
+	mov dword [0x8000], ebx ; Restore VideoStruct and save in desired position
+
 	; ATA LBA args
 	mov eax, 20        ; Logical Block Address of sector
 	mov ecx, 100       ; N Sectors
 	mov edi, 0x0100000 ; Addr buffer
 	call ata_lba_read
-
+	
 	jmp CODE_SEG:0x0100000
 
 	hlt

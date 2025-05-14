@@ -1,10 +1,12 @@
 #include "video.h"
 #include "boot.h"
+#include <stddef.h>
 #include <stdint.h>
+
+#define VIDEO_STRUCT_ADDR 0x8000 // VideoStruct save point
 
 #define DEFAULT_MODE 0x13 // 320x200 16
 
-//#define DESIRED_RESOLUTION 1024, 768, 16       //W, H, BPP
 #define DESIRED_RESOLUTION 800, 600, 16        //W, H, BPP
 #define MOST_COMPATIBILITIE_MODE 640, 480, 16  //W, H, BPP
 
@@ -40,11 +42,24 @@ void setup_video(){
 	struct VbeInfoBlock infoBlock;
 	struct VbeInfoMode info;
 
+	// Default Mode
+	struct VideoStruct videoStruct = { 
+		.mode=0x3,
+		.height=80, .width=25, .bpp=4,
+
+		.framebuffer_physical = 0xB8000,
+		.framebuffer_virtual = 0x0,
+
+		.isGraphical = 0,
+		.isVesa = 0
+	};
+
 	struct biosreg oreg;
 	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
 	bios_intcall(0x10, &ireg, &oreg);
 
-	if(oreg.ax == 0x004f){
+	// False for tests
+	if(/*oreg.ax == 0x004f*/0){
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
 
 		uint16_t findedMode = findMode(modes, &info, DESIRED_RESOLUTION);
@@ -59,9 +74,28 @@ void setup_video(){
 		ireg.di = 0;
 
 		bios_intcall(0x10, &ireg, 0x0);
+
+		videoStruct.mode = findedMode;
+		videoStruct.height = info.height;
+		videoStruct.width = info.width;
+		videoStruct.bpp = info.bpp;
+
+		videoStruct.framebuffer_physical = info.framebuffer,
+		videoStruct.framebuffer_virtual = 0x0,
+
+		videoStruct.isGraphical = 1;
+		videoStruct.isVesa = 1;
 	}
 	else{
 		bios_printf("%s\r\n", "Vesa Not Detected");
 	}
+
+	uint8_t* dst = (uint8_t*)VIDEO_STRUCT_ADDR;
+	uint8_t* src = (uint8_t*)&videoStruct;
+
+	// Save Video struct
+	// for == memcpy 
+	for(size_t i = 0; i < sizeof(struct VideoStruct); i++)
+    dst[i] = src[i];
 }
 

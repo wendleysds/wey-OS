@@ -51,7 +51,7 @@ struct VbeInfoMode {
 	uint8_t reserved1[206];
 } __attribute__ ((packed));
 
-struct VideoStructPtr{
+struct VideoStruct{
 	uint16_t mode;
 
 	uint16_t width;

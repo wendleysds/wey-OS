@@ -42,10 +42,14 @@ void init_log(const char* msg, void (*init_method)(void)){
 	terminal_write(0x0A, " OK\n");
 }
 
+extern void display_video_info();
+
 void kmain(){
 	terminal_init();
   terminal_cursor_disable();
 	terminal_clear();
+
+	display_video_info();
 
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));
@@ -77,7 +81,8 @@ void kmain(){
 	// Start drivrers
 	init_keyboard();
 
-	terminal_clear();
+	terminal_write(0x0F, "\n");
+	//terminal_clear();
 
 	terminal_write(0x0A, "KERNEL READY\n\n");
 	terminal_cursor_enable();

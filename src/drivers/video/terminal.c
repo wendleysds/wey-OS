@@ -1,5 +1,6 @@
 #include <drivers/terminal.h>
 #include <lib/utils.h>
+#include <lib/mem.h>
 #include <io.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -33,13 +34,41 @@ struct Cursor{
 	uint8_t enabled;
 };
 
+struct VideoStructPtr{
+	uint16_t mode;
+
+	uint16_t width;
+	uint16_t height;
+	uint8_t bpp;
+
+	uint32_t framebuffer_physical;	
+	uint32_t framebuffer_virtual;
+	//flags
+	uint8_t isGraphical;
+	uint8_t isVesa;
+} __attribute__ ((packed));
+
 static struct Cursor cursor;
+static struct VideoStructPtr videoInfo;
 static volatile char* videoMemory = VGA_MEMORY;
 
 void terminal_init(){
+	struct VideoStructPtr* videoInfoPtr = (struct VideoStructPtr*)0x8000;
+	memcpy(&videoInfo, videoInfoPtr, sizeof(struct VideoStructPtr));
+
 	cursor.y = 0;
 	cursor.x = 0;
 	cursor.enabled = 1;
+
+	}
+
+void display_video_info(){
+	terminal_write(0x0F, "--video-info--\n");
+	terminal_write(0x0F, "Mode:        0x%x\n", videoInfo.mode);	
+	terminal_write(0x0F, "Resolution:  %dx%dx%d\n", videoInfo.height, videoInfo.width, videoInfo.bpp);
+	terminal_write(0x0F, "isGraphical: %s\n", videoInfo.isGraphical ? "true" : "false");
+	terminal_write(0x0F, "isVesa:      %s\n", videoInfo.isVesa ? "true" : "false");
+	terminal_write(0x0F, "--------------\n");
 }
 
 void update_cursor() {

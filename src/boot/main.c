@@ -17,9 +17,9 @@ void main(){
 
 	setup_video();
 
-	while(1){
+	/*while(1){
 		__asm__ __volatile__ ("hlt");
-	}
+	}*/
 
 	go_to_protect_mode();
 }
