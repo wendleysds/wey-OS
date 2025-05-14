@@ -1,5 +1,5 @@
-#include "boot.h"
-#include "video.h"
+#include <boot/bios.h>
+#include <boot/video.h>
 #include <stdint.h>
 
 /*
@@ -17,7 +17,8 @@ void main(){
 
 	setup_video();
 
-	/*while(1){
+	/*
+	while(1){
 		__asm__ __volatile__ ("hlt");
 	}*/
 

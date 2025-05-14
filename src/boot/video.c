@@ -1,5 +1,5 @@
-#include "video.h"
-#include "boot.h"
+#include <boot/video.h>
+#include <boot/bios.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,7 +14,7 @@
 // If it doesn't find it, it returns DEFAULT_MODE and fills outinfo with its data.
 static uint16_t findMode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_t x, uint16_t y, uint8_t bpp){
 	struct biosreg oreg;
-	struct biosreg ireg = { .ax=0x4F01, .ah=0x4F, .es=SEG((uint32_t)outinfo), .di=OFF((uint32_t)outinfo)};
+	struct biosreg ireg = { .ax=0x4F01, .ah=0x4F, .es=SEG(outinfo), .di=OFF(outinfo)};
 
 	int i;
 	for(i = 0; modes[i] != 0xFFFF; i++){
@@ -55,7 +55,7 @@ void setup_video(){
 	};
 
 	struct biosreg oreg;
-	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG((uint32_t)&infoBlock), .di=OFF((uint32_t)&infoBlock) };
+	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG(&infoBlock), .di=OFF(&infoBlock) };
 	bios_intcall(0x10, &ireg, &oreg);
 
 	// False for tests
