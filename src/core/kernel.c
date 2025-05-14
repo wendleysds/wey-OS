@@ -46,10 +46,14 @@ extern void display_video_info();
 
 void kmain(){
 	terminal_init();
-  terminal_cursor_disable();
+  /*terminal_cursor_disable();
 	terminal_clear();
 
-	display_video_info();
+	display_video_info();*/
+	
+	while(1){
+		__asm__ ("hlt");
+	}
 
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));

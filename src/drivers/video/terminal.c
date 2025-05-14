@@ -25,28 +25,14 @@
 
 #define DEFAULT_TAB_DISTANCE 4
 
-struct Cursor{
-	uint8_t x, y;
-	uint8_t enabled;
-};
-
-struct VideoStructPtr{
-	uint16_t mode;
-
-	uint16_t width;
-	uint16_t height;
-	uint8_t bpp;
-
-	uint32_t framebuffer_physical;	
-	uint32_t framebuffer_virtual;
-	//flags
-	uint8_t isGraphical;
-	uint8_t isVesa;
-} __attribute__ ((packed));
-
 static struct Cursor cursor;
 static struct VideoStructPtr video;
 static volatile char* videoMemory = 0x0;
+
+void putpixel(volatile char* screen, int x, int y, uint16_t color) {
+    unsigned where = x * video.width + y * video.pitch;
+    screen[where] = color;
+}
 
 void terminal_init(){
 	struct VideoStructPtr* videoInfoPtr = (struct VideoStructPtr*)0x8000;
@@ -57,12 +43,18 @@ void terminal_init(){
 	cursor.enabled = 1;
 
 	videoMemory = (volatile char*)video.framebuffer_physical;
+	
+	// fill screen with Withe
+	for(int x = 0; x < video.width; x++)
+		for(int y = 0; y < video.height; y++)
+			putpixel(videoMemory, x, y, 0xFFFF);
 }
 
 void display_video_info(){
 	terminal_write(0x0F, "--video-info--\n");
 	terminal_write(0x0F, "Mode:        0x%x\n", video.mode);	
 	terminal_write(0x0F, "Resolution:  %dx%dx%d\n", video.width, video.height, video.bpp);
+	terminal_write(0x0F, "Pitch        0x%x\n", video.pitch);
 	terminal_write(0x0F, "isGraphical: %s\n", video.isGraphical ? "true" : "false");
 	terminal_write(0x0F, "isVesa:      %s\n", video.isVesa ? "true" : "false");
 	terminal_write(0x0F, "--------------\n\n");

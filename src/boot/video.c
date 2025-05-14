@@ -45,7 +45,7 @@ void setup_video(){
 	// Default Mode
 	struct VideoStruct videoStruct = { 
 		.mode=0x3,
-		.width=80, .height=25, .bpp=4,
+		.width=80, .height=25, .bpp=4, .pitch=0x1,
 
 		.framebuffer_physical = 0xB8000,
 		.framebuffer_virtual = 0x0,
@@ -59,7 +59,7 @@ void setup_video(){
 	bios_intcall(0x10, &ireg, &oreg);
 
 	// False for tests
-	if(/*oreg.ax == 0x004f*/0){
+	if(oreg.ax == 0x004f){
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
 
 		uint16_t findedMode = findMode(modes, &info, DESIRED_RESOLUTION);
@@ -78,6 +78,7 @@ void setup_video(){
 		videoStruct.mode = findedMode;
 		videoStruct.width = info.width;
 		videoStruct.height = info.height;
+		videoStruct.pitch = info.pitch;
 		videoStruct.bpp = info.bpp;
 
 		videoStruct.framebuffer_physical = info.framebuffer,
