@@ -28,12 +28,13 @@ For studies and also to understand how an operating system works "under the hood
 ```
 .
 ├── build/         # Compiled files (binaries, objects, etc.)
-├── linker.ld      # Linker script (e.g., GNU ld)
+├── linker16.ld    # Linker script for 16-bit code (/src/boot)
+├── linker32.ld    # Linker script for 32-bit code
 ├── makefile       # Build script
 ├── README.md      # Project documentation
 └── src/           # Operating system source code
     ├── arch/      # Architecture-specific code
-    ├── boot/      # Bootloader and initialization (16 bit code)
+    ├── boot/      # Bootloader and initialization (16-bit code)
     ├── core/      # System core (scheduling, syscalls, etc.)
     ├── drivers/   # Device drivers (keyboard, video, etc.)
     ├── include/   # Header files (.h)
