@@ -45,7 +45,7 @@ void setup_video(){
 	// Default Mode
 	struct VideoStruct videoStruct = { 
 		.mode=0x3,
-		.height=80, .width=25, .bpp=4,
+		.width=80, .height=25, .bpp=4,
 
 		.framebuffer_physical = 0xB8000,
 		.framebuffer_virtual = 0x0,
@@ -76,15 +76,15 @@ void setup_video(){
 		bios_intcall(0x10, &ireg, 0x0);
 
 		videoStruct.mode = findedMode;
-		videoStruct.height = info.height;
 		videoStruct.width = info.width;
+		videoStruct.height = info.height;
 		videoStruct.bpp = info.bpp;
 
 		videoStruct.framebuffer_physical = info.framebuffer,
 		videoStruct.framebuffer_virtual = 0x0,
 
-		videoStruct.isGraphical = 1;
-		videoStruct.isVesa = 1;
+		videoStruct.isGraphical = !(findedMode <= 0x3 || findedMode == 0x7);
+		videoStruct.isVesa = !(findedMode >= 0 && findedMode <= 0x16);
 	}
 	else{
 		bios_printf("%s\r\n", "Vesa Not Detected");

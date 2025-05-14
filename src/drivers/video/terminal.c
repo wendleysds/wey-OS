@@ -20,10 +20,6 @@
  *
  */
 
-#define VGA_MEMORY (volatile char*)0xB8000
-#define VGA_WIDTH 80
-#define VGA_HEIGTH 25
-
 #define DEFAULT_CURSOR_START 11
 #define DEFAULT_CURSOR_END 12
 
@@ -49,33 +45,34 @@ struct VideoStructPtr{
 } __attribute__ ((packed));
 
 static struct Cursor cursor;
-static struct VideoStructPtr videoInfo;
-static volatile char* videoMemory = VGA_MEMORY;
+static struct VideoStructPtr video;
+static volatile char* videoMemory = 0x0;
 
 void terminal_init(){
 	struct VideoStructPtr* videoInfoPtr = (struct VideoStructPtr*)0x8000;
-	memcpy(&videoInfo, videoInfoPtr, sizeof(struct VideoStructPtr));
+	memcpy(&video, videoInfoPtr, sizeof(struct VideoStructPtr));
 
 	cursor.y = 0;
 	cursor.x = 0;
 	cursor.enabled = 1;
 
-	}
+	videoMemory = (volatile char*)video.framebuffer_physical;
+}
 
 void display_video_info(){
 	terminal_write(0x0F, "--video-info--\n");
-	terminal_write(0x0F, "Mode:        0x%x\n", videoInfo.mode);	
-	terminal_write(0x0F, "Resolution:  %dx%dx%d\n", videoInfo.height, videoInfo.width, videoInfo.bpp);
-	terminal_write(0x0F, "isGraphical: %s\n", videoInfo.isGraphical ? "true" : "false");
-	terminal_write(0x0F, "isVesa:      %s\n", videoInfo.isVesa ? "true" : "false");
-	terminal_write(0x0F, "--------------\n");
+	terminal_write(0x0F, "Mode:        0x%x\n", video.mode);	
+	terminal_write(0x0F, "Resolution:  %dx%dx%d\n", video.width, video.height, video.bpp);
+	terminal_write(0x0F, "isGraphical: %s\n", video.isGraphical ? "true" : "false");
+	terminal_write(0x0F, "isVesa:      %s\n", video.isVesa ? "true" : "false");
+	terminal_write(0x0F, "--------------\n\n");
 }
 
 void update_cursor() {
 	if(!cursor.enabled)
 		return;
 
-    uint16_t pos = cursor.y * VGA_WIDTH + cursor.x;
+    uint16_t pos = cursor.y * video.width + cursor.x;
 
     outb(0x3D4, 0x0F);
     outb(0x3D5, (uint8_t)(pos & 0xFF));
@@ -112,11 +109,11 @@ void terminal_cursor_disable(){
 }
 
 void scroll_terminal(){
-	if(cursor.y >= VGA_HEIGTH){
-		for(int y = 1; y < VGA_HEIGTH; y++){
-			for(int x = 0; x < VGA_WIDTH; x++){
-				int from = (y * VGA_WIDTH + x) * 2;
-				int to = ((y - 1) * VGA_WIDTH + x) * 2;
+	if(cursor.y >= video.height){
+		for(int y = 1; y < video.height; y++){
+			for(int x = 0; x < video.width; x++){
+				int from = (y * video.width + x) * 2;
+				int to = ((y - 1) * video.width + x) * 2;
 
 				videoMemory[to] = videoMemory[from]; // Copy char
 				videoMemory[to + 1] = videoMemory[from + 1]; // Copy color
@@ -124,18 +121,18 @@ void scroll_terminal(){
 		}
 
 		// Clear last line
-		for(int x = 0; x < VGA_WIDTH; x++){
-			int index = ((VGA_HEIGTH - 1) * VGA_WIDTH + x) * 2;
+		for(int x = 0; x < video.width; x++){
+			int index = ((video.height - 1) * video.width + x) * 2;
 			videoMemory[index] = ' ';
 			videoMemory[index + 1] = 0x0F;
 		}
 
-		cursor.y = VGA_HEIGTH - 1; // Adjust to last visible line
+		cursor.y = video.height - 1; // Adjust to last visible line
 	}
 }
 
 void terminal_clear() {
-	for(int i = 0; i < VGA_WIDTH * VGA_HEIGTH; i++){
+	for(int i = 0; i < video.width * video.height; i++){
 		videoMemory[i * 2] = ' ';
 		videoMemory[i * 2 + 1] = 0x0F;
 	}
@@ -162,12 +159,12 @@ void terminal_putchar(char c, unsigned char color) {
 		cursor.x--;
 	}
 	else {
-      int index = (cursor.y * VGA_WIDTH + cursor.x) * 2;
+      int index = (cursor.y * video.width + cursor.x) * 2;
       videoMemory[index] = c;
       videoMemory[index + 1] = color;
 
       cursor.x += 1;
-      if (cursor.x >= VGA_WIDTH) {
+      if (cursor.x >= video.width) {
           cursor.y += 1;
           cursor.x = 0;
 		}
@@ -182,7 +179,7 @@ void terminal_backspace(){
 
 	if(cursor.x == 0){
 		cursor.y -= 1;
-		cursor.x = VGA_WIDTH;
+		cursor.x = video.width;
 	}
 	
 	cursor.x -= 1;
