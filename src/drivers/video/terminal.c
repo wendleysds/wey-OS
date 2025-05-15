@@ -1,3 +1,4 @@
+#include "core/kernel.h"
 #include <drivers/terminal.h>
 #include <lib/utils.h>
 #include <lib/mem.h>
@@ -27,12 +28,43 @@
 
 static struct Cursor cursor;
 static struct VideoStructPtr video;
-static volatile char* videoMemory = 0x0;
+static uint16_t* videoMemory = 0x0;
 
-void putpixel(volatile char* screen, int x, int y, uint16_t color) {
-    unsigned where = x * video.width + y * video.pitch;
-    screen[where] = color;
+void putpixel(struct VideoStructPtr* v, uint16_t x, uint16_t y, uint32_t color){
+	uint32_t offset = y * v->pitch + x * (v->bpp / 8);
+	uint8_t* framebuffer = (uint8_t*)v->framebuffer_physical;
+
+	switch (v->bpp) {
+		case 8:
+			framebuffer[offset] = (uint8_t)color;
+			break;
+		case 15: // RGB555
+    case 16: // RGB565
+			*(uint16_t*)(framebuffer + offset) = (uint16_t)color;
+			break;
+		case 24:
+			framebuffer[offset + 0] = (uint8_t)(color & 0xFF);
+			framebuffer[offset + 1] = (uint8_t)((color >> 8) & 0xFF);
+			framebuffer[offset + 2] = (uint8_t)((color >> 16) & 0xFF);
+			break;
+		case 32:
+			*(uint32_t*)(framebuffer + offset) = color;
+			break;
+		default:
+			panic("Video: Unsupported bpp");
+			break;
+	}
 }
+
+/*void putpixel(struct VideoStructPtr* v, int x, int y, uint16_t color) {
+	uint16_t* pixel = (uint16_t*)(v->framebuffer_physical + y * v->pitch + x * sizeof(uint16_t));
+	*pixel = color;
+}
+
+void _putpixel(struct VideoStructPtr* v, int x, int y, uint16_t color){
+	int index = (y * v->pitch + x * 2) / 2;
+	videoMemory[index] = color;
+}*/
 
 void terminal_init(){
 	struct VideoStructPtr* videoInfoPtr = (struct VideoStructPtr*)0x8000;
@@ -42,12 +74,33 @@ void terminal_init(){
 	cursor.x = 0;
 	cursor.enabled = 1;
 
-	videoMemory = (volatile char*)video.framebuffer_physical;
+	videoMemory = (uint16_t*)video.framebuffer_physical;
 	
 	// fill screen with Withe
-	for(int x = 0; x < video.width; x++)
-		for(int y = 0; y < video.height; y++)
-			putpixel(videoMemory, x, y, 0xFFFF);
+	uint32_t screenSize = video.width * video.height;
+	for(uint32_t i = 0; i < screenSize; i++){
+		videoMemory[i] = 0xFFFF;
+	}
+
+	int xOffset = 20;
+	int yOffset = 20;
+
+	int color[] = {0x0, 0x6D9D, 0x018C, 0x31B3, 0x5D7D, 0x3B5C, 0x2A97, 0x2236, 0x0};
+
+	int c = 0;
+	int loops = 8;
+	while(loops > 0){
+		for(uint32_t x = xOffset; x < video.width - xOffset; x++)
+			for(uint32_t y = yOffset; y < video.height - yOffset; y++)
+				putpixel(&video, x, y, color[c]);
+
+		xOffset += 20;
+		yOffset += 20;
+
+		c++;
+		loops--;
+	}
+
 }
 
 void display_video_info(){
