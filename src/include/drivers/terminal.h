@@ -6,7 +6,7 @@
 #define TERMINAL_DEFAULT_COLOR 0x0F
 
 struct Cursor{
-	uint8_t x, y;
+	uint16_t x, y;
 	uint8_t enabled;
 }__attribute__ ((packed));
 
