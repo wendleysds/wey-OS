@@ -46,10 +46,10 @@ extern void display_video_info();
 
 void kmain(){
 	terminal_init();
-  /*terminal_cursor_disable();
-	terminal_clear();
+  terminal_cursor_disable();
+	//terminal_clear();
 
-	display_video_info();*/
+	display_video_info();
 	
 	while(1){
 		__asm__ ("hlt");
@@ -77,9 +77,9 @@ void kmain(){
 		terminal_write(0x0F, "\n");
 		panic("Failed to initializing paging!");
 	}else{
-		terminal_write(0x0A, " OK\n");
 		paging_switch(kernel_directory);
 		enable_paging();
+		terminal_write(0x0A, " OK\n");
 	}
 
 	// Start drivrers
