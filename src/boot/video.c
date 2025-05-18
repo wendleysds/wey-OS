@@ -58,7 +58,6 @@ void setup_video(){
 	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG(&infoBlock), .di=OFF(&infoBlock) };
 	bios_intcall(0x10, &ireg, &oreg);
 
-	// False for tests
 	if(oreg.ax == 0x004f){
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
 
@@ -95,7 +94,7 @@ void setup_video(){
 	uint8_t* src = (uint8_t*)&videoStruct;
 
 	// Save Video struct
-	// for == memcpy 
+	// for equals memcpy :D 
 	for(size_t i = 0; i < sizeof(struct VideoStruct); i++)
     dst[i] = src[i];
 }
