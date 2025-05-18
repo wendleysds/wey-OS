@@ -8,22 +8,8 @@
 #include <stdarg.h>
 
 /*
- * Main output module
- *
- * TODO: Rewrite to be a "Wrapper" VGA and VESA methods
- *
- * like:
- *
- * #ifdef USE_VGA
- * 	#define terminal_putchar(c, x, y, color) vga_putchar(c, x, y, color)
- * #else
- *	#define terminal_putchar(c, x, y, color) vesa_putchar(c, x, y, color)
- * #endif
- *
+ * Main video stdout module
  */
-
-#define DEFAULT_CURSOR_START 11
-#define DEFAULT_CURSOR_END 12
 
 #define DEFAULT_TAB_DISTANCE 4
 
@@ -90,13 +76,13 @@ void terminal_init(){
 }
 
 void display_video_info(){
-	terminal_write(0x0F, "--video-info--\n");
-	terminal_write(0x0F, "Mode:        0x%x\n", video.mode);	
-	terminal_write(0x0F, "Resolution:  %dx%dx%d\n", video.width, video.height, video.bpp);
-	terminal_write(0x0F, "Pitch        0x%x\n", video.pitch);
-	terminal_write(0x0F, "isGraphical: %s\n", video.isGraphical ? "true" : "false");
-	terminal_write(0x0F, "isVesa:      %s\n", video.isVesa ? "true" : "false");
-	terminal_write(0x0F, "--------------\n\n");
+	terminal_write("--video-info--\n");
+	terminal_write("Mode:        0x%x\n", video.mode);	
+	terminal_write("Resolution:  %dx%dx%d\n", video.width, video.height, video.bpp);
+	terminal_write("Pitch        0x%x\n", video.pitch);
+	terminal_write("isGraphical: %s\n", video.isGraphical ? "true" : "false");
+	terminal_write("isVesa:      %s\n", video.isVesa ? "true" : "false");
+	terminal_write("--------------\n\n");
 }
 
 void update_cursor() {
@@ -110,27 +96,6 @@ void update_cursor() {
 
     outb(0x3D4, 0x0E);
     outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
-}
-
-void terminal_cursor_enable(){
-	terminal_cursor_enable_SE(DEFAULT_CURSOR_START, DEFAULT_CURSOR_END);
-}
-
-void terminal_cursor_enable_SE(uint8_t cursor_start, uint8_t cursor_end){
-	if(cursor_start > cursor_end){
-		terminal_write(0x04, "error enabling cursor!\n   ");
-		terminal_write(TERMINAL_DEFAULT_COLOR, "'cursor_start' must be greater than 'cursor_end'");
-		return;
-	}
-
-	outb(0x3D4, 0x0A);
-	outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
-
-	outb(0x3D4, 0x0B);
-	outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
-
-	cursor.enabled = 1;
-	update_cursor();
 }
 
 void terminal_cursor_disable(){
@@ -172,7 +137,7 @@ void terminal_clear() {
 	update_cursor();
 }
 
-void terminal_putchar(char c, unsigned char color) {
+void terminal_putchar(char c, uint32_t color) {
 	if (c == '\n') {
 		cursor.y += 1;
 		cursor.x = 0;
@@ -211,7 +176,8 @@ void terminal_backspace(){
 	update_cursor();
 }
 
-void terminal_vwrite(unsigned char color, const char *format, va_list args) {
+
+void terminal_vwrite(uint32_t color, const char *format, va_list args) {
   char buffer[32];
 
   for (const char *ptr = format; *ptr; ptr++) {
@@ -248,7 +214,15 @@ void terminal_vwrite(unsigned char color, const char *format, va_list args) {
 	update_cursor();
 }
 
-void terminal_write(unsigned char color, const char *format, ...) {
+void terminal_write(const char *format, ...){
+	va_list args;
+  va_start(args, format);
+  terminal_vwrite(TERMINAL_DEFAULT_COLOR, format, args);
+  va_end(args);
+
+}
+
+void terminal_cwrite(uint32_t color, const char *format, ...) {
   va_list args;
   va_start(args, format);
   terminal_vwrite(color, format, args);

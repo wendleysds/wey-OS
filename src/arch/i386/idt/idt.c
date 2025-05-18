@@ -89,19 +89,19 @@ void init_idt(){
 }
 
 void _print_frame(struct InterruptFrame* frame){
-  terminal_write(TERMINAL_DEFAULT_COLOR, 
+  terminal_write( 
     "\nedi 0x%x esi 0x%x ebp 0x%x\n", 
     frame->edi, frame->esi, frame->ebp
   );
-  terminal_write(TERMINAL_DEFAULT_COLOR, 
+  terminal_write(
     "kernelesp 0x%x ebx 0x%x edx 0x%x ecx 0x%x\n", 
     frame->kernelesp, frame->ebx, frame->edx, frame->ecx
   );
-  terminal_write(TERMINAL_DEFAULT_COLOR, 
+  terminal_write(
     "eax 0x%x eip 0x%x\n", 
     frame->eax, frame->ip
   );
-  terminal_write(TERMINAL_DEFAULT_COLOR, 
+  terminal_write(
     "cs 0x%x eflags 0x%x useresp 0x%x ss 0x%x\n\n", 
     frame->cs, frame->eflags, frame->useresp, frame->ss
   );
@@ -123,13 +123,13 @@ void interrupt_handler(int interrupt, struct InterruptFrame* frame){
 	}
 	else{
 		if(interrupt < 32){
-			terminal_write(TERMINAL_DEFAULT_COLOR, 
+			terminal_write(
 				"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
 				interrupt, interrupt, _exceptionMessages[interrupt], frame->ip);
 
 			_print_frame(frame);
 
-			terminal_write(TERMINAL_DEFAULT_COLOR, "System Halted!\n");
+			terminal_write("System Halted!\n");
 			while(1){
 				__asm__ volatile ("hlt");
 			}

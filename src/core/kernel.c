@@ -37,16 +37,15 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
 };
 
 void init_log(const char* msg, void (*init_method)(void)){
-	terminal_write(TERMINAL_DEFAULT_COLOR, msg);
+	terminal_write(msg);
 	init_method();
-	terminal_write(0x0A, " OK\n");
+	terminal_write(" OK\n");
 }
 
 extern void display_video_info();
 
 void kmain(){
 	terminal_init();
-  terminal_cursor_disable();
 	//terminal_clear();
 
 	display_video_info();
@@ -59,37 +58,36 @@ void kmain(){
 	memset(gdt, 0x00, sizeof(gdt));
 	gdt_structured_to_gdt(gdt, gdt_ptr, TOTAL_GDT_SEGMENTS);
 
-	terminal_write(TERMINAL_DEFAULT_COLOR, "Loading Global Descriptor Table (GDT)...");
+	terminal_write("Loading Global Descriptor Table (GDT)...");
 	gdt_load(gdt, sizeof(gdt) - 1);
-	terminal_write(0x0A, " OK\n");
+	terminal_write(" OK\n");
 
 	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
 
 	init_log("Initializing kernel heap...", init_kheap);
 
-	terminal_write(TERMINAL_DEFAULT_COLOR, "Initializing paging...");
+	terminal_write("Initializing paging...");
 
 	uint32_t tableAmount = 10;
 	kernel_directory = paging_new_directory(tableAmount, FPAGING_RW | FPAGING_P);
 
 	// Test if the kernel page directory is allocated correctly 
 	if(!kernel_directory || kernel_directory->tableCount != tableAmount){
-		terminal_write(0x0F, "\n");
+		terminal_write("\n");
 		panic("Failed to initializing paging!");
 	}else{
 		paging_switch(kernel_directory);
 		enable_paging();
-		terminal_write(0x0A, " OK\n");
+		terminal_write(" OK\n");
 	}
 
 	// Start drivrers
 	init_keyboard();
 
-	terminal_write(0x0F, "\n");
+	terminal_write("\n");
 	//terminal_clear();
 
-	terminal_write(0x0A, "KERNEL READY\n\n");
-	terminal_cursor_enable();
+	terminal_write("KERNEL READY\n\n");
 
 	// Main loop
 	while(1){
@@ -98,7 +96,7 @@ void kmain(){
 }
 
 void panic(const char* fmt, ...){
-	terminal_write(TERMINAL_DEFAULT_COLOR, "\nPanic!\n  ");
+	terminal_write("\nPanic!\n  ");
 
 	va_list args;
   va_start(args, fmt);

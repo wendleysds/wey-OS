@@ -60,7 +60,7 @@ void _iqr_keyboard_handler(struct InterruptFrame* frame){
 
 		char c = _handle_scancode(scanCode);
 		if(c != 0){
-			terminal_write(TERMINAL_DEFAULT_COLOR, "%c", c);
+			terminal_write("%c", c);
 		}
 	}
 	
