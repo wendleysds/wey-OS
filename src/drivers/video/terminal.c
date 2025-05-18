@@ -13,13 +13,14 @@
 
 #define DEFAULT_TAB_DISTANCE 4
 
+#define BACKGROUND_COLOR 0x0
+
 static struct Cursor cursor;
 static struct VideoStructPtr video;
-static uint16_t* videoMemory = 0x0;
 
-void putpixel(struct VideoStructPtr* v, uint16_t x, uint16_t y, uint32_t color){
+void vesa_putpixel(struct VideoStructPtr* v, uint16_t x, uint16_t y, uint32_t color){
 	uint32_t offset = y * v->pitch + x * (v->bpp / 8);
-	uint8_t* framebuffer = (uint8_t*)v->framebuffer_physical;
+	uint8_t* framebuffer = (uint8_t*)v->framebuffer_virtual;
 
 	switch (v->bpp) {
 		case 8:
@@ -43,7 +44,7 @@ void putpixel(struct VideoStructPtr* v, uint16_t x, uint16_t y, uint32_t color){
 	}
 }
 
-static void font_printchar(const unsigned char* font, const char c, uint8_t fontWidth, uint8_t fontHeigth){
+static void vesa_printchar(const unsigned char* font, const char c, uint8_t fontWidth, uint8_t fontHeigth){
 	uint16_t x = cursor.x * fontWidth;
 	uint16_t y = cursor.y * fontHeigth;
 
@@ -53,7 +54,7 @@ static void font_printchar(const unsigned char* font, const char c, uint8_t font
 		for (uint8_t row = 0; row < fontWidth; row++){
 			unsigned char mask = 0x80 >> row;
 			if(bitmapLine & mask)
-				putpixel(&video, x, y, 0xFFFFFFFF);
+				vesa_putpixel(&video, x, y, 0xFFFFFFFF);
 
 			x++;
 		}
@@ -63,6 +64,9 @@ static void font_printchar(const unsigned char* font, const char c, uint8_t font
 	}
 }
 
+struct VideoStructPtr* _get_video(){
+	return &video;
+}
 
 void terminal_init(){
 	struct VideoStructPtr* videoInfoPtr = (struct VideoStructPtr*)0x8000;
@@ -72,69 +76,30 @@ void terminal_init(){
 	cursor.x = 0;
 	cursor.enabled = 1;
 
-	videoMemory = (uint16_t*)video.framebuffer_physical;
+	video.framebuffer_virtual = video.framebuffer_physical;
 }
 
 void display_video_info(){
 	terminal_write("--video-info--\n");
-	terminal_write("Mode:        0x%x\n", video.mode);	
+	terminal_write("Mode:        0x%x\n",     video.mode);	
 	terminal_write("Resolution:  %dx%dx%d\n", video.width, video.height, video.bpp);
-	terminal_write("Pitch        0x%x\n", video.pitch);
-	terminal_write("isGraphical: %s\n", video.isGraphical ? "true" : "false");
-	terminal_write("isVesa:      %s\n", video.isVesa ? "true" : "false");
+	terminal_write("Pitch        0x%x\n",     video.pitch);
+	terminal_write("isGraphical: %s\n",       video.isGraphical ? "true" : "false");
+	terminal_write("isVesa:      %s\n",       video.isVesa ? "true" : "false");
 	terminal_write("--------------\n\n");
 }
 
-void update_cursor() {
-	if(!cursor.enabled)
-		return;
-
-    uint16_t pos = cursor.y * video.width + cursor.x;
-
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (uint8_t)(pos & 0xFF));
-
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
-}
-
-void terminal_cursor_disable(){
-	outb(0x3D4, 0x0A);
-	outb(0x3D5, 0x20);
-	cursor.enabled = 0;
-}
-
 void scroll_terminal(){
-	if(cursor.y >= video.height){
-		for(int y = 1; y < video.height; y++){
-			for(int x = 0; x < video.width; x++){
-				int from = (y * video.width + x) * 2;
-				int to = ((y - 1) * video.width + x) * 2;
-
-				videoMemory[to] = videoMemory[from]; // Copy char
-				videoMemory[to + 1] = videoMemory[from + 1]; // Copy color
-			}
-		}
-
-		// Clear last line
-		for(int x = 0; x < video.width; x++){
-			int index = ((video.height - 1) * video.width + x) * 2;
-			videoMemory[index] = ' ';
-			videoMemory[index + 1] = 0x0F;
-		}
-
-		cursor.y = video.height - 1; // Adjust to last visible line
-	}
+	// TODO: Implement
 }
 
 void terminal_clear() {
-	for(int i = 0; i < video.width * video.height; i++){
-		videoMemory[i * 2] = ' ';
-		videoMemory[i * 2 + 1] = 0x0F;
-	}
+	for(uint16_t x = 0; x < video.width; x++)
+		for(uint16_t y = 0; y < video.height; y++)
+			vesa_putpixel(&video, x, y, BACKGROUND_COLOR);
+
 	cursor.x = 0;
 	cursor.y = 0;
-	update_cursor();
 }
 
 void terminal_putchar(char c, uint32_t color) {
@@ -149,31 +114,20 @@ void terminal_putchar(char c, uint32_t color) {
 		terminal_backspace();
 	}
 	else{
-		font_printchar((const unsigned char *)font8x16, c, 8, 16);
+		vesa_printchar((const unsigned char *)font8x16, c, 8, 16);
 
 		cursor.x++;
-    if (cursor.x >= video.width) {
+    if (cursor.x >= (video.width / 8)) {
 			cursor.y += 1;
 			cursor.x = 0;
 		}
 	}
 	
-	//scroll_terminal();
+	scroll_terminal();
 }
 
 void terminal_backspace(){
-	if(cursor.x == 0 && cursor.y != 0)
-		return;
-
-	if(cursor.x == 0){
-		cursor.y -= 1;
-		cursor.x = video.width;
-	}
-	
-	cursor.x -= 1;
-	terminal_putchar(' ', TERMINAL_DEFAULT_COLOR);
-	cursor.x -= 1;
-	update_cursor();
+	// TODO: Implement
 }
 
 
@@ -210,8 +164,6 @@ void terminal_vwrite(uint32_t color, const char *format, va_list args) {
 			terminal_putchar(*ptr, color);
     }
   }
-
-	update_cursor();
 }
 
 void terminal_write(const char *format, ...){
@@ -219,7 +171,6 @@ void terminal_write(const char *format, ...){
   va_start(args, format);
   terminal_vwrite(TERMINAL_DEFAULT_COLOR, format, args);
   va_end(args);
-
 }
 
 void terminal_cwrite(uint32_t color, const char *format, ...) {

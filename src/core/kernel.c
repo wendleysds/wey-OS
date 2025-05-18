@@ -14,6 +14,7 @@
 #include <memory/paging.h>
 
 #include <def/config.h>
+#include <def/status.h>
 #include <stdint.h>
 
 /* 
@@ -43,16 +44,13 @@ void init_log(const char* msg, void (*init_method)(void)){
 }
 
 extern void display_video_info();
+extern struct VideoStructPtr* _get_video();
 
 void kmain(){
 	terminal_init();
-	//terminal_clear();
-
-	display_video_info();
+	terminal_clear();
 	
-	while(1){
-		__asm__ ("hlt");
-	}
+	display_video_info();
 
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));
@@ -68,24 +66,24 @@ void kmain(){
 
 	terminal_write("Initializing paging...");
 
-	uint32_t tableAmount = 10;
+	uint32_t tableAmount = PAGING_TOTAL_ENTRIES_PER_TABLE;
 	kernel_directory = paging_new_directory(tableAmount, FPAGING_RW | FPAGING_P);
 
 	// Test if the kernel page directory is allocated correctly 
 	if(!kernel_directory || kernel_directory->tableCount != tableAmount){
 		terminal_write("\n");
 		panic("Failed to initializing paging!");
-	}else{
-		paging_switch(kernel_directory);
-		enable_paging();
-		terminal_write(" OK\n");
 	}
+
+	paging_switch(kernel_directory);
+	enable_paging();
+	
+	terminal_write(" OK\n");
 
 	// Start drivrers
 	init_keyboard();
 
 	terminal_write("\n");
-	//terminal_clear();
 
 	terminal_write("KERNEL READY\n\n");
 
