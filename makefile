@@ -2,7 +2,17 @@ TARGET = kernel.img
 
 # Compilers
 CC = i686-elf-gcc
-CFLAGS = -Isrc/include -ffreestanding -nostdlib -Wall -Werror
+
+CFLAGS = -Isrc/include -Wall -Werror
+
+# Bare-metal Flags
+CFLAGS += -ffreestanding -nostdlib -nostartfiles
+# Warnig Suppresion Flags
+CFLAGS += -Wno-unused-function -Wno-unused-parameter
+# Alignment Flags
+CFLAGS += -falign-jumps -falign-functions -falign-loops
+# Optimzation Flags
+CFLAGS += -fstrength-reduce -finline-functions
 
 ASM = nasm
 ASMFLAGS =
@@ -16,8 +26,9 @@ BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/objs
 BIN_DIR = $(BUILD_DIR)/bin
 IMG_DIR = $(BUILD_DIR)/img
+MOUNT_DIR = $(BUILD_DIR)/mnt
 
-BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR)
+BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR)
 
 # Files
 LINKER_B16_FILE = linker16.ld
@@ -49,15 +60,10 @@ OBJ_C32_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C32_FILES))
 OBJ_ASM16_FILES = $(patsubst $(SRC_DIR)/boot/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B16_ASM_FILES))
 OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM_FILES))
 
-# Create directories
-$(BUILD_DIRS):
-	@echo "Creating directories..."
-	mkdir -p $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR)
-
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(TARGET): $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
+$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
 	@echo "Creating os image..."
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$(IMG_DIR)/$@ bs=1048576 count=16
@@ -65,6 +71,11 @@ $(TARGET): $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
 	dd if=$(STEP1_BIN) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
 	dd if=$(KERNEL_BIN) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=20 conv=notrunc
 	@echo "Created IMG in $(IMG_DIR)/$@"
+
+# Create directories
+$(BUILD_DIRS):
+	@echo "Creating Building Directories..."
+	mkdir -p $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR)
 
 # Compile files
 # Bootlodaer
@@ -118,13 +129,9 @@ $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS) -f elf32 $< -o $@
 
-# Include dependency files
--include $(C_OBJ_FILES:.o=.d)
-
 all:
 	make clean
 	make
-	make kernel.img
 
 run:
 	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG_DIR)/$(TARGET)
