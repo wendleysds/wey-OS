@@ -22,10 +22,13 @@ struct PagingDirectory {
 };
 
 struct PagingDirectory* paging_new_directory(uint32_t tableAmount, uint8_t flags);
+void paging_free_directory(struct PagingDirectory* directory);
+
 void paging_switch(struct PagingDirectory* directory);
 void enable_paging();
 
-void paging_free_directory(struct PagingDirectory* directory);
+int paging_map(struct PagingDirectory* directory, void* virtual, void* physic, uint8_t flags);
+int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags);
 
 #endif
 
