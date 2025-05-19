@@ -127,7 +127,7 @@ all:
 	make kernel.img
 
 run:
-	qemu-system-i386 -drive format=raw,file=$(IMG_DIR)/$(TARGET)
+	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG_DIR)/$(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR)
