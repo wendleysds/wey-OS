@@ -3,14 +3,12 @@
 
 #define SUCCESS 0
 #define FAILED 1
-#define INVALID_VARG -1
-#define NO_MEMORY -2
+#define ERROR -1
+#define INVALID_VARG -2
+#define NO_MEMORY -3
+#define TIMEOUT -4
 
 // generic alias
-
 #define OK SUCCESS
-#define ERROR FAILED
-
-const char* status_to_strint(int status);
 
 #endif

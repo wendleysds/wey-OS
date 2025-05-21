@@ -5,6 +5,7 @@
 
 #include <arch/i386/gdt.h>
 #include <arch/i386/idt.h>
+#include <arch/i386/timer.h>
 #include <arch/i386/tss.h>
 
 #include <lib/mem.h>
@@ -61,7 +62,11 @@ void kmain(){
 	terminal_write(" OK\n");
 
 	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
-
+	
+	terminal_write("Initializing PIT(IRQ 0) with %dhz...", TIMER_FREQUENCY);
+	pit_init(TIMER_FREQUENCY);
+	terminal_write(" OK\n");
+	
 	init_log("Initializing kernel heap...", init_kheap);
 
 	terminal_write("Initializing paging...");

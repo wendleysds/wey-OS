@@ -21,7 +21,3 @@ void itoa(int value, char* result, int base){
 
 	result[j] = '\0';
 }
-
-void sleep(int cycles){
-	for(volatile int i = 0; i < cycles; i++);
-}

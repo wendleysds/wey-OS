@@ -6,6 +6,7 @@
 
 #define TOTAL_GDT_SEGMENTS 6
 #define TOTAL_INTERRUPTS 256
+#define TIMER_FREQUENCY 20
 
 #define HEAP_BSIZE 1024 * 1024 * 20   // 20 MB
 #define HEAP_BLOCK_SIZE 4096          // 4 kB
