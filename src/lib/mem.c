@@ -11,14 +11,21 @@ void* memset(void* ptr, int c, unsigned long size){
 }
 
 void* memcpy(void* dest, void* src, unsigned long length){
-	char* d = dest;
-	char* s = src;
+	char *d = (char*)dest;
+	const char *s = (const char*)src;
 
-	while(length--){
-		*d++ = *s++;
+	if(d < s){
+		while(length--){
+			*d++ = *s++;
+		}
+	}
+	else{
+		while(length--){
+			*(d + length) = *(s + length);
+		}
 	}
 
-	return dest;
+	return d;
 }
 
 int memcmp(const void* s1, const void* s2, int count){
