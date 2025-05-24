@@ -58,8 +58,7 @@ struct FATHeaderExtended{
 	uint8_t filSysType[8];
 }__attribute__((packed));
 
-struct FATDirectoryEntry
-{
+struct FATDirectoryEntry{
 	uint8_t DIR_Name[11];
   uint8_t DIR_Attr;
   uint8_t NTRes;
@@ -71,10 +70,10 @@ struct FATDirectoryEntry
   uint16_t DIR_WrtTime;
   uint16_t DIR_WrtDate;
   uint16_t DIR_FstClusLO;
-  uint32_t DIR_FileSize ;
+  uint32_t DIR_FileSize;
 }__attribute__((packed));
 
-struct FATLongDirectoryEntry {
+struct FATLongDirectoryEntry{
 	uint8_t LDIR_Ord;
 	uint8_t LDIR_Name1[10]; // Characters 1-5
 	uint8_t LDIR_Attr; // Must be ATTR_LONG_NAME
@@ -83,6 +82,45 @@ struct FATLongDirectoryEntry {
 	uint8_t LDIR_Name2[12]; // Characters 6-11
 	uint16_t LDIR_FstClusLO; // Must be 0
 	uint8_t LDIR_Name3[4]; // Characters 12-13
+}__attribute__((packed));
+
+struct FATHeaders{
+	struct FATHeader boot;
+	struct FATHeaderExtended extended;
+}__attribute__((packed));
+
+enum ItemType{
+	File,
+	LongFile,
+	Directory,
+	LongDirectory
+};
+
+struct Directory{
+	struct FATDirectoryEntry* entry;
+	uint16_t total;
+	uint16_t startSector;
+	uint16_t endSector;
+}__attribute__((packed));
+
+struct FATItem{
+	enum ItemType type;
+	union{
+		struct FATDirectoryEntry* file;
+		struct Directory* directory;
+	}__attribute__((packed));
+}__attribute__((packed));
+
+struct FATFileDescriptor{
+	struct FATItem* item;
+	uint32_t unused;
+}__attribute__((packed));
+
+struct FAT{
+	struct FATHeaders headers;
+	struct Directory rootDir;
+	struct Stream* readStream; // Gerenal Purpose Read Stream
+	struct Stream* clusterReadStream;
 }__attribute__((packed));
 
 #endif

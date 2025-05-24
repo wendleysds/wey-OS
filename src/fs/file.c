@@ -8,7 +8,10 @@
 #define SECTOR_SIZE 512
 
 struct Stream* stream_new(){
-	return (struct Stream*)kmalloc(sizeof(struct Stream));
+	struct Stream* s = (struct Stream*)kmalloc(sizeof(struct Stream));
+	s->unused = 0;
+
+	return s;
 }
 
 int stream_read(struct Stream *stream, void *buffer, int total){
