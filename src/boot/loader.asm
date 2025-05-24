@@ -7,29 +7,29 @@ nop
 ; FAT32 BIOS Parameter Block
 BS_OEMName      db "MSWIN4.1"
 BPB_BytsPerSec  dw 0x200
-BPB_SecPerClus  db 0x8
+BPB_SecPerClus  db 0x80
 BPB_RsvdSecCnt  dw 0x20
-BPB_NumFATs     db 0x2
-BPB_RootEntCnt  dw 0x0
-BPB_TotSec16    dw 0x0
+BPB_NumFATs     db 0x02
+BPB_RootEntCnt  dw 0x00
+BPB_TotSec16    dw 0x00
 BPB_Media       db 0xF8 ; Media descriptor (0xF8 = HD, 0xF0 = floppy)
-BPB_FATSz16     dw 0x0
+BPB_FATSz16     dw 0x00
 BPB_SecPerTrk   dw 0x20
 BPB_NumHeads    dw 0x40
-BPB_HiddSec     dd 0x0
+BPB_HiddSec     dd 0x00
 BPB_TotSec32    dd 32768 ; 16 MiB / 512 = 32768
 
 ; FAT32 Extended BPB
-BPB_FATSz32     dd 128 ; (128 sectors × 512 = 64 KiB)
-BPB_ExtFlags    dw 0x0
-BPB_FSVer       dw 0x0
-BPB_RootClus    dd 0x2
-BPB_FSInfo      dw 0x1
-BPB_BkBootSec   dw 6
+BPB_FATSz32     dd 0x80 ; (128 sectors × 512 = 64 KiB)
+BPB_ExtFlags    dw 0x00
+BPB_FSVer       dw 0x00
+BPB_RootClus    dd 0x20
+BPB_FSInfo      dw 0x01
+BPB_BkBootSec   dw 0x06
 BPB_Reserved    times 12 db 0
 
 BS_DrvNum       db 0x80
-BS_Reserved1    db 0x0
+BS_Reserved1    db 0x00
 BS_BootSig      db 0x29
 BS_VolID        dd 0xCAFE
 BS_VolLab       db "NO NAME    " ; 11 bytes, volume label
