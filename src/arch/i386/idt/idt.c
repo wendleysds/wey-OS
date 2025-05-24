@@ -11,7 +11,7 @@
  * IDT & IQR Configurator and Loader
  */
 
-const char* _exceptionMessages[] = {
+static const char* _exceptionMessages[] = {
   "Division By Zero",
   "Debug",
   "Non Maskable Interrupt",
@@ -46,7 +46,7 @@ const char* _exceptionMessages[] = {
 	"Reserved"
 };
 
-void _print_frame(struct InterruptFrame* frame);
+static void _print_frame(struct InterruptFrame* frame);
 
 extern void load_idt(struct IDTr_ptr* ptr);
 extern void* interrupt_pointer_table[TOTAL_INTERRUPTS];
@@ -56,7 +56,7 @@ struct IDTr_ptr idtr_ptr;
 
 static INTERRUPT_CALLBACK_FUNCTION interrupt_callbacks[TOTAL_INTERRUPTS] = {0x0};
 
-void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags){
+static void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags){
 	struct InterruptDescriptor* desc = &idt[interrupt_num];
 	desc->offset_1 = base & 0xFFFF;
 	desc->selector = selector;
@@ -65,11 +65,11 @@ void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint
 	desc->offset_2 = (base >> 16) & 0xFFFF;
 }
 
-void _set_idt(uint8_t interrupt_num, void* address){
+static void _set_idt(uint8_t interrupt_num, void* address){
 	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
 }
 
-void _PIC_clock(struct InterruptFrame* frame){
+static void _PIC_clock(struct InterruptFrame* frame){
 	outb(0x20, 0x20);
 }
 
@@ -88,7 +88,7 @@ void init_idt(){
 	enable_interrupts();
 }
 
-void _print_frame(struct InterruptFrame* frame){
+static void _print_frame(struct InterruptFrame* frame){
   terminal_write( 
     "\nedi 0x%x esi 0x%x ebp 0x%x\n", 
     frame->edi, frame->esi, frame->ebp

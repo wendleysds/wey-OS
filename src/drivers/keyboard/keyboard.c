@@ -50,7 +50,7 @@ static char _handle_scancode(uint8_t scanCode){
 	return c;
 }
 
-void _iqr_keyboard_handler(struct InterruptFrame* frame){
+static void _iqr_keyboard_handler(struct InterruptFrame* frame){
 	uint8_t scanCode = inb(_KEYBOARD_INPUT_PORT);
 
 	if(!(scanCode & _KEYBOARD_KEY_RELEASED)){

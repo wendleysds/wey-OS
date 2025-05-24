@@ -56,7 +56,7 @@ static int _get_block_entry_flag(uint8_t entry)
 
 // Finds a sequence of contiguous free blocks in the heap large 
 // enough to satisfy an allocation request
-int _get_start_block(struct Heap *heap, uint32_t totalBlocks)
+static int _get_start_block(struct Heap *heap, uint32_t totalBlocks)
 {
   struct HeapTable *table = heap->table;
   size_t consecutiveFreeBlocks = 0;
@@ -86,7 +86,7 @@ int _get_start_block(struct Heap *heap, uint32_t totalBlocks)
   return NO_MEMORY;
 }
 
-void _set_blocks_free(struct Heap *heap, int startingBlock)
+static void _set_blocks_free(struct Heap *heap, int startingBlock)
 {
   struct HeapTable *table = heap->table;
   for (int i = startingBlock; i < (int)table->total; i++)
@@ -100,7 +100,7 @@ void _set_blocks_free(struct Heap *heap, int startingBlock)
   }
 }
 
-void _set_blocks_taken(struct Heap *heap, int startBlock, int totalBlocks)
+static void _set_blocks_taken(struct Heap *heap, int startBlock, int totalBlocks)
 {
   int end_block = (startBlock + totalBlocks) - 1;
 
@@ -121,18 +121,18 @@ void _set_blocks_taken(struct Heap *heap, int startBlock, int totalBlocks)
   }
 }
 
-void *_block_to_address(struct Heap *heap, int block)
+static void *_block_to_address(struct Heap *heap, int block)
 {
   return heap->startAddress + (block * HEAP_BLOCK_SIZE);
 }
 
-int _address_to_block(struct Heap *heap, void *address)
+static int _address_to_block(struct Heap *heap, void *address)
 {
   return ((int)(address - heap->startAddress)) / HEAP_BLOCK_SIZE;
 }
 
 // Finds free blocks and marks them as allocated, returning a pointer to the memory
-void *_malloc_blocks(struct Heap *heap, uint32_t totalBlocks)
+static void *_malloc_blocks(struct Heap *heap, uint32_t totalBlocks)
 {
   void *address = 0;
 
