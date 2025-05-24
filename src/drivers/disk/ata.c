@@ -1,3 +1,4 @@
+#include "drivers/terminal.h"
 #include <drivers/ATA/ata.h>
 #include <io.h>
 #include <def/status.h>
@@ -34,8 +35,8 @@ int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
 	// Wait until disk be ready
 	uint8_t status = FAILED;
 	for(int i = 0; i < TRIES; i++){
-		uint8_t status = inb(STATUS_REGISTER);
-		if(!(status & ATA_SR_BSY) && (status & ATA_SR_DRDY)){
+		uint8_t ATAStatus = inb(STATUS_REGISTER);
+		if(!(ATAStatus & ATA_SR_BSY) && (ATAStatus & ATA_SR_DRDY)){
 			status = OK;
 			break;
 		}
