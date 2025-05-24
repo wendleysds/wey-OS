@@ -18,6 +18,9 @@
 #include <def/status.h>
 #include <stdint.h>
 
+#include <fs/fat/fatdefs.h>
+#include <fs/file.h>
+
 /* 
  * Main module for the protected-mode kernel code
  */ 
@@ -38,10 +41,10 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
   {.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
-void init_log(const char* msg, void (*init_method)(void)){
+static void init_log(const char* msg, void (*init_method)(void)){
 	terminal_write(msg);
 	init_method();
-	terminal_write(" OK\n");
+	terminal_cwrite(0x00FF00, " OK\n");
 }
 
 extern void display_video_info();
@@ -50,7 +53,7 @@ extern struct VideoStructPtr* _get_video();
 void kmain(){
 	terminal_init();
 	terminal_clear();
-	
+
 	display_video_info();
 
 	// GDT Setup
@@ -59,13 +62,13 @@ void kmain(){
 
 	terminal_write("Loading Global Descriptor Table (GDT)...");
 	gdt_load(gdt, sizeof(gdt) - 1);
-	terminal_write(" OK\n");
+	terminal_cwrite(0x00FF00, " OK\n");
 
 	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
 	
 	terminal_write("Initializing PIT(IRQ 0) with %dhz...", TIMER_FREQUENCY);
 	pit_init(TIMER_FREQUENCY);
-	terminal_write(" OK\n");
+	terminal_cwrite(0x00FF00, " OK\n");
 	
 	init_log("Initializing kernel heap...", init_kheap);
 
@@ -83,14 +86,47 @@ void kmain(){
 	paging_switch(kernel_directory);
 	enable_paging();
 	
-	terminal_write(" OK\n");
+	terminal_cwrite(0x00FF00, " OK\n");
 
+	struct Stream* stream = stream_new();
+
+	if(!stream){
+		panic("stream is null");
+	}
+
+	struct FAT* fat = (struct FAT*)kmalloc(sizeof(struct FAT));
+
+	if(!fat){
+		panic("fat is null");
+	}
+
+	stream_seek(stream, 0); // Boot sector
+	int res = stream_read(stream, &fat->headers, sizeof(fat->headers));
+	if(res != SUCCESS){
+		panic("Read Error! %d", res);
+	}
+
+	terminal_write("\n--FAT-INFO--\n");
+	terminal_write("Bytes Per Sector:    0x%x\n", fat->headers.boot.bytesPerSec);
+	terminal_write("Sectors Per Cluster: 0x%x\n", fat->headers.boot.secPerClus);
+	terminal_write("Number Os FATs:      0x%x\n", fat->headers.boot.numFATs);
+	terminal_write("ToSec32:             %d\n", fat->headers.boot.toSec32);
+	terminal_write("FATsz32:             0x%x\n", fat->headers.extended.FATSz32);
+	terminal_write("Root Clusters:       0x%x\n", fat->headers.extended.rootClus);
+	terminal_write("Driver Number:       0x%x\n", fat->headers.extended.drvNum);
+	terminal_write("Boot Signature:      0x%x\n", fat->headers.extended.bootSig);
+	terminal_write("Volume Identifier:   0x%x\n", fat->headers.extended.volID);
+	terminal_write("------------\n");
+	
 	// Start drivrers
-	init_keyboard();
+	/*init_keyboard();
 
 	terminal_write("\n");
 
-	terminal_write("KERNEL READY\n\n");
+	terminal_cwrite(0x00FF00, "KERNEL READY\n\n");*/
+
+	terminal_cwrite(0x00FF00, "\nKERNEL OK");
+	terminal_cwrite(0x757575, "... i think\n\n");
 
 	// Main loop
 	while(1){
