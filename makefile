@@ -36,21 +36,23 @@ LINKER_B32_FILE = linker32.ld
 
 # Binaries
 BOOTLOADER_BIN = $(BIN_DIR)/bootloader.bin
-KERNEL_BIN = $(BIN_DIR)/kernel.bin
 STEP1_BIN = $(BIN_DIR)/step1.bin
+KERNEL_BIN = $(BIN_DIR)/kernel.bin
+
+FAT_SIG = $(BIN_DIR)/FATSignature.bin
+FAT_EMPTY = $(BIN_DIR)/FAT.bin
 
 # Source Files
+EXCLUDED_B16_FILES = $(SRC_DIR)/boot/entry16.asm $(SRC_DIR)/boot/loader.asm
+EXCLUDED_B32_FILES = $(SRC_DIR)/core/entry32.asm $(SRC_DIR)/fs/fat/fat.asm $(SRC_DIR)/fs/fat/fatSig.asm
+
 SRC_C16_FILES = $(shell find $(SRC_DIR)/boot/ -type f -name "*.c")
 SRC_C32_FILES = $(shell find $(SRC_DIR) -type f -name "*.c" ! -path "$(SRC_DIR)/boot/*")
 
-EXCLUDE_B16_ASM_FILES = $(SRC_DIR)/boot/entry16.asm $(SRC_DIR)/boot/loader.asm
-SRC_B16_ASM_FILES = $(filter-out $(EXCLUDE_B16_ASM_FILES), $(shell find $(SRC_DIR)/boot/ -type f -name "*.asm"))
-
-EXCLUDE_B32_ASM_FILES = $(SRC_DIR)/core/entry32.asm
-SRC_B32_ASM_FILES = $(filter-out $(EXCLUDE_B32_ASM_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm" ! -path "$(SRC_DIR)/boot/*"))
+SRC_B16_ASM_FILES = $(filter-out $(EXCLUDED_B16_FILES), $(shell find $(SRC_DIR)/boot/ -type f -name "*.asm"))
+SRC_B32_ASM_FILES = $(filter-out $(EXCLUDED_B32_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm" ! -path "$(SRC_DIR)/boot/*"))
 
 # Object files
-
 KERNEL16_ENTRY = $(OBJ_DIR)/boot/entry16.asm.o
 KERNEL32_ENTRY= $(OBJ_DIR)/core/entry32.asm.o
 
@@ -63,15 +65,21 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
+$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN) $(FAT_SIG) $(FAT_EMPTY)
 	@echo "Creating os image..."
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$(IMG_DIR)/$@ bs=1048576 count=16
 	dd if=$(BOOTLOADER_BIN) of=$(IMG_DIR)/$@ conv=notrunc
-	dd if=$(STEP1_BIN) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
-	dd if=$(KERNEL_BIN) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=20 conv=notrunc
+	dd if=$(FAT_SIG) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
+	dd if=$(FAT_EMPTY) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
 	@echo "Created IMG in $(IMG_DIR)/$@"
-
+	@echo "Mounting $@ in $(MOUNT_DIR) and copying binaries..."
+	sudo mount -t vfat $(IMG_DIR)/$@ $(MOUNT_DIR)
+	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
+	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
+	sudo umount $(MOUNT_DIR)
+	@echo "IMG Ready!"
+	
 # Create directories
 $(BUILD_DIRS):
 	@echo "Creating Building Directories..."
@@ -81,7 +89,7 @@ $(BUILD_DIRS):
 # Bootlodaer
 $(BOOTLOADER_BIN): $(SRC_DIR)/boot/loader.asm
 	@echo "Compiling bootloader..."
-	$(ASM) $(ASMFLAGS) -f bin $^ -o $(BOOTLOADER_BIN)
+	$(ASM) $(ASMFLAGS) -f bin $^ -o $@
 
 # Kernel
 $(KERNEL_BIN): $(KERNEL32_ENTRY) $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) | $(BIN_DIR)
@@ -96,6 +104,15 @@ $(STEP1_BIN): $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) | $(BIN_DIR)
 	@echo "Obj C Files:" $(OBJ_C16_FILES)
 	@echo "Obj ASM Files:" $(OBJ_ASM16_FILES)
 	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $@ $^ --oformat binary
+
+# File System
+$(FAT_SIG): $(SRC_DIR)/fs/fat/fatSig.asm
+	@echo "Compiling FAT Signature..."
+	$(ASM) $(ASMFLAGS) -f bin $^ -o $@
+
+$(FAT_EMPTY): $(SRC_DIR)/fs/fat/fat.asm
+	@echo "Compiling empty FAT"
+	$(ASM) $(ASMFLAGS) -f bin $^ -o $@
 
 # Compile Objects
 # Entries
