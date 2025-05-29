@@ -97,11 +97,10 @@ find_file:
 	call cluster_to_lba
 	call lba_to_chs
 
-	xor bx, bx
-	mov es, bx
-	mov bx, 0x8000
+	mov bx, 0x8000 ; Root Sector Buffer
 	mov al, byte[BPB_SecPerClus]
 	call disk_read
+	jc .not_found
 
 	mov si, 0x8000
 
@@ -140,6 +139,7 @@ find_file:
 	ret
 
 load_file:
+	clc
 	ret
 
 ; Print messages in the screen
@@ -163,8 +163,7 @@ print_str:
 
 ; Read sectors in CHS mode and store im memory
 ;
-; ax: [Offset]
-; es: [Segment]
+; bx: [Buffer]
 ; al: [Sectors Amount]
 ;
 ; Set the variables 'Sector', 'Cylinder' and 'Head' before using!
@@ -179,9 +178,9 @@ disk_read:
 	mov cl, byte[Sector]
 
 	mov dl, byte[BS_DrvNum]
-
 	int 0x13
 	jc .disk_error
+
 	popa
 	clc
 	ret
