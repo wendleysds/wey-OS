@@ -47,89 +47,99 @@ start:
 	mov sp, 0x7C00
 	sti
 
-	; FAT Resolver
-	
+	; Update disk geometry
+	mov dl, byte[BS_DrvNum]
+	mov ah, 0x08  ; Disk info
+	int 0x13
+	jc .err
+	; Sec Per Tracks
+	mov bl, cl
+    and bl, 0x3F
+	mov byte[BPB_SecPerTrk], bl
+	; Number of Heads - 1
+	mov ax, 0
+	mov al, dh
+    inc ax
+	mov word[BPB_NumHeads], ax
+
+	; Resolve Fat	
 	; Data Sector: FirstDataSector = BPB_ResvdSecCnt + (BPB_NumFATs * FATSz)
 	mov cx, word[BPB_SecPerClus]
 	mov al, byte[BPB_NumFATs]
 	mul word[BPB_FATSz32]
 	add ax, word[BPB_RsvdSecCnt]
 	mov word[DataSector], ax
-	
-	; Firt Sector Of Cluster
-	mov ax, word[BPB_RootClus]
-	call cluster_to_lba
-	mov word[FirstSector], ax
 
 	call find_file
-	jc .not_found
+	jc .err
+	
+	call load_file
+	jc .err
 	jmp .ok
-.not_found:
-	mov si, msg_NOFILE
-	call print_str
-	jmp .halt
 
 .ok:
 	mov si, msg_OK
-	call print_str
 	jmp .halt
 
 .err:
 	mov si, msg_ERROR
-	call print_str
+	jmp .halt
 
 .halt:
+	call print_str
 	hlt
 	jmp $
 
+
 find_file:
 	pusha
-	mov ax, word[FirstSector]
+	mov ax, word[BPB_RootClus]
+	call cluster_to_lba
 	call lba_to_chs
 
+	xor bx, bx
+	mov es, bx
 	mov bx, 0x8000
 	mov al, byte[BPB_SecPerClus]
 	call disk_read
-	jc .disk_error
 
-	mov si, 0x8000 ; buffer
+	mov si, 0x8000
+
 .next_entry:
-	cmp byte[si], 0x0
+    cmp byte [si], 0x00
 	je .not_found
-	cmp byte[si], 0xE5
+	cmp byte [si], 0xE5
 	je .skip_entry
 
 	mov di, entry_file_name
-	mov cx, 11
-	push si
-	repe cmpsb
-	pop si
-	je .found
+    mov cx, 11
+    push si
+    repe cmpsb
+    pop si
+    je .found
 
 .skip_entry:
-	add si, 32
-	cmp si, 0x8000 + 512
+    add si, 32
+    cmp si, 0x8000 + 512
 	jb .next_entry
 
 .not_found:
 	popa
-	stc
+    stc
 	ret
 
-.disk_error:
-	mov si, msg_DSK_ERR
-	call print_str
-	jmp .not_found
-
 .found:
-	mov dx, word[si+20]
-	shl edx, 16
-	mov ax, word [si+26]
-	or dx, ax
-	mov word[Cluster], dx
+	mov dx, word [si+20]
+    shl edx, 16
+    mov ax, word [si+26]
+    or dx, ax
+    mov word [Cluster], dx
 
-	popa
+    popa
 	clc
+	ret
+
+load_file:
 	ret
 
 ; Print messages in the screen
@@ -153,7 +163,8 @@ print_str:
 
 ; Read sectors in CHS mode and store im memory
 ;
-; bx: [Buffer]
+; ax: [Offset]
+; es: [Segment]
 ; al: [Sectors Amount]
 ;
 ; Set the variables 'Sector', 'Cylinder' and 'Head' before using!
@@ -168,10 +179,9 @@ disk_read:
 	mov cl, byte[Sector]
 
 	mov dl, byte[BS_DrvNum]
-	mov es, bx
+
 	int 0x13
 	jc .disk_error
-
 	popa
 	clc
 	ret
@@ -219,9 +229,7 @@ lba_to_chs:
 	ret
 
 msg_OK: db "OK", 0x0a, 0x0d, 0
-msg_ERROR: db "ERROR!", 0x0a, 0x0d, 0
-msg_DSK_ERR: db "Disk ERROR!", 0x0a, 0x0d, 0
-msg_NOFILE: db "File not found!", 0x0a, 0x0d, 0
+msg_ERROR: db "ERROR", 0x0a, 0x0d, 0
 
 entry_file_name: db "STEP1   BIN"
 
@@ -231,7 +239,6 @@ Cylinder dw 0x0
 Sector dw 0x0
 
 DataSector dw 0x0
-FirstSector dw 0x0
 Cluster dw 0x0
 
 times 510-($ - $$) db 0
