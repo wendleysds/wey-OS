@@ -60,7 +60,6 @@ start:
 	jc .err
 	
 	call load_file
-	jc .err
 
 	jmp 0x0000:0x1000
 
@@ -72,6 +71,13 @@ start:
 	hlt
 	jmp $
 
+
+; Seach a file with the name iquals [entry_file_name] and get wis desired cluster
+;
+; [entry_file_name]
+;
+; returns:
+;   store result in 'Cluster' variable and the file size in 'FileSize'.
 
 find_file:
 	pusha
@@ -120,56 +126,24 @@ find_file:
 	clc
 	ret
 
+; Load the firsts [BPB_BytsPerSec * BPB_SecPerClus] bytes to 0x0000:0x10000
+;
+; [Cluster]
+;
+; returns:
+;   none
 load_file:
 	pusha
-
-	xor bx, bx
-	mov es, bx
 	mov bx, 0x1000
 
-.next_cluster:
 	mov ax, word [Cluster]
     call cluster_to_lba
     call lba_to_chs
 
 	mov al, byte [BPB_SecPerClus]
     call disk_read
-
-	mov cx, word [BPB_BytsPerSec]
-    mov cl, byte [BPB_SecPerClus]
-	mul cx
-    add bx, ax
-
-	mov ax, word [Cluster]
-	shl ax, 2
-	mov cx, word [BPB_BytsPerSec]
-	div cx
-	mov si, dx
-
-	mov ax, word [BPB_RsvdSecCnt]
-	add ax, dx
-	call lba_to_chs
-
-	push bx
-	mov bx, 0x9000
-	mov al, 1
-	call disk_read
-	pop bx
-
-	mov si, 0x9000
-	add si, dx
-	mov eax, dword [si]
-	and eax, 0x0FFFFFFF
-	mov word [Cluster], ax
-
-	cmp eax, 0x0FFFFFF8
-	jae .done
-
-	jmp .next_cluster
-
-.done:
+	
 	popa
-	clc
 	ret
 
 ; Print messages in the screen
@@ -236,8 +210,6 @@ cluster_to_lba:
 	add ax, word[DataSector]
 	ret
 
-
-
 ; Convert LBA scheme to CHS scheme
 ;
 ; Sector = (LBA % (Sectors per Track)) + 1
@@ -270,20 +242,6 @@ Sector dw 0x0
 
 DataSector dw 0x0
 Cluster dw 0x0
-
-; GDT
-
-gdt_descriptor:
-	dw gdt_end - gdt_start - 1
-	dd gdt_start
-
-gdt_start:
-
-gdt_null: dd 0,0
-gdt_code: db 0xff, 0xff, 0, 0, 0, 10011010b, 00000000b, 0
-gdt_data: db 0xff, 0xff, 0, 0, 0, 10010010b, 11001111b, 0
-
-gdt_end:
 
 times 510-($ - $$) db 0
 dw 0xAA55
