@@ -4,23 +4,23 @@ OUTPUT_FORMAT(binary)
 SECTIONS{
 	. = 0x1000;
 
-	.text : ALIGN(4096){
+	.text : ALIGN(0){
 		*(.text)
 	}
 
-	.asm : ALIGN(4096){
+	.asm : ALIGN(0){
 		*(.asm)
 	}
 
-	.rodata : ALIGN(4096){
+	.rodata : ALIGN(0){
 		*(.rodata)
 	}
 
-	.data : ALIGN(4096){
+	.data : ALIGN(0){
 		*(.data)
 	}
 
-	.bss : ALIGN(4096){
+	.bss : ALIGN(0){
 		*(COMMON)
 		*(.bss)
 	}
