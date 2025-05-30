@@ -45,25 +45,11 @@ start:
 	mov es, ax
 
 	mov sp, 0x7C00
+
+	
 	sti
 
-	; Update disk geometry
-	mov dl, byte[BS_DrvNum]
-	mov ah, 0x08  ; Disk info
-	int 0x13
-	jc .err
-	; Sec Per Tracks
-	mov bl, cl
-    and bl, 0x3F
-	mov byte[BPB_SecPerTrk], bl
-	; Number of Heads - 1
-	mov ax, 0
-	mov al, dh
-    inc ax
-	mov word[BPB_NumHeads], ax
-
-	; Resolve Fat	
-	; Data Sector: FirstDataSector = BPB_ResvdSecCnt + (BPB_NumFATs * FATSz)
+	; Get Data Sector: BPB_ResvdSecCnt + (BPB_NumFATs * FATSz)
 	mov cx, word[BPB_SecPerClus]
 	mov al, byte[BPB_NumFATs]
 	mul word[BPB_FATSz32]
@@ -75,18 +61,14 @@ start:
 	
 	call load_file
 	jc .err
-	jmp .ok
 
-.ok:
-	mov si, msg_OK
-	jmp .halt
+	jmp 0x0000:0x1000
 
 .err:
 	mov si, msg_ERROR
-	jmp .halt
+	call print_str
 
 .halt:
-	call print_str
 	hlt
 	jmp $
 
@@ -139,6 +121,54 @@ find_file:
 	ret
 
 load_file:
+	pusha
+
+	xor bx, bx
+	mov es, bx
+	mov bx, 0x1000
+
+.next_cluster:
+	mov ax, word [Cluster]
+    call cluster_to_lba
+    call lba_to_chs
+
+	mov al, byte [BPB_SecPerClus]
+    call disk_read
+
+	mov cx, word [BPB_BytsPerSec]
+    mov cl, byte [BPB_SecPerClus]
+	mul cx
+    add bx, ax
+
+	mov ax, word [Cluster]
+	shl ax, 2
+	mov cx, word [BPB_BytsPerSec]
+	div cx
+	mov si, dx
+
+	mov ax, word [BPB_RsvdSecCnt]
+	add ax, dx
+	call lba_to_chs
+
+	push bx
+	mov bx, 0x9000
+	mov al, 1
+	call disk_read
+	pop bx
+
+	mov si, 0x9000
+	add si, dx
+	mov eax, dword [si]
+	and eax, 0x0FFFFFFF
+	mov word [Cluster], ax
+
+	cmp eax, 0x0FFFFFF8
+	jae .done
+
+	jmp .next_cluster
+
+.done:
+	popa
 	clc
 	ret
 
@@ -206,6 +236,8 @@ cluster_to_lba:
 	add ax, word[DataSector]
 	ret
 
+
+
 ; Convert LBA scheme to CHS scheme
 ;
 ; Sector = (LBA % (Sectors per Track)) + 1
@@ -227,8 +259,7 @@ lba_to_chs:
 	mov byte[Cylinder], al
 	ret
 
-msg_OK: db "OK", 0x0a, 0x0d, 0
-msg_ERROR: db "ERROR", 0x0a, 0x0d, 0
+msg_ERROR: db "NO", 0x0a, 0x0d, 0
 
 entry_file_name: db "STEP1   BIN"
 
@@ -239,6 +270,20 @@ Sector dw 0x0
 
 DataSector dw 0x0
 Cluster dw 0x0
+
+; GDT
+
+gdt_descriptor:
+	dw gdt_end - gdt_start - 1
+	dd gdt_start
+
+gdt_start:
+
+gdt_null: dd 0,0
+gdt_code: db 0xff, 0xff, 0, 0, 0, 10011010b, 00000000b, 0
+gdt_data: db 0xff, 0xff, 0, 0, 0, 10010010b, 11001111b, 0
+
+gdt_end:
 
 times 510-($ - $$) db 0
 dw 0xAA55
