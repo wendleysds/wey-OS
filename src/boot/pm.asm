@@ -62,7 +62,6 @@ init_pm:
 	out 0x92, al
 	
 	mov dword [0x8000], ebx ; Restore VideoStruct and save in desired position
-	mov dword[ADDR], 0xB8000
 
 	mov cx, 0x08
 	mov al, 0x02
@@ -70,8 +69,6 @@ init_pm:
 	mul dx
 	add ax, 0x20
 	mov word[DataSector], ax
-
-	call clear_screen
 
 	call find_file
 	jc .err
@@ -81,18 +78,11 @@ init_pm:
 	jmp .ok
 
 .err:
-	mov eax, 1
-   	jmp .halt
-
-.ok:
-	mov eax, 0
-
-.halt:
-	call print_eax_decimal
-	hlt
+   	hlt
 	jmp $
 
-	;jmp CODE_SEG:0x0100000
+.ok:
+	jmp CODE_SEG:0x0100000
 
 ;Seach a file with the name iquals [entry_file_name] and get wis desired cluster
 ;
@@ -208,66 +198,6 @@ get_next_cluster:
 	popad
 	ret
 
-; Clears the screen
-clear_screen:
-	push eax
-	push ebx
-	mov eax, 80
-	mov ebx, 25
-	mul ebx
-
-	mov ebx, 0xB8000
-.loop:
-	mov [ebx], byte 0x0
-	inc ebx
-	dec eax
-
-	cmp eax, 0
-	je .done
-	jmp .loop
-
-.done:
-	pop ebx
-	pop eax
-	ret
-
-print_eax_decimal:
-	pushad
-
-	mov ecx, 0             ; Contador de dígitos
-	mov ebx, 10            ; Divisor
-
-	mov esi, [ADDR]
-	cmp eax, 0
-	jne .convert_loop
-	mov byte [esi], '0'
-	mov byte [esi+1], 0x0F ; Atributo de cor
-	add esi, 2
-	jmp .done
-
-.convert_loop:
-	xor edx, edx
-	div ebx                ; EAX=quociente, EDX=resto
-	push edx               ; Salva dígito
-	inc ecx
-	cmp eax, 0
-	jne .convert_loop
-
-.print_digits:
-	pop edx
-	add dl, '0'            ; Converte para ASCII
-	mov [esi], dl          ; Escreve caractere
-	mov byte [esi+1], 0x0F ; Cor cinza claro
-	add esi, 2
-	loop .print_digits
-	add esi, 2
-	mov [ADDR], esi
-
-.done:
-	popad
-	ret
-
-
 ; Convert Cluster to LBA
 ;
 ; LBA = (([CLUSTER] – 2) * BPB_SecPerClus) + FirstDataSector;
@@ -353,4 +283,3 @@ entry_file_name: db "KERNEL  BIN"
 
 DataSector: dd 0x0
 Cluster: dd 0x0
-ADDR: dd 0x0

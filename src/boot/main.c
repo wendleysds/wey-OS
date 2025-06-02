@@ -15,7 +15,7 @@ void main(){
 
 	// Check Memory
 
-	//setup_video();
+	setup_video();
 
 	go_to_protect_mode();
 }

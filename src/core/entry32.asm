@@ -4,6 +4,7 @@ global _entry32
 global kernel_registers
 
 extern kmain
+extern helloword
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
@@ -39,12 +40,11 @@ _entry32:
   out 0x21, al
 	out 0xA1, al
 
-	call kmain
+  jmp CODE_SEG:kmain
 
-.halt_kernel:
 	cli
 	hlt
-	jmp .halt_kernel
+	jmp $
 
 kernel_registers:
   mov ax, DATA_SEG
