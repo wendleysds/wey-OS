@@ -150,22 +150,19 @@ find_file:
 load_file:
 	pushad
 	mov edi, 0x0100000
+	mov ecx, 0x8
 
 .read_cluster:
-	mov eax, dword [Cluster]
-	call cluster_to_lba
-
-	mov ecx, 0x8
-	call ata_lba_read
-
-	add edi, 0x1000
-
-	call get_next_cluster
-
 	mov eax, dword [Cluster]
 	cmp eax, 0x0FFFFFF8
 	jae .done
 
+	call cluster_to_lba
+	call ata_lba_read
+
+	add edi, 0x1000 ; 4096
+
+	call get_next_cluster
 	jmp .read_cluster 
 
 .done:
@@ -297,6 +294,7 @@ cluster_to_lba:
 ; returns:
 ;   none
 ata_lba_read:
+	pushad
 	mov ebx, eax, ; Backup the LBA
 
 	; Send the highest 8 bits of the lba to hard disk controller
@@ -348,6 +346,7 @@ ata_lba_read:
 	pop ecx
 
 	loop .next_sector
+	popad
 	ret
 
 entry_file_name: db "KERNEL  BIN"
