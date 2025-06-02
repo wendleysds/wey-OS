@@ -15,12 +15,7 @@ void main(){
 
 	// Check Memory
 
-	setup_video();
-
-	
-	while(1){
-		__asm__ __volatile__ ("hlt");
-	}
+	//setup_video();
 
 	go_to_protect_mode();
 }
