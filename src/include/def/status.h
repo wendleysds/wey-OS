@@ -7,6 +7,7 @@
 #define INVALID_VARG -2
 #define NO_MEMORY -3
 #define TIMEOUT -4
+#define ERROR_IO -5
 
 // generic alias
 #define OK SUCCESS
