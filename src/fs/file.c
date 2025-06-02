@@ -9,6 +9,8 @@
 
 struct Stream* stream_new(){
 	struct Stream* s = (struct Stream*)kmalloc(sizeof(struct Stream));
+	if(!s) return 0x0;
+	
 	s->unused = 0;
 
 	return s;
