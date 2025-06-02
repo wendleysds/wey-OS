@@ -1,6 +1,6 @@
 #ifndef _FAT32_H
 #define _FAT32_H
 
-
+int fs_init();
 
 #endif

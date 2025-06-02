@@ -35,11 +35,11 @@ struct FATHeader{
 	uint16_t rootEntCnt;
 	uint16_t totSec16;
 	uint8_t mediaType;
-	uint16_t fATSz16;
+	uint16_t FATSz16;
 	uint16_t secPerTrk;
 	uint16_t numHeads;
 	uint32_t hiddSec;
-	uint32_t toSec32;
+	uint32_t totSec32;
 }__attribute__((packed));
 
 struct FATHeaderExtended{
@@ -98,7 +98,7 @@ enum ItemType{
 
 struct Directory{
 	struct FATDirectoryEntry* entry;
-	uint16_t total;
+	uint16_t itensCount;
 	uint16_t startSector;
 	uint16_t endSector;
 }__attribute__((packed));
