@@ -17,11 +17,11 @@ For studies and also to understand how an operating system works "under the hood
 - Handlers for hardware and software interrupts
 - Paging (memory management via paging)
 - Heap allocator (hmalloc, hcalloc, hfree)
-- Basic video driver (text mode via VGA)
 - Initial support for VESA (graphics mode)
 - Keyboard driver
 - Basic terminal interface
 - Modular organization with support for future extensions
+- FAT 32 (File System)
 
 ## Directory Structure
 
@@ -39,7 +39,8 @@ For studies and also to understand how an operating system works "under the hood
     ├── drivers/   # Device drivers (keyboard, video, etc.)
     ├── include/   # Header files (.h)
     ├── lib/       # Helper functions and internal libraries
-    └── memory/    # Memory management (paging, heap, etc.)
+    ├── memory/    # Memory management (paging, heap, etc.)
+    └── fs/        # File System code
 ```
 
 ## How to Build
@@ -115,14 +116,11 @@ make disassembly-img
 - The system is single-tasked, executing only a continuous kernel loop.
 - TSS partially implemented. No context switching yet.
 
-### File System
-- Non-existent
-
 ### Modularity and Extensibility
 - No loadable modules: The kernel is monolithic and does not support dynamic loading of drivers or extensions.
 
 ### Graphics and Interface
-- Experimental graphics support: VESA is under development, but the system still relies mainly on VGA text mode.
+- Experimental graphics support: VESA is under development.
 
 ## Licence
 
