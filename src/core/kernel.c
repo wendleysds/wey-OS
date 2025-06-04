@@ -18,9 +18,7 @@
 #include <def/status.h>
 #include <stdint.h>
 
-#include <fs/fat/fatdefs.h>
-#include <fs/fat/fat32.h>
-#include <fs/file.h>
+#include <fs/fs.h>
 
 /* 
  * Main module for the protected-mode kernel code
@@ -84,9 +82,7 @@ void kmain(){
 	
 	terminal_cwrite(0x00FF00, " OK\n");
 
-	int res = fs_init();
-	if(res != SUCCESS)
-		panic("File System init error! %d\n", res);
+	fs_init();
 		
 	// Start drivrers
 	/*init_keyboard();

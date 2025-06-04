@@ -7,5 +7,7 @@ typedef void (*FN_READ)();
 typedef void (*FN_STAT)();
 typedef void (*FN_CLOSE)();
 
+void fs_init();
+
 #endif
 
