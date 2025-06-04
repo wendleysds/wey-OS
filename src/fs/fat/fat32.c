@@ -7,48 +7,66 @@
 #include <io/stream.h>
 #include <stdint.h>
 
-static uint16_t _get_dir_itens_count(uint32_t dirStartSector){
-	return 0;
+static int firstDataSector = -1; 
+
+static uint32_t _cluster_to_lba(uint32_t cluster){
+	return firstDataSector + ((cluster - 2) * 0x200);
 }
 
-static int _list_root_dir(struct FAT* fat){
-	struct FATHeaders* h = &fat->headers;
-	
-	uint32_t firstDataSector = h->boot.rsvdSecCnt + (h->boot.numFATs * h->extended.FATSz32);
-	uint32_t rootSector = firstDataSector + ((h->extended.rootClus - 2) * h->boot.secPerClus);
+static uint16_t _get_directory_itens_count(struct Directory* dir){
+	uint32_t dirSector = _cluster_to_lba(dir->firstCluster) * 0x200;
 
-	terminal_write("\n");
-	terminal_write("First Data Sector: %d\n",firstDataSector);
-	terminal_write("Root Sector:       %d\n", rootSector);
-
-	uint8_t buffer[512];
-	
-	// bytes offset = sector * bytesPerSector
-	stream_seek(fat->readStream, rootSector * fat->headers.boot.bytesPerSec);
-	stream_read(fat->readStream, buffer, sizeof(buffer));
-	terminal_write("\n");
-
-	struct FATDirectoryEntry* entries = (struct FATDirectoryEntry*)buffer;
-
-	for (int i = 0; i < 16; i++){
-		if (entries[i].DIR_Name[0] == 0x00) break;
-        if (entries[i].DIR_Name[0] == 0xE5) continue;
-		if (entries[i].DIR_FileSize == -1) continue;
-
-		char type = (entries[i].DIR_Attr & 0x10) ? 'D' : 'F';
-
-		char name[12] = {0};
-        memcpy(name, entries[i].DIR_Name, 11);
-        name[11] = '\0';
-
-		terminal_write("[%c] %s (%d bytes)\n", type, name, entries[i].DIR_FileSize);
+	struct Stream* stream = stream_new();
+	if(!stream){
+		return NO_MEMORY;
 	}
 
-	return FAILED;
+	struct FAT32DirectoryEntry entry;
+	stream_seek(stream, dirSector);
+	int count = 0;
+
+	do{
+		if(stream_read(stream, &entry, sizeof(entry)) != SUCCESS){
+			stream_dispose(stream);
+			return ERROR_IO;
+		}
+
+		if(entry.DIR_Name[0] == 0x0) break;
+		if(entry.DIR_Name[0] == 0xE5) continue;
+
+		count++;
+
+	} while(1);
+
+	stream_dispose(stream);
+
+	return count;
 }
 
-int fs_init(){
-	struct FAT* fat = (struct FAT*)kmalloc(sizeof(struct FAT));
+static int _get_root_directory(struct FAT* fat){
+	struct FATHeaders* h = &fat->headers;
+	fat->rootDir.firstCluster = h->extended.rootClus;
+	fat->rootDir.currentCluster = h->extended.rootClus;
+
+	uint16_t itemCount = _get_directory_itens_count(&fat->rootDir);
+	if(itemCount < 0)
+		return itemCount;
+
+	uint32_t dirSize = sizeof(struct FAT32DirectoryEntry) * itemCount;
+	struct FAT32DirectoryEntry* directoryEntry = (struct FAT32DirectoryEntry*)kcalloc(dirSize);
+
+	if(!directoryEntry){
+		return NO_MEMORY;
+	}
+
+	fat->rootDir.entry = directoryEntry;
+	fat->rootDir.itensCount = itemCount;
+
+	return SUCCESS;
+}
+
+int FAT32_init(struct FAT* fat){
+	fat = (struct FAT*)kmalloc(sizeof(struct FAT));
 	if(!fat){
 		return NO_MEMORY;
 	}
@@ -57,25 +75,25 @@ int fs_init(){
 
 	fat->readStream = stream_new();
 	if(!fat->readStream){
-		kfree(fat);
 		return NO_MEMORY;
 	}
 
 	fat->clusterReadStream = stream_new();
 	if(!fat->clusterReadStream){
-		stream_dispose(fat->readStream);
-		kfree(fat);
 		return NO_MEMORY;
 	}
 
 	if(stream_read(fat->readStream, &fat->headers, sizeof(fat->headers)) != SUCCESS){
-		stream_dispose(fat->readStream);
-		stream_dispose(fat->clusterReadStream);
-		kfree(fat);
 		return ERROR_IO;
 	}
 
-	_list_root_dir(fat);
+	struct FATHeaders* h = &fat->headers;
+	firstDataSector = h->boot.rsvdSecCnt + (h->boot.numFATs * h->extended.FATSz32);
+
+	int status = _get_root_directory(fat);
+	if(status != SUCCESS){
+		return status;
+	}
 
 	return SUCCESS;
 }
