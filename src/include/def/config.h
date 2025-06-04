@@ -8,9 +8,14 @@
 #define TOTAL_INTERRUPTS 256
 #define TIMER_FREQUENCY 20
 
+// Memory
 #define HEAP_BSIZE 1024 * 1024 * 20   // 20 MB
 #define HEAP_BLOCK_SIZE 4096          // 4 kB
 #define HEAP_ADDRESS 0x01000000
 #define HEAP_TABLE_ADDRESS 0x00007E00
+
+// Files and File System
+#define PATH_MAX 128
+#define FILE_DESCRIPTORS_MAX 64
 
 #endif
