@@ -42,7 +42,7 @@ struct FATHeader{
 	uint32_t totSec32;
 }__attribute__((packed));
 
-struct FATHeaderExtended{
+struct FAT32HeaderExtended{
 	uint32_t FATSz32;
 	uint16_t extFlags;
 	uint16_t FSVer;
@@ -58,7 +58,7 @@ struct FATHeaderExtended{
 	uint8_t filSysType[8];
 }__attribute__((packed));
 
-struct FATDirectoryEntry{
+struct FAT32DirectoryEntry{
 	uint8_t DIR_Name[11];
 	uint8_t DIR_Attr;
 	uint8_t NTRes;
@@ -86,7 +86,7 @@ struct FATLongDirectoryEntry{
 
 struct FATHeaders{
 	struct FATHeader boot;
-	struct FATHeaderExtended extended;
+	struct FAT32HeaderExtended extended;
 }__attribute__((packed));
 
 enum ItemType{
@@ -97,18 +97,18 @@ enum ItemType{
 };
 
 struct Directory{
-	struct FATDirectoryEntry* entry;
+	struct FAT32DirectoryEntry* entry;
 	uint16_t itensCount;
-	uint16_t startSector;
-	uint16_t endSector;
+	uint32_t firstCluster;
+	uint32_t currentCluster;
 }__attribute__((packed));
 
 struct FATItem{
 	enum ItemType type;
 	union{
-		struct FATDirectoryEntry* file;
+		struct FAT32DirectoryEntry* file;
 		struct Directory* directory;
-	}__attribute__((packed));
+	};
 }__attribute__((packed));
 
 struct FATFileDescriptor{
