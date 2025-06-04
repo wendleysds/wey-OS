@@ -1,6 +1,6 @@
 #include <arch/i386/timer.h>
 #include <arch/i386/idt.h>
-#include <io.h>
+#include <io/ports.h>
 #include <def/config.h>
 #include <stdint.h>
 

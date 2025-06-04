@@ -1,7 +1,7 @@
 #include <arch/i386/idt.h>
 #include <drivers/terminal.h>
 #include <def/config.h>
-#include <io.h>
+#include <io/ports.h>
 #include <lib/mem.h>
 #include <core/kernel.h>
 

@@ -1,4 +1,4 @@
-#include <stream.h>
+#include <io/stream.h>
 #include <drivers/ATA/ata.h>
 #include <memory/kheap.h>
 #include <lib/mem.h>

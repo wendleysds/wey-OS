@@ -4,7 +4,7 @@
 #include <lib/mem.h>
 #include <def/status.h>
 #include <drivers/terminal.h>
-#include <stream.h>
+#include <io/stream.h>
 #include <stdint.h>
 
 static uint16_t _get_dir_itens_count(uint32_t dirStartSector){

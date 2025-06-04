@@ -3,7 +3,7 @@
 #include <lib/font.h>
 #include <lib/utils.h>
 #include <lib/mem.h>
-#include <io.h>
+#include <io/ports.h>
 #include <stdint.h>
 #include <stdarg.h>
 

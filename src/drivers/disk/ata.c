@@ -1,6 +1,5 @@
-#include "drivers/terminal.h"
 #include <drivers/ATA/ata.h>
-#include <io.h>
+#include <io/ports.h>
 #include <def/status.h>
 #include <stdint.h>
 
