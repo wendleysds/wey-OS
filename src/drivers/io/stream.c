@@ -1,5 +1,5 @@
 #include <io/stream.h>
-#include <drivers/ATA/ata.h>
+#include <io/ata.h>
 #include <memory/kheap.h>
 #include <lib/mem.h>
 
