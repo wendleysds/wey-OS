@@ -1,4 +1,4 @@
-TARGET = kernel.img
+TARGET = $(IMG_DIR)/kernel.img
 
 # Compilers
 CC = i686-elf-gcc
@@ -64,21 +64,23 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 
 SECTOR_SIZE = 512
 
-# Create kernel.img
-$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN) $(FAT_SIG) $(FAT_EMPTY)
-	@echo "Creating os image..."
-	mkdir -p $(IMG_DIR)
-	dd if=/dev/zero of=$(IMG_DIR)/$@ bs=1048576 count=16
-	dd if=$(BOOTLOADER_BIN) of=$(IMG_DIR)/$@ conv=notrunc
-	dd if=$(FAT_SIG) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
-	dd if=$(FAT_EMPTY) of=$(IMG_DIR)/$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
-	@echo "Created IMG in $(IMG_DIR)/$@"
-	@echo "Mounting $@ in $(MOUNT_DIR) and copying binaries..."
-	sudo mount -t vfat $(IMG_DIR)/$@ $(MOUNT_DIR)
+update-bins: $(TARGET) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
+	@echo "Mounting $< in $(MOUNT_DIR) and copying binaries..."
+	sudo mount -t vfat $< $(MOUNT_DIR)
 	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
 	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
 	sudo umount $(MOUNT_DIR)
 	@echo "IMG Ready!"
+
+# Create kernel.img
+$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(FAT_SIG) $(FAT_EMPTY)
+	@echo "Creating os image..."
+	mkdir -p $(IMG_DIR)
+	dd if=/dev/zero of=$@ bs=1048576 count=16
+	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
+	dd if=$(FAT_SIG) of=$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
+	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
+	@echo "Created IMG in $@"
 	
 # Create directories
 $(BUILD_DIRS):
@@ -151,7 +153,7 @@ all:
 	make
 
 run:
-	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG_DIR)/$(TARGET)
+	qemu-system-i386 -serial stdio -drive format=raw,file=$(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR)
