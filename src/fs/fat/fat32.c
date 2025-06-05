@@ -97,3 +97,18 @@ int FAT32_init(struct FAT* fat){
 
 	return SUCCESS;
 }
+
+struct FATFileDescriptor* FAT32_open(const char *pathname, uint8_t flags, uint8_t mode){
+	return 0x0;
+}
+
+int FAT32_read(struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
+	return -1;
+}
+
+int FAT32_close(struct FATFileDescriptor *ffd){
+	if(!ffd)
+		return FAILED;
+
+	return SUCCESS;
+}
