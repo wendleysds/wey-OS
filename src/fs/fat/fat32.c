@@ -8,13 +8,14 @@
 #include <stdint.h>
 
 static int firstDataSector = -1; 
+static struct FATHeaders headers;
 
 static uint32_t _cluster_to_lba(uint32_t cluster){
-	return firstDataSector + ((cluster - 2) * 0x200);
+	return firstDataSector + ((cluster - 2) * headers.boot.bytesPerSec);
 }
 
 static uint16_t _get_directory_itens_count(struct Directory* dir){
-	uint32_t dirSector = _cluster_to_lba(dir->firstCluster) * 0x200;
+	uint32_t dirSector = _cluster_to_lba(dir->firstCluster) * headers.boot.bytesPerSec;
 
 	struct Stream* stream = stream_new();
 	if(!stream){
@@ -44,9 +45,8 @@ static uint16_t _get_directory_itens_count(struct Directory* dir){
 }
 
 static int _get_root_directory(struct FAT* fat){
-	struct FATHeaders* h = &fat->headers;
-	fat->rootDir.firstCluster = h->extended.rootClus;
-	fat->rootDir.currentCluster = h->extended.rootClus;
+	fat->rootDir.firstCluster = headers.extended.rootClus;
+	fat->rootDir.currentCluster = headers.extended.rootClus;
 
 	uint16_t itemCount = _get_directory_itens_count(&fat->rootDir);
 	if(itemCount < 0)
@@ -87,8 +87,8 @@ int FAT32_init(struct FAT* fat){
 		return ERROR_IO;
 	}
 
-	struct FATHeaders* h = &fat->headers;
-	firstDataSector = h->boot.rsvdSecCnt + (h->boot.numFATs * h->extended.FATSz32);
+	headers = fat->headers;
+	firstDataSector = headers.boot.rsvdSecCnt + (headers.boot.numFATs * headers.extended.FATSz32);
 
 	int status = _get_root_directory(fat);
 	if(status != SUCCESS){
