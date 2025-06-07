@@ -67,10 +67,10 @@ char *strchr(const char *s, int c){
 
 char* strtok(char *restrict s, const char *restrict delim){
 	static char* p = NULL;
-	if(!s)
+	if(s)
 		p = s;
 
-	if(p == NULL)
+	if(!p)
 		return NULL;
 
 	while(*p && strchr(delim, *p)){
