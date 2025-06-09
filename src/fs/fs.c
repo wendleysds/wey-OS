@@ -11,12 +11,15 @@ static struct FileDescriptor* fileDescriptors[FILE_DESCRIPTORS_MAX];
 
 void fs_init() {
 	memset(fileDescriptors, 0x0, sizeof(fileDescriptors));
-	struct FAT fat;
 
+	struct FAT fat;
 	int status = FAT32_init(&fat); 
+
 	if(status != SUCCESS){
 		panic("Failed to initialize File System! STATUS %d", status);
 	}
+
+	FAT32_open(&fat, "/kernel.bin", 0, 0);	
 }
 
 
