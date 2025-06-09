@@ -106,6 +106,7 @@ struct Directory{
 struct FATItem{
 	enum ItemType type;
 	union{
+		struct FATLongDirectoryEntry* fileLong;
 		struct FAT32DirectoryEntry* file;
 		struct Directory* directory;
 	};
@@ -114,6 +115,8 @@ struct FATItem{
 struct FATFileDescriptor{
 	struct FATItem* item;
 	uint32_t unused;
+	uint32_t firstCluster;
+	uint32_t currentCluster;
 }__attribute__((packed));
 
 struct FAT{
