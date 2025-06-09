@@ -164,7 +164,7 @@ void terminal_backspace(){
 	}
 }
 
-void terminal_vwrite(uint32_t color, const char *format, va_list args) {
+void terminal_vwrite(uint32_t color, const char *restrict format, va_list args) {
   char buffer[32];
 
   for (const char *ptr = format; *ptr; ptr++) {
@@ -199,14 +199,14 @@ void terminal_vwrite(uint32_t color, const char *format, va_list args) {
   }
 }
 
-void terminal_write(const char *format, ...){
+void terminal_write(const char *restrict format, ...){
 	va_list args;
   va_start(args, format);
   terminal_vwrite(TERMINAL_DEFAULT_COLOR, format, args);
   va_end(args);
 }
 
-void terminal_cwrite(uint32_t color, const char *format, ...) {
+void terminal_cwrite(uint32_t color, const char *restrict format, ...) {
   va_list args;
   va_start(args, format);
   terminal_vwrite(color, format, args);

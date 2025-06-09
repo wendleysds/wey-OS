@@ -28,9 +28,9 @@ struct VideoStructPtr{
 void terminal_init();
 
 void terminal_clear();
-void terminal_write(const char* format, ...);
-void terminal_cwrite(uint32_t color, const char *format, ...);
-void terminal_vwrite(uint32_t color, const char *format, va_list args);
+void terminal_write(const char *restrict format, ...);
+void terminal_cwrite(uint32_t color, const char *restrict format, ...);
+void terminal_vwrite(uint32_t color, const char *restrict format, va_list args);
 void terminal_backspace();
 
 #endif
