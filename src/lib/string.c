@@ -65,6 +65,16 @@ char *strchr(const char *s, int c){
 	return *s == c ? (char *) s : NULL;
 }
 
+char *strrchr(const char *s, int c) {
+	const char *p = NULL;
+	for (;;) {
+		if (*s == (char)c)
+			p = s;
+		if (*s++ == '\0')
+			return (char *)p;
+	}
+}
+
 char* strtok(char *restrict s, const char *restrict delim){
 	static char* p = NULL;
 	if(s)
