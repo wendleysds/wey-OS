@@ -221,16 +221,16 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 
 	char* token = strtok(path, "/");
 
-	struct FATItem item;
+	struct FATItem itembuff;
 
-	if(_get_item_in_diretory(token, &item, &fat->rootDir) != SUCCESS){
+	if(_get_item_in_diretory(token, &itembuff, &fat->rootDir) != SUCCESS){
 			kfree(fd);
 			return 0x0;
 	}
 
 	while((token = strtok(0x0, "/"))){
-		if(item.type == Directory){
-			if(_get_item_in_diretory(token, &item, item.directory) == SUCCESS){
+		if(itembuff.type == Directory){
+			if(_get_item_in_diretory(token, &itembuff, itembuff.directory) == SUCCESS){
 				continue;
 			}
 		}
@@ -239,21 +239,21 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 		return 0x0;
 	}
 
-	struct FATItem* fitem = (struct FATItem*)kmalloc(sizeof(struct FATItem));
-	if(!fitem){
+	struct FATItem* item = (struct FATItem*)kmalloc(sizeof(struct FATItem));
+	if(!item){
 		kfree(fd);
 		return 0x0;
 	}
 
-	memcpy(fitem, &item, sizeof(struct FATItem));
+	memcpy(item, &itembuff, sizeof(struct FATItem));
 
 	uint32_t cluster = 0;
-	if(fitem->type == Directory)
-		cluster = _get_cluster_entry(fitem->directory->entry);
-	else if(fitem->type == File)
-		cluster = _get_cluster_entry(fitem->file);
+	if(item->type == Directory)
+		cluster = _get_cluster_entry(item->directory->entry);
+	else if(item->type == File)
+		cluster = _get_cluster_entry(item->file);
 
-	fd->item = fitem;
+	fd->item = item;
 	fd->firstCluster = cluster;
 	fd->currentCluster = 1;
 	fd->unused = 0;
