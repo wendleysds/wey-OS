@@ -65,10 +65,11 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 update-bins: $(TARGET) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
-	@echo "Mounting $< in $(MOUNT_DIR) and copying binaries..."
+	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
 	sudo mount -t vfat $< $(MOUNT_DIR)
 	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
 	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
+	sudo cp -r home $(MOUNT_DIR)
 	sudo umount $(MOUNT_DIR)
 	@echo "IMG Ready!"
 

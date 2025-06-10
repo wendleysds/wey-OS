@@ -13,7 +13,7 @@ static int firstDataSector = -1;
 static struct FATHeaders headers;
 
 static uint32_t _cluster_to_lba(uint32_t cluster){
-	return firstDataSector + ((cluster - 2) * headers.boot.bytesPerSec);
+	return firstDataSector + ((cluster - 2) * headers.boot.secPerClus);
 }
 
 static uint32_t _get_cluster_entry(struct FAT32DirectoryEntry* entry){
@@ -215,8 +215,6 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 		return 0x0;
 	}
 
-	memset(fd, 0x0, sizeof(struct FATFileDescriptor));
-		
 	char path[PATH_MAX];
 	memset(path, 0x0, sizeof(path)); // remove garbage
 	strcpy(path, pathname);
@@ -225,27 +223,71 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 
 	struct FATItem item;
 
-	do{
-		int res = _get_item_in_diretory("kernel.bin", &item, &fat->rootDir);
-		if(res != SUCCESS) break;
+	if(_get_item_in_diretory(token, &item, &fat->rootDir) != SUCCESS){
+			kfree(fd);
+			return 0x0;
+	}
 
-		terminal_write("\n--file--\n");
-		terminal_write("type:    %s\n", item.type == File ? "File" : "Directory");
-		
-		if(item.type == File){
-			terminal_write("name:    %s\n", item.file->DIR_Name);
-			terminal_write("HighC:   %d\n", item.file->DIR_FstClusHI);
-			terminal_write("LowC:    %d\n", item.file->DIR_FstClusLO);
-			terminal_write("Size:    %d Bytes\n", item.file->DIR_FileSize);
+	while((token = strtok(0x0, "/"))){
+		if(item.type == Directory){
+			if(_get_item_in_diretory(token, &item, item.directory) == SUCCESS){
+				continue;
+			}
 		}
 
-	} while ((token = strtok(0x0, "/")));
+		kfree(fd);
+		return 0x0;
+	}
 
-	return 0x0;
+	struct FATItem* fitem = (struct FATItem*)kmalloc(sizeof(struct FATItem));
+	if(!fitem){
+		kfree(fd);
+		return 0x0;
+	}
+
+	memcpy(fitem, &item, sizeof(struct FATItem));
+
+	uint32_t cluster = 0;
+	if(fitem->type == Directory)
+		cluster = _get_cluster_entry(fitem->directory->entry);
+	else if(fitem->type == File)
+		cluster = _get_cluster_entry(fitem->file);
+
+	fd->item = fitem;
+	fd->firstCluster = cluster;
+	fd->currentCluster = 1;
+	fd->unused = 0;
+
+	return fd;
 }
 
-int FAT32_read(struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
-	return -1;
+// Maximum reading of 4096 bytes  (for now)
+// NOT SUPPORT CLUSTER CHAIN READ (for now)
+int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
+	if(ffd->item->type == Directory)
+		return INVALID_VARG;
+
+	uint32_t cluster = _get_cluster_entry(ffd->item->file);
+	uint32_t sector = _cluster_to_lba(cluster);
+	uint32_t offset = sector * headers.boot.bytesPerSec;
+	offset += ffd->unused;
+
+	if((ffd->unused + count) > ffd->item->file->DIR_FileSize){
+		int remain = ffd->item->file->DIR_FileSize - ffd->unused;
+
+		stream_seek(fat->clusterReadStream, offset);
+		stream_read(fat->clusterReadStream, buffer, remain);
+
+		ffd->unused += remain;
+		return remain;
+	}
+
+	stream_seek(fat->clusterReadStream, offset);
+	stream_read(fat->clusterReadStream, buffer, count);
+
+	ffd->unused += count;
+
+	return count;
 }
 
 int FAT32_close(struct FATFileDescriptor *ffd){
