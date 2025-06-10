@@ -179,11 +179,9 @@ get_next_cluster:
 	add eax, ebx ; BPB_RsvdSecCnt + offset
 
 	; Read the sector
-	push edx
 	mov edi, 0x6000
 	mov ecx, 1
 	call ata_lba_read
-	pop edx
 
 	; Get fat entry
 	mov esi, 0x6000

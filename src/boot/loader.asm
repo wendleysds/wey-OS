@@ -43,10 +43,7 @@ start:
 	mov ss, ax
 	mov fs, ax
 	mov es, ax
-
 	mov sp, 0x7C00
-
-	
 	sti
 
 	; Get Data Sector: BPB_ResvdSecCnt + (BPB_NumFATs * FATSz)
@@ -57,17 +54,25 @@ start:
 	mov word[DataSector], ax
 
 	call find_file
-	jc .err
+	jc .notfound
 	
 	call load_file
 
 	jmp 0x0000:0x1000
 
+.notfound:
+	mov si, msg_ERRFNOT
+	jmp .halt
+
 .err:
 	mov si, msg_ERROR
-	call print_str
+	jmp .halt
+
+.diskerr:
+	mov si, msg_ERRDISK
 
 .halt:
+	call print_str
 	hlt
 	jmp $
 
@@ -88,7 +93,7 @@ find_file:
 	mov bx, 0x8000 ; Root Sector Buffer
 	mov al, byte[BPB_SecPerClus]
 	call disk_read
-	jc .not_found
+	jc start.diskerr
 
 	mov si, 0x8000
 
@@ -144,6 +149,7 @@ load_file:
     call disk_read
 	
 	popa
+	clc
 	ret
 
 ; Print messages in the screen
@@ -231,7 +237,9 @@ lba_to_chs:
 	mov byte[Cylinder], al
 	ret
 
-msg_ERROR: db "NO", 0x0a, 0x0d, 0
+msg_ERRFNOT: db "File not found!", 0x0a, 0x0d, 0
+msg_ERRDISK: db "Disk read error!", 0x0a, 0x0d, 0
+msg_ERROR: db "Error", 0x0a, 0x0d, 0
 
 entry_file_name: db "STEP1   BIN"
 
