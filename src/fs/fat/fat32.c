@@ -294,5 +294,18 @@ int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd)
 		return FAILED;
 
+	if(ffd->item->type == Directory){
+		kfree(ffd->item->directory->entry);
+		kfree(ffd->item->directory);
+	} else if(ffd->item->type == File){
+		kfree(ffd->item->file);
+	} else {
+		kfree(ffd->item->fileLong);
+	}
+
+	kfree(ffd->item);
+	kfree(ffd);
+	ffd = 0x0;
+
 	return SUCCESS;
 }

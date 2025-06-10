@@ -38,6 +38,7 @@ void fs_init() {
 
 	for(int i = 0; i < bytesReaded; i++)
 		terminal_write("%c", buffer[i]);
-}
 
+	FAT32_close(file);
+}
 
