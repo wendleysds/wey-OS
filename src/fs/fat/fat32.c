@@ -9,6 +9,8 @@
 #include <io/stream.h>
 #include <stdint.h>
 
+#define CLUSTER_SIZE 4096
+
 static int firstDataSector = -1; 
 static struct FATHeaders headers;
 
@@ -18,6 +20,30 @@ static uint32_t _cluster_to_lba(uint32_t cluster){
 
 static uint32_t _get_cluster_entry(struct FAT32DirectoryEntry* entry){
 	return (entry->DIR_FstClusHI << 16) | entry->DIR_FstClusLO;
+}
+
+static uint32_t _next_cluster(struct FAT* fat, uint32_t current){
+	uint16_t secSize = headers.boot.bytesPerSec;
+	uint8_t buffer[headers.boot.bytesPerSec];
+
+	uint32_t offset = current * 4;
+	uint32_t sector = headers.boot.rsvdSecCnt + (offset / secSize);
+	uint32_t entryOffset = offset % secSize;
+	sector *= headers.boot.bytesPerSec;
+
+	stream_seek(fat->readStream, sector);
+	if(stream_read(fat->readStream, buffer, sizeof(buffer)) == SUCCESS){
+		uint32_t nextCluster = 
+			buffer[entryOffset] | 
+			(buffer[entryOffset + 1] << 8) |
+			(buffer[entryOffset + 2] << 16) |
+			(buffer[entryOffset + 3] << 24);
+
+		nextCluster &= 0x0FFFFFFF;
+		return nextCluster;
+	}
+
+	return 0xFFFFFFFF;
 }
 
 // set 'out' with the 'name' formated in 8:3
@@ -255,40 +281,58 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 
 	fd->item = item;
 	fd->firstCluster = cluster;
-	fd->currentCluster = 1;
-	fd->unused = 0;
+	fd->currentCluster = cluster;
+	fd->cursor = 0;
 
 	return fd;
 }
 
-// Maximum reading of 4096 bytes  (for now)
-// NOT SUPPORT CLUSTER CHAIN READ (for now)
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
-	if(ffd->item->type == Directory)
+	if (!fat || !ffd || !ffd->item || ffd->item->type != File || !buffer)
 		return INVALID_VARG;
 
-	uint32_t cluster = _get_cluster_entry(ffd->item->file);
-	uint32_t sector = _cluster_to_lba(cluster);
+	uint32_t cursor = ffd->cursor;
+	uint32_t fileSize = ffd->item->file->DIR_FileSize;
+
+	if (cursor >= fileSize) return 0;
+	if ((cursor + count) > fileSize)
+		count = fileSize - cursor;
+
+	uint32_t remaining = count;
+	uint32_t totalRead = 0;
+
+	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
 	uint32_t offset = sector * headers.boot.bytesPerSec;
-	offset += ffd->unused;
 
-	if((ffd->unused + count) > ffd->item->file->DIR_FileSize){
-		int remain = ffd->item->file->DIR_FileSize - ffd->unused;
+	while (remaining > 0) {
+		uint32_t clusterOffset = cursor % CLUSTER_SIZE;
+		uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+		uint32_t toRead = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
 
-		stream_seek(fat->clusterReadStream, offset);
-		stream_read(fat->clusterReadStream, buffer, remain);
+		stream_seek(fat->clusterReadStream, offset + clusterOffset);
+		if(stream_read(fat->clusterReadStream, (uint8_t*)buffer + totalRead, toRead) != SUCCESS){
+			return ERROR_IO;
+		}
 
-		ffd->unused += remain;
-		return remain;
+		cursor += toRead;
+		totalRead += toRead;
+		remaining -= toRead;
+
+		if (cursor % CLUSTER_SIZE == 0) {
+			uint32_t next = _next_cluster(fat, ffd->currentCluster);
+			if (next >= 0x0FFFFFF8)
+				break;
+
+			ffd->currentCluster = next;
+			sector = _cluster_to_lba(ffd->currentCluster);
+			offset = sector * headers.boot.bytesPerSec;
+		}
 	}
 
-	stream_seek(fat->clusterReadStream, offset);
-	stream_read(fat->clusterReadStream, buffer, count);
-
-	ffd->unused += count;
-
-	return count;
+	ffd->cursor = cursor;
+	return totalRead;
 }
+
 
 int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd)

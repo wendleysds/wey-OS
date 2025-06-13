@@ -4,6 +4,7 @@
 #include <fs/file.h>
 #include <fs/fat/fat32.h>
 #include <lib/mem.h>
+#include <lib/string.h>
 #include <core/kernel.h>
 #include <def/status.h>
 #include <def/config.h>
@@ -23,21 +24,34 @@ void fs_init() {
 		panic("Failed to initialize File System! STATUS %d", status);
 	}
 
-	char* filepath = "/home/test.txt";
+	char* filepath = "/home/chars.txt";
 
-	FILE* file = FAT32_open(&fat, filepath, 0, 0);	
-	if(!file)
+	FILE* file = FAT32_open(&fat, filepath, 0, 0);
+
+	if(!file){
 		terminal_write("%s not found!\n", filepath);
+		return;
+	}
 
-	char buffer[512];
+	terminal_write("Reading %s...\n", file->item->file->DIR_Name);
 
-	terminal_write("\nReading content from '%s'...\n");
-	int bytesReaded = FAT32_read(&fat, file, buffer, sizeof(buffer));
-	terminal_write("Readed %d bytes\n", bytesReaded);
-	terminal_write("%s: ", filepath);
+	char buffer[5000];
+	int bytesReaded = 0;
+	int totalReaded = 0;
+	int lastReadAmount = 0;
+	while((bytesReaded = FAT32_read(&fat, file, buffer, 50)) > 0){
+		totalReaded += bytesReaded;
+		lastReadAmount = bytesReaded;
+	}
 
-	for(int i = 0; i < bytesReaded; i++)
+	terminal_write("Total read: %d bytes\n", totalReaded);
+
+	terminal_write("Reading Last %d bytes\n", lastReadAmount);
+	for (int i = 0; i < lastReadAmount; i++) {
 		terminal_write("%c", buffer[i]);
+	}
+
+	terminal_write("\n");
 
 	FAT32_close(file);
 }
