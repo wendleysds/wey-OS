@@ -9,6 +9,10 @@
 #include <io/stream.h>
 #include <stdint.h>
 
+/*
+ * Main module for FAT32 parse and handler
+ */
+
 #define CLUSTER_SIZE 4096
 
 static int firstDataSector = -1; 
@@ -115,6 +119,7 @@ static int _get_directory_itens_count(struct Directory* dir){
 	return count;
 }
 
+// Transform a entry in a Directory
 static struct Directory* _create_directory_entry(struct FAT32DirectoryEntry* entry){
 	struct Directory* dir = (struct Directory*)kcalloc(sizeof(struct Directory));
 	if(!dir){
@@ -250,8 +255,8 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 	struct FATItem itembuff;
 
 	if(_get_item_in_diretory(token, &itembuff, &fat->rootDir) != SUCCESS){
-			kfree(fd);
-			return 0x0;
+		kfree(fd);
+		return 0x0;
 	}
 
 	while((token = strtok(0x0, "/"))){
