@@ -147,10 +147,10 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 
 	struct FAT32DirectoryEntry buffer;
 	char filename[12];
-
 	_format_fat_name(itemName, filename);
-	uint32_t lba = _cluster_to_lba(dir->firstCluster) * headers.boot.bytesPerSec;
-	stream_seek(stream, lba);
+
+	uint32_t lba = _cluster_to_lba(dir->firstCluster);
+	stream_seek(stream, lba* headers.boot.bytesPerSec);
 
 	while(1){
 		if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS){
