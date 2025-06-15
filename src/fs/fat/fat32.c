@@ -236,7 +236,7 @@ int FAT32_init(struct FAT* fat){
 	return SUCCESS;
 }
 
-struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint8_t flags, uint8_t mode){
+struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint8_t flags){
 	if(strlen(pathname) == 0 || strlen(pathname) > PATH_MAX){
 		return 0x0;
 	}
@@ -294,7 +294,7 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
 	if (!fat || !ffd || !ffd->item || ffd->item->type != File || !buffer)
-		return INVALID_VARG;
+		return INVALID_ARG;
 
 	uint32_t cursor = ffd->cursor;
 	uint32_t fileSize = ffd->item->file->DIR_FileSize;

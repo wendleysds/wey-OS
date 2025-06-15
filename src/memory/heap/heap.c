@@ -153,7 +153,7 @@ int create_heap(struct Heap *heap, struct HeapTable *table, void *startPtr, void
 {
   if (!_is_aligned(startPtr) || !_is_aligned(end))
   {
-    return INVALID_VARG;
+    return INVALID_ARG;
   }
 
   memset(heap, 0, sizeof(struct Heap));
