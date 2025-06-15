@@ -1,5 +1,6 @@
 #include "drivers/terminal.h"
 #include "fs/fat/fatdefs.h"
+#include "memory/kheap.h"
 #include <fs/fs.h>
 #include <fs/file.h>
 #include <fs/fat/fat32.h>
@@ -11,48 +12,75 @@
 #include <stdint.h>
 
 static struct FileDescriptor* fileDescriptors[FILE_DESCRIPTORS_MAX];
-
-typedef struct FATFileDescriptor FILE;
+static struct FAT fat;
 
 void fs_init() {
 	memset(fileDescriptors, 0x0, sizeof(fileDescriptors));
 
-	struct FAT fat;
 	int status = FAT32_init(&fat); 
-
 	if(status != SUCCESS){
 		panic("Failed to initialize File System! STATUS %d", status);
 	}
-
-	char* filepath = "/home/chars.txt";
-
-	FILE* file = FAT32_open(&fat, filepath, 0, 0);
-
-	if(!file){
-		terminal_write("%s not found!\n", filepath);
-		return;
-	}
-
-	terminal_write("Reading %s...\n", file->item->file->DIR_Name);
-
-	char buffer[5000];
-	int bytesReaded = 0;
-	int totalReaded = 0;
-	int lastReadAmount = 0;
-	while((bytesReaded = FAT32_read(&fat, file, buffer, 50)) > 0){
-		totalReaded += bytesReaded;
-		lastReadAmount = bytesReaded;
-	}
-
-	terminal_write("Total read: %d bytes\n", totalReaded);
-
-	terminal_write("Reading Last %d bytes\n", lastReadAmount);
-	for (int i = 0; i < lastReadAmount; i++) {
-		terminal_write("%c", buffer[i]);
-	}
-
-	terminal_write("\n");
-
-	FAT32_close(file);
 }
 
+static uint8_t _get_next_fd_index(){
+	uint8_t i = 3; // first 3 reserved: std(in, out, err)
+	for (; i < FILE_DESCRIPTORS_MAX - 3; i++) {
+		if(fileDescriptors[i] == 0x0)
+			return i;
+	}
+
+	return ERROR;
+}
+
+int open(const char *pathname, int flags){
+	int p = _get_next_fd_index();
+	if(p == ERROR)
+		return p;
+
+	void* ffd = FAT32_open(&fat, pathname, flags);
+	if(!ffd){
+		return FILE_NOT_FOUND;
+	}
+
+	struct FileDescriptor* fd = (struct FileDescriptor*)kmalloc(sizeof(struct FileDescriptor));
+	if(!fd){
+		FAT32_close(ffd);
+		return NO_MEMORY;
+	}
+
+	fd->descriptorPtr = ffd;
+	fd->flags = flags;
+	fd->index = p;
+	fileDescriptors[p] = fd;
+
+	return p;
+}
+
+int read(int fd, void *buffer, uint32_t count){
+	if(fd < 0 || !buffer){
+		return INVALID_ARG;
+	}
+
+	struct FileDescriptor* fdPtr = fileDescriptors[fd];
+	if(!fdPtr){
+		return NULL_PTR;
+	}
+
+	if(fdPtr->flags & O_RDONLY)
+		return FAT32_read(&fat, fdPtr->descriptorPtr, buffer, count);
+	else
+		return READ_FAIL;
+}
+
+int close(int fd){
+	struct FileDescriptor* fdPtr = fileDescriptors[fd];
+	if(!fdPtr)
+		return ERROR;
+
+	FAT32_close(fdPtr->descriptorPtr);
+	kfree(fdPtr);
+	fileDescriptors[fd] = 0x0;
+
+	return 0;
+}

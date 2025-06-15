@@ -91,6 +91,11 @@ void kmain(){
 
 	terminal_cwrite(0x00FF00, "KERNEL READY\n\n");*/
 
+	int fd = open("/home/test.txt", O_RDONLY);
+	char buffer[32];
+	read(fd, buffer, sizeof(buffer));
+	terminal_write("\n%s", buffer);
+
 	terminal_cwrite(0x00FF00, "\nKERNEL OK");
 
 	// Main loop
