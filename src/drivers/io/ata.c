@@ -31,6 +31,10 @@
  * standard I/O ports of the ATA interface (primary channel, master).
  */
 int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
+	return ata_read_sectors_28(lba, totalSectors, buffer);
+}
+
+int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 	// Wait until disk be ready
 	uint8_t status = FAILED;
 	for(int i = 0; i < TRIES; i++){
@@ -51,6 +55,57 @@ int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
 	outb(CYLINDER_HIGH_REGISTER, (uint8_t)(lba >> 16));  // High
 	outb(COMMAND_REGISTER, 0x20); // Read
 	
+	uint16_t* ptr = (uint16_t*)buffer;
+	for(uint8_t sector = 0; sector < totalSectors; sector++){
+		int tries = TRIES;
+		while(tries--){
+			status = inb(0x1F7);
+			if (status & ATA_SR_ERR)
+				return ERROR;
+
+			if (status & ATA_SR_DRQ)
+				break;
+		}
+
+		if(tries < 0)
+			return TIMEOUT;
+
+		for(int i = 0; i < WORDS_PER_READ; i++){
+			*ptr++ = insw(0x1F0);
+		}
+	}
+
+	return SUCCESS;
+}
+
+int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
+	// Wait until disk be ready
+	uint8_t status = FAILED;
+	for(int i = 0; i < TRIES; i++){
+		uint8_t ATAStatus = inb(STATUS_REGISTER);
+		if(!(ATAStatus & ATA_SR_BSY) && (ATAStatus & ATA_SR_DRDY)){
+			status = OK;
+			break;
+		}
+	}
+
+	if(status == FAILED)
+		return TIMEOUT;
+
+	outb(SECTOR_COUNT_REGISTER, (totalSectors >> 8) & 0xFF);
+	outb(SECTOR_NUMBER_REGISTER, (lba >> 24) & 0xFF);
+	outb(CYLINDER_LOW_REGISTER, (lba >> 32) & 0xFF);
+	outb(CYLINDER_HIGH_REGISTER, (lba >> 40) & 0xFF);
+
+	outb(SECTOR_COUNT_REGISTER, totalSectors & 0xFF);
+	outb(SECTOR_NUMBER_REGISTER, (lba >> 0) & 0xFF);
+	outb(CYLINDER_LOW_REGISTER, (lba >> 8) & 0xFF);
+	outb(CYLINDER_HIGH_REGISTER, (lba >> 16) & 0xFF);
+
+	outb(DRIVE_HEAD_REGISTER, 0x40);
+
+	outb(COMMAND_REGISTER, 0x24);
+
 	uint16_t* ptr = (uint16_t*)buffer;
 	for(uint8_t sector = 0; sector < totalSectors; sector++){
 		int tries = TRIES;
