@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define TRIES 100000
-#define WORDS_PER_READ 256
+#define WORDS_PER_SECTOR 256
 
 // ATA Primary ports
 #define DATA_RESGISTE 0x1F0
@@ -34,45 +34,47 @@ int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
 	return ata_read_sectors_28(lba, totalSectors, buffer);
 }
 
+/*
+ * Write sectors from an ATA disk using LBA addressing.
+ *
+ * Writing is done through direct communication with the 
+ * standard I/O ports of the ATA interface (primary channel, master).
+ */
+int ata_write_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
+	return ata_write_sectors_28(lba, totalSectors, buffer);
+}
+
 int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 	// Wait until disk be ready
-	uint8_t status = FAILED;
-	for(int i = 0; i < TRIES; i++){
-		uint8_t ATAStatus = inb(STATUS_REGISTER);
-		if(!(ATAStatus & ATA_SR_BSY) && (ATAStatus & ATA_SR_DRDY)){
-			status = OK;
-			break;
-		}
-	}
+	int t = TRIES;
+	uint8_t status;
+	do{
+		status = inb_p(STATUS_REGISTER);
+		if(!t--)
+			return TIMEOUT;
+	} while (status & ATA_SR_BSY);
 
-	if(status == FAILED)
-		return TIMEOUT;
-
-	outb(DRIVE_HEAD_REGISTER, (lba >> 24) | 0xE0);       // Drive + LBA bits
-	outb(SECTOR_COUNT_REGISTER, totalSectors);
-	outb(SECTOR_NUMBER_REGISTER, (uint8_t)(lba & 0xFF)); // Low
-	outb(CYLINDER_LOW_REGISTER, (uint8_t)(lba >> 8));    // Mid
-	outb(CYLINDER_HIGH_REGISTER, (uint8_t)(lba >> 16));  // High
-	outb(COMMAND_REGISTER, 0x20); // Read
+	outb_p(DRIVE_HEAD_REGISTER, (lba >> 24) | 0xE0);       // Drive + LBA bits
+	outb_p(SECTOR_COUNT_REGISTER, totalSectors);
+	outb_p(SECTOR_NUMBER_REGISTER, (uint8_t)(lba & 0xFF)); // Low
+	outb_p(CYLINDER_LOW_REGISTER, (uint8_t)(lba >> 8));    // Mid
+	outb_p(CYLINDER_HIGH_REGISTER, (uint8_t)(lba >> 16));  // High
+	outb_p(COMMAND_REGISTER, 0x20); // Read
 	
 	uint16_t* ptr = (uint16_t*)buffer;
 	for(uint8_t sector = 0; sector < totalSectors; sector++){
-		int tries = TRIES;
-		while(tries--){
-			status = inb(0x1F7);
+		t = TRIES;
+		do {
+			status = inb_p(STATUS_REGISTER);
+
 			if (status & ATA_SR_ERR)
 				return ERROR;
+			if (!t--)
+				return TIMEOUT;
+		} while (!(status & ATA_SR_DRQ));
 
-			if (status & ATA_SR_DRQ)
-				break;
-		}
-
-		if(tries < 0)
-			return TIMEOUT;
-
-		for(int i = 0; i < WORDS_PER_READ; i++){
-			*ptr++ = insw(0x1F0);
-		}
+		insw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		ptr += WORDS_PER_SECTOR;
 	}
 
 	return SUCCESS;
@@ -80,52 +82,89 @@ int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 
 int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
 	// Wait until disk be ready
-	uint8_t status = FAILED;
-	for(int i = 0; i < TRIES; i++){
-		uint8_t ATAStatus = inb(STATUS_REGISTER);
-		if(!(ATAStatus & ATA_SR_BSY) && (ATAStatus & ATA_SR_DRDY)){
-			status = OK;
-			break;
-		}
-	}
+	int t = TRIES;
+	uint8_t status;
+	do{
+		status = inb_p(STATUS_REGISTER);
+		if(!t--)
+			return TIMEOUT;
+	} while (status & ATA_SR_BSY);
 
-	if(status == FAILED)
-		return TIMEOUT;
+	outb_p(SECTOR_COUNT_REGISTER, (totalSectors >> 8) & 0xFF);
+	outb_p(SECTOR_NUMBER_REGISTER, (lba >> 24) & 0xFF);
+	outb_p(CYLINDER_LOW_REGISTER, (lba >> 32) & 0xFF);
+	outb_p(CYLINDER_HIGH_REGISTER, (lba >> 40) & 0xFF);
 
-	outb(SECTOR_COUNT_REGISTER, (totalSectors >> 8) & 0xFF);
-	outb(SECTOR_NUMBER_REGISTER, (lba >> 24) & 0xFF);
-	outb(CYLINDER_LOW_REGISTER, (lba >> 32) & 0xFF);
-	outb(CYLINDER_HIGH_REGISTER, (lba >> 40) & 0xFF);
+	outb_p(SECTOR_COUNT_REGISTER, totalSectors & 0xFF);
+	outb_p(SECTOR_NUMBER_REGISTER, (lba >> 0) & 0xFF);
+	outb_p(CYLINDER_LOW_REGISTER, (lba >> 8) & 0xFF);
+	outb_p(CYLINDER_HIGH_REGISTER, (lba >> 16) & 0xFF);
 
-	outb(SECTOR_COUNT_REGISTER, totalSectors & 0xFF);
-	outb(SECTOR_NUMBER_REGISTER, (lba >> 0) & 0xFF);
-	outb(CYLINDER_LOW_REGISTER, (lba >> 8) & 0xFF);
-	outb(CYLINDER_HIGH_REGISTER, (lba >> 16) & 0xFF);
+	outb_p(DRIVE_HEAD_REGISTER, 0x40);
 
-	outb(DRIVE_HEAD_REGISTER, 0x40);
-
-	outb(COMMAND_REGISTER, 0x24);
+	outb_p(COMMAND_REGISTER, 0x24);
 
 	uint16_t* ptr = (uint16_t*)buffer;
 	for(uint8_t sector = 0; sector < totalSectors; sector++){
-		int tries = TRIES;
-		while(tries--){
-			status = inb(0x1F7);
+		t = TRIES;
+		do {
+			status = inb_p(STATUS_REGISTER);
+
 			if (status & ATA_SR_ERR)
 				return ERROR;
+			if (!t--)
+				return TIMEOUT;
+		} while (!(status & ATA_SR_DRQ));
 
-			if (status & ATA_SR_DRQ)
-				break;
-		}
-
-		if(tries < 0)
-			return TIMEOUT;
-
-		for(int i = 0; i < WORDS_PER_READ; i++){
-			*ptr++ = insw(0x1F0);
-		}
+		insw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		ptr += WORDS_PER_SECTOR;
 	}
 
 	return SUCCESS;
+}
+
+int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
+	if (totalSectors == 0)
+    	return INVALID_ARG;
+
+	int t = TRIES;
+	uint8_t status;
+	do{
+		status = inb_p(STATUS_REGISTER);
+		if(!t--)
+			return TIMEOUT;
+	} while (status & ATA_SR_BSY);
+
+	outb_p(DRIVE_HEAD_REGISTER, (lba >> 24) | 0xE0);       // Drive + LBA bits
+	outb_p(SECTOR_COUNT_REGISTER, totalSectors);
+	outb_p(SECTOR_NUMBER_REGISTER, (uint8_t)(lba & 0xFF)); // Low
+	outb_p(CYLINDER_LOW_REGISTER, (uint8_t)(lba >> 8));    // Mid
+	outb_p(CYLINDER_HIGH_REGISTER, (uint8_t)(lba >> 16));  // High
+	outb_p(COMMAND_REGISTER, 0x30); // Write
+
+	uint16_t* ptr = (uint16_t*)buffer;
+	for(uint8_t sector = 0; sector < totalSectors; sector++){
+		t = TRIES;
+		do {
+			status = inb_p(STATUS_REGISTER);
+
+			if (status & ATA_SR_ERR)
+				return ERROR;
+			if (!t--)
+				return TIMEOUT;
+		} while (!(status & ATA_SR_DRQ));
+
+		outsw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		ptr += WORDS_PER_SECTOR;
+	}
+
+	// Flush
+	outb_p(COMMAND_REGISTER, 0xE7);
+
+	return SUCCESS;
+}
+
+int ata_write_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
+	return NOT_IMPLEMENTED;
 }
 

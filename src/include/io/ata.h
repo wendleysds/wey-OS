@@ -32,9 +32,15 @@ struct ATAIdentifyDevice {
 	uint16_t reservedVendor[128];       // 128–255
 } __attribute__((packed));
 
+int ata_identify_device(uint16_t driver, struct ATAIdentifyDevice* restrict atabuff);
+
 int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer);
 int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer);
 int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer);
+
+int ata_write_sectors(uint32_t lba, uint8_t totalSectors, void* buffer);
+int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer);
+int ata_write_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer);
 
 #endif
 
