@@ -9,17 +9,27 @@
 #define O_CREAT     0x4
 #define O_DIRECTORY 0x8
 
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
 struct FileDescriptor {
 	uint8_t index;
 	uint8_t flags;
 	void* descriptorPtr;	
 };
 
-struct Stat {};
+struct Stat {
+	uint32_t fileSize;
+	uint8_t attr;
+	uint16_t creDate;
+	uint16_t modDate;
+};
 
 void fs_init();
 
 int open(const char *pathname, int flags);
+int stat(const char* restrict pathname, struct Stat* restrict statbuf);
 int read(int fd, void* buffer, uint32_t count);
 int write(int fd, const void* buffer, uint32_t count);
 int lseek(int fd, int offset, int whence);

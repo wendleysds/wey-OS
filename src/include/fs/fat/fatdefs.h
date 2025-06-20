@@ -75,13 +75,13 @@ struct FAT32DirectoryEntry{
 
 struct FATLongDirectoryEntry{
 	uint8_t LDIR_Ord;
-	uint8_t LDIR_Name1[10]; // Characters 1-5
+	uint16_t LDIR_Name1[5]; // Characters 1-5
 	uint8_t LDIR_Attr; // Must be ATTR_LONG_NAME
 	uint8_t LDIR_Type;
 	uint8_t LDIR_Chksum;
-	uint8_t LDIR_Name2[12]; // Characters 6-11
+	uint16_t LDIR_Name2[6]; // Characters 6-11
 	uint16_t LDIR_FstClusLO; // Must be 0
-	uint8_t LDIR_Name3[4]; // Characters 12-13
+	uint16_t LDIR_Name3[2]; // Characters 12-13
 }__attribute__((packed));
 
 struct FATHeaders{

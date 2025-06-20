@@ -57,6 +57,10 @@ int open(const char *pathname, int flags){
 	return p;
 }
 
+int stat(const char* restrict pathname, struct Stat* restrict statbuf){
+	return FAT32_stat(&fat, pathname, statbuf);
+}
+
 int read(int fd, void *buffer, uint32_t count){
 	if(fd < 0 || !buffer){
 		return INVALID_ARG;

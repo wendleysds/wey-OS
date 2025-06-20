@@ -8,7 +8,7 @@
 #include <drivers/terminal.h>
 #include <io/stream.h>
 #include <stdint.h>
-
+#include <io/ata.h>
 /*
  * Main module for FAT32 parse and handler
  */
@@ -119,8 +119,16 @@ static int _get_directory_itens_count(struct Directory* dir){
 	return count;
 }
 
+static int _create_FATEntry(struct Directory* dir, const char* name, uint32_t attr){
+	return NOT_IMPLEMENTED;
+}
+
 // Transform a entry in a Directory
 static struct Directory* _create_directory_entry(struct FAT32DirectoryEntry* entry){
+	if(!(entry->DIR_Attr & ATTR_DIRECTORY)){
+		return 0x0;
+	}
+
 	struct Directory* dir = (struct Directory*)kcalloc(sizeof(struct Directory));
 	if(!dir){
 		return 0x0;
@@ -143,6 +151,10 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
+	}
+	
+	if(strlen(itemName) > 11){
+		return NOT_SUPPORTED;
 	}
 
 	struct FAT32DirectoryEntry buffer;
@@ -292,6 +304,54 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 	return fd;
 }
 
+int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* restrict statbuf){
+	char path[PATH_MAX];
+	memset(path, 0x0, sizeof(path)); // remove garbage
+	strcpy(path, pathname);
+
+	char* token = strtok(path, "/");
+
+	struct FATItem itembuff;
+
+	if(_get_item_in_diretory(token, &itembuff, &fat->rootDir) != SUCCESS){
+		return FILE_NOT_FOUND;
+	}
+
+	while((token = strtok(0x0, "/"))){
+		if(itembuff.type == Directory){
+			if(_get_item_in_diretory(token, &itembuff, itembuff.directory) == SUCCESS){
+				continue;
+			}
+		}
+
+		return FILE_NOT_FOUND;
+	}
+
+	struct FAT32DirectoryEntry* entry;
+	if(itembuff.type == Directory){
+		entry = itembuff.directory->entry;
+	} else if (itembuff.type == File){
+		entry = itembuff.file;
+	} else{
+		return NOT_SUPPORTED;
+	}
+
+	statbuf->fileSize = entry->DIR_FileSize;
+	statbuf->attr = entry->DIR_Attr;
+	statbuf->creDate = entry->DIR_CrtDate;
+	statbuf->modDate = entry->DIR_WrtTime;
+
+	return SUCCESS;
+}
+
+int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buffer, uint32_t size){
+	if(!fat|| !ffd || !buffer){
+		return INVALID_ARG;
+	}
+
+	return NOT_IMPLEMENTED;
+}
+
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
 	if (!fat || !ffd || !ffd->item || ffd->item->type != File || !buffer)
 		return INVALID_ARG;
@@ -338,10 +398,9 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 	return totalRead;
 }
 
-
 int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd)
-		return FAILED;
+		return NULL_PTR;
 
 	if(ffd->item->type == Directory){
 		kfree(ffd->item->directory->entry);
@@ -354,7 +413,6 @@ int FAT32_close(struct FATFileDescriptor *ffd){
 
 	kfree(ffd->item);
 	kfree(ffd);
-	ffd = 0x0;
 
 	return SUCCESS;
 }

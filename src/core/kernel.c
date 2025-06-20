@@ -85,17 +85,31 @@ void kmain(){
 	fs_init();
 		
 	// Start drivrers
-	/*init_keyboard();
+	//init_keyboard();
 
-	terminal_write("\n");
-
-	terminal_cwrite(0x00FF00, "KERNEL READY\n\n");*/
+	char* filepath = "/home/test.txt";
+	struct Stat statbuff;
+	char buffer[32];
 
 	int fd = open("/home/test.txt", O_RDONLY);
-	char buffer[32];
+	stat(filepath, &statbuff);
 	read(fd, buffer, sizeof(buffer));
-	terminal_write("\n%s", buffer);
 
+	terminal_write("\ntest.txt:\n");
+	terminal_write("Create Date: %d/%d/%d\n", 
+		1980 + ((statbuff.creDate >> 9) & 0x7F),
+		(statbuff.creDate >> 5) & 0x0F,
+		statbuff.creDate & 0x1F
+	);
+	terminal_write("Modefi Date: %d/%d/%d\n", 
+		1980 + ((statbuff.creDate >> 9) & 0x7F),
+		(statbuff.creDate >> 5) & 0x0F,
+		statbuff.creDate & 0x1F
+	);
+	terminal_write("Size: %d\n", statbuff.fileSize);
+	terminal_write("Attr: %d\n", statbuff.attr);
+
+	terminal_write("Content: %s", buffer);
 	terminal_cwrite(0x00FF00, "\nKERNEL OK");
 
 	// Main loop
