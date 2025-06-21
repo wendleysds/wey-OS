@@ -4,7 +4,6 @@ global _entry32
 global kernel_registers
 
 extern kmain
-extern helloword
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
