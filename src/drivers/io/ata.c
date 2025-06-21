@@ -7,7 +7,7 @@
 #define WORDS_PER_SECTOR 256
 
 // ATA Primary ports
-#define DATA_RESGISTE 0x1F0
+#define DATA_REGISTER 0x1F0
 #define ERROR_REGISTER 0x1F1
 #define FEATURES_REGISTER 0x1F1
 #define SECTOR_COUNT_REGISTER 0x1F2
@@ -23,6 +23,46 @@
 #define ATA_SR_DRDY    0x40
 #define ATA_SR_DRQ     0x08
 #define ATA_SR_ERR     0x01
+
+int ata_identify_device(uint16_t driver, struct ATAIdentifyDevice *restrict atabuff){
+	outb_p(DRIVE_HEAD_REGISTER, 0xA0 | (driver << 4));
+
+	outb_p(SECTOR_COUNT_REGISTER, 0x0);
+	outb_p(SECTOR_NUMBER_REGISTER, 0x0);
+	outb_p(CYLINDER_LOW_REGISTER, 0x0);
+	outb_p(CYLINDER_HIGH_REGISTER, 0x0);
+
+	outb_p(COMMAND_REGISTER, 0xEC); // ATA Idendify
+
+	uint8_t status = inb_p(STATUS_REGISTER);
+	if(status == 0){
+		return INVALID_ARG; // Drive not exists
+	}
+
+	int t = TRIES;
+	do{
+		status = inb_p(STATUS_REGISTER);
+		if(!t--)
+			return TIMEOUT;
+	} while (status & ATA_SR_BSY);
+
+	if(inb_p(CYLINDER_LOW_REGISTER) || inb_p(CYLINDER_HIGH_REGISTER)){
+		return OP_ABORTED; // Drive is not ATA
+	}
+
+	status = inb(STATUS_REGISTER);
+	if (!(status & ATA_SR_DRQ)){
+		return ERROR;
+	}
+
+	if(status & ATA_SR_ERR){
+		return ERROR;
+	}
+
+	insw(DATA_REGISTER, atabuff, WORDS_PER_SECTOR);
+
+	return SUCCESS;
+}
 
 /*
  * Reads sectors from an ATA disk using LBA addressing.
@@ -73,7 +113,7 @@ int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 				return TIMEOUT;
 		} while (!(status & ATA_SR_DRQ));
 
-		insw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		insw(DATA_REGISTER, ptr, WORDS_PER_SECTOR);
 		ptr += WORDS_PER_SECTOR;
 	}
 
@@ -90,6 +130,7 @@ int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
 			return TIMEOUT;
 	} while (status & ATA_SR_BSY);
 
+	outb_p(DRIVE_HEAD_REGISTER, 0x40);
 	outb_p(SECTOR_COUNT_REGISTER, (totalSectors >> 8) & 0xFF);
 	outb_p(SECTOR_NUMBER_REGISTER, (lba >> 24) & 0xFF);
 	outb_p(CYLINDER_LOW_REGISTER, (lba >> 32) & 0xFF);
@@ -99,8 +140,6 @@ int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
 	outb_p(SECTOR_NUMBER_REGISTER, (lba >> 0) & 0xFF);
 	outb_p(CYLINDER_LOW_REGISTER, (lba >> 8) & 0xFF);
 	outb_p(CYLINDER_HIGH_REGISTER, (lba >> 16) & 0xFF);
-
-	outb_p(DRIVE_HEAD_REGISTER, 0x40);
 
 	outb_p(COMMAND_REGISTER, 0x24);
 
@@ -116,7 +155,7 @@ int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
 				return TIMEOUT;
 		} while (!(status & ATA_SR_DRQ));
 
-		insw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		insw(DATA_REGISTER, ptr, WORDS_PER_SECTOR);
 		ptr += WORDS_PER_SECTOR;
 	}
 
@@ -154,7 +193,7 @@ int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 				return TIMEOUT;
 		} while (!(status & ATA_SR_DRQ));
 
-		outsw(DATA_RESGISTE, ptr, WORDS_PER_SECTOR);
+		outsw(DATA_REGISTER, ptr, WORDS_PER_SECTOR);
 		ptr += WORDS_PER_SECTOR;
 	}
 
