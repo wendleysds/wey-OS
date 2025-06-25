@@ -53,9 +53,18 @@ start:
 	add ax, word[BPB_RsvdSecCnt]
 	mov word[DataSector], ax
 
+	mov ax, word[BPB_RootClus]
+	mov word[Cluster], ax
+
+	mov bx, 0x8000
+	mov dx, init_folder
+	call find_file
+
+	mov dx, init_file_name
 	call find_file
 	jc .notfound
-	
+
+	mov bx, 0x1000
 	call load_file
 
 	jmp 0x0000:0x1000
@@ -77,76 +86,81 @@ start:
 	jmp $
 
 
-; Seach a file with the name iquals [entry_file_name] and get wis desired cluster
+; Seach a file with the name iquals [File Name] and get wis desired cluster
 ;
-; [entry_file_name]
+; [Cluster]
+; dx: [File Name]
+; bx: [Buffer]
 ;
 ; returns:
 ;   store result in 'Cluster' variable and the file size in 'FileSize'.
-
 find_file:
 	pusha
-	mov ax, word[BPB_RootClus]
+	push dx
+	mov ax, word[Cluster]
 	call cluster_to_lba
 	call lba_to_chs
 
-	mov bx, 0x8000 ; Root Sector Buffer
 	mov al, byte[BPB_SecPerClus]
 	call disk_read
 	jc start.diskerr
 
-	mov si, 0x8000
+	mov si, bx
+	pop dx
 
 .next_entry:
-    cmp byte [si], 0x00
+	cmp byte[si], 0x00
 	je .not_found
-	cmp byte [si], 0xE5
+	cmp byte[si], 0xE5
 	je .skip_entry
 
-	mov di, entry_file_name
-    mov cx, 11
-    push si
-    repe cmpsb
-    pop si
-    je .found
+	mov di, dx
+	mov cx, 11
+	push si
+	repe cmpsb
+	pop si
+	je .found
 
 .skip_entry:
-    add si, 32
-    cmp si, 0x8000 + 512
-	jb .next_entry
+	add si, 32
+	jmp .next_entry
 
 .not_found:
 	popa
-    stc
+	stc
 	ret
 
 .found:
-	mov dx, word [si+20]
-    shl edx, 16
-    mov ax, word [si+26]
-    or dx, ax
-    mov word [Cluster], dx
+	mov dx, word[si+20]
+	shl edx, 16
+	mov ax, word[si+26]
+	or dx, ax
+	mov word[Cluster], dx
 
-    popa
+	mov dx, word[si+28]
+	mov word[FileSize], dx
+
+	popa
 	clc
 	ret
 
-; Load the firsts [BPB_BytsPerSec * BPB_SecPerClus] bytes to 0x0000:0x10000
+; Load the firsts [BPB_BytsPerSec * BPB_SecPerClus] bytes to bx: [Destination]
 ;
 ; [Cluster]
+; [FileSize]
+; bx: [Destination]
 ;
 ; returns:
 ;   none
 load_file:
 	pusha
-	mov bx, 0x1000
 
-	mov ax, word [Cluster]
-    call cluster_to_lba
-    call lba_to_chs
+	mov ax, word[Cluster]
+	call cluster_to_lba
+	call lba_to_chs
 
-	mov al, byte [BPB_SecPerClus]
-    call disk_read
+	mov al, byte[BPB_SecPerClus]
+	call disk_read
 	
 	popa
 	clc
@@ -160,16 +174,16 @@ load_file:
 ;   none
 print_str:
 	pusha
- 	mov ah, 0x0E
+	mov ah, 0x0E
 .next_char:
- 	lodsb
- 	or al, al
- 	jz .done
- 	int 0x10
- 	jmp .next_char
+	lodsb
+	or al, al
+	jz .done
+	int 0x10
+	jmp .next_char
 .done:
 	popa
- 	ret
+	ret
 
 ; Read sectors in CHS mode and store im memory
 ;
@@ -237,19 +251,22 @@ lba_to_chs:
 	mov byte[Cylinder], al
 	ret
 
-msg_ERRFNOT: db "File not found!", 0x0a, 0x0d, 0
-msg_ERRDISK: db "Disk read error!", 0x0a, 0x0d, 0
-msg_ERROR: db "Error", 0x0a, 0x0d, 0
+msg_ERRFNOT: db "File not found!", 0
+msg_ERRDISK: db "Disk error!", 0
+msg_ERROR: db "Error", 0
 
-entry_file_name: db "STEP1   BIN"
+init_folder: db "BOOT       ", 0
+init_file_name: db "STEP1   BIN", 0
+
+FileSize: dw 0x0
 
 ; For LBA
-Head dw 0x0
-Cylinder dw 0x0
-Sector dw 0x0
+Head: dw 0x0
+Cylinder: dw 0x0
+Sector: dw 0x0
 
-DataSector dw 0x0
-Cluster dw 0x0
+DataSector: dw 0x0
+Cluster: dw 0x0
 
 times 510-($ - $$) db 0
 dw 0xAA55
