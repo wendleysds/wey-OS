@@ -80,7 +80,7 @@ int ata_read_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
  * Writing is done through direct communication with the 
  * standard I/O ports of the ATA interface (primary channel, master).
  */
-int ata_write_sectors(uint32_t lba, uint8_t totalSectors, void* buffer){
+int ata_write_sectors(uint32_t lba, uint8_t totalSectors, const void* buffer){
 	return ata_write_sectors_28(lba, totalSectors, buffer);
 }
 
@@ -162,7 +162,7 @@ int ata_read_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
 	return SUCCESS;
 }
 
-int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
+int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, const void* buffer){
 	if (totalSectors == 0)
     	return INVALID_ARG;
 
@@ -203,7 +203,7 @@ int ata_write_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 	return SUCCESS;
 }
 
-int ata_write_sectors_48(uint64_t lba, uint16_t totalSectors, void* buffer){
+int ata_write_sectors_48(uint64_t lba, uint16_t totalSectors, const void* buffer){
 	return NOT_IMPLEMENTED;
 }
 

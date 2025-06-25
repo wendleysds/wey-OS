@@ -10,6 +10,7 @@
 
 #include <lib/mem.h>
 #include <lib/utils.h>
+#include <lib/string.h>
 
 #include <memory/kheap.h>
 #include <memory/paging.h>
@@ -88,11 +89,17 @@ void kmain(){
 	//init_keyboard();
 
 	char* filepath = "/home/test.txt";
+	char* newTxt = "Mario";
+	
 	struct Stat statbuff;
 	char buffer[32];
 
-	int fd = open("/home/test.txt", O_RDONLY);
+	int fd = open("/home/test.txt", O_RDWR);
 	stat(filepath, &statbuff);
+
+	terminal_write("\nWrite status %d\n", write(fd, newTxt, strlen(newTxt)));
+		
+	lseek(fd, 0, SEEK_SET);
 	read(fd, buffer, sizeof(buffer));
 
 	terminal_write("\ntest.txt:\n");

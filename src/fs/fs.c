@@ -77,6 +77,26 @@ int read(int fd, void *buffer, uint32_t count){
 		return READ_FAIL;
 }
 
+int write(int fd, const void *buffer, uint32_t count){
+	if(fd < 0 || !buffer){
+		return INVALID_ARG;
+	}
+
+	struct FileDescriptor* fdPtr = fileDescriptors[fd];
+	if(!fdPtr){
+		return NULL_PTR;
+	}
+
+	if(fdPtr->flags & O_WRONLY)
+		return FAT32_write(&fat, fdPtr->descriptorPtr, buffer, count);
+	else
+		return WRITE_FAIL;
+}
+
+int lseek(int fd, int offset, int whence){
+	return NOT_IMPLEMENTED;
+}
+
 int close(int fd){
 	struct FileDescriptor* fdPtr = fileDescriptors[fd];
 	if(!fdPtr)

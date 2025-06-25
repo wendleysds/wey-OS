@@ -17,6 +17,10 @@ struct Stream* stream_new(){
 }
 
 int stream_read(struct Stream *stream, void *buffer, int total){
+	if(!stream || !buffer){
+		return INVALID_ARG;
+	}
+
 	int status = SUCCESS;
 	int totalRemaining = total;
 	char* bufPtr = (char*)buffer;
@@ -43,6 +47,14 @@ int stream_read(struct Stream *stream, void *buffer, int total){
 	}
 
 	return status;
+}
+
+int stream_write(struct Stream *stream, void *buffer, int total){
+	if(!stream || !buffer){
+		return INVALID_ARG;
+	}
+	
+	return NOT_IMPLEMENTED;
 }
 
 void stream_seek(struct Stream *stream, uint32_t sector){
