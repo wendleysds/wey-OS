@@ -105,6 +105,7 @@ struct Directory{
 
 struct FATItem{
 	enum ItemType type;
+	int offsetInBytes; // LBA of the item for updating
 	union{
 		struct FATLongDirectoryEntry* fileLong;
 		struct FAT32DirectoryEntry* file;
@@ -122,7 +123,10 @@ struct FATFileDescriptor{
 struct FAT{
 	struct FATHeaders headers;
 	struct Directory rootDir;
-	struct Stream* readStream; // Gerenal Purpose Read Stream
+
+	// Streams for reading and writing
+	struct Stream* readStream;  // Gerenal Purpose Read Stream
+	struct Stream* writeStream; // General Purpose Write Stream
 	struct Stream* clusterReadStream;
 }__attribute__((packed));
 

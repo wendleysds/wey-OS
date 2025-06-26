@@ -25,9 +25,10 @@ void fs_init() {
 
 static uint8_t _get_next_fd_index(){
 	uint8_t i = 3; // First three indices are reserved for stdin, stdout, and stderr
-	for (; i < FILE_DESCRIPTORS_MAX - 3; i++) {
-		if(fileDescriptors[i] == 0x0)
-			return i;
+	for(; i < FILE_DESCRIPTORS_MAX; i++){
+		if(!fileDescriptors[i]){
+			return i; // Return the first available index
+		}
 	}
 
 	return ERROR;
@@ -111,7 +112,7 @@ int lseek(int fd, int offset, int whence){
 }
 
 int close(int fd){
-	if(fd <= 3 || fd >= FILE_DESCRIPTORS_MAX){
+	if(fd < 3 || fd >= FILE_DESCRIPTORS_MAX){
 		return INVALID_ARG; // Reserved file descriptors cannot be closed
 	}
 
@@ -119,6 +120,11 @@ int close(int fd){
 	if(!fdPtr)
 		return ERROR;
 
+	int status = FAT32_update_file(&fat, fdPtr->descriptorPtr);
+	if(status != SUCCESS){
+		return status; // Return error if updating file failed
+	}
+	
 	FAT32_close(fdPtr->descriptorPtr);
 	kfree(fdPtr);
 	fileDescriptors[fd] = 0x0;

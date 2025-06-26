@@ -84,40 +84,38 @@ void kmain(){
 	terminal_cwrite(0x00FF00, " OK\n");
 
 	fs_init();
+
+	terminal_cwrite(0x00FF00, "\nKERNEL READY!\n");
+
+	terminal_clear();
 		
 	// Start drivrers
 	//init_keyboard();
 
 	char* filepath = "/home/test.txt";
-	char* newTxt = "Mario";
-	
+	char* toWrite = "Test ";
+
 	struct Stat statbuff;
-	char buffer[32];
+	char buffer[512];
 
 	int fd = open("/home/test.txt", O_RDWR);
 	stat(filepath, &statbuff);
+	
+	lseek(fd, statbuff.fileSize, SEEK_SET);
+	
+	for (int i = 0; i < 5; i++)
+	{
+		write(fd, toWrite, strlen(toWrite));
+	}
 
-	terminal_write("\nWrite status %d\n", write(fd, newTxt, strlen(newTxt)));
-		
 	lseek(fd, 0, SEEK_SET);
 	read(fd, buffer, sizeof(buffer));
 
-	terminal_write("\ntest.txt:\n");
-	terminal_write("Create Date: %d/%d/%d\n", 
-		1980 + ((statbuff.creDate >> 9) & 0x7F),
-		(statbuff.creDate >> 5) & 0x0F,
-		statbuff.creDate & 0x1F
-	);
-	terminal_write("Modefi Date: %d/%d/%d\n", 
-		1980 + ((statbuff.creDate >> 9) & 0x7F),
-		(statbuff.creDate >> 5) & 0x0F,
-		statbuff.creDate & 0x1F
-	);
-	terminal_write("Size: %d\n", statbuff.fileSize);
-	terminal_write("Attr: %d\n", statbuff.attr);
+	terminal_write("test.txt:\n");
 
 	terminal_write("Content: %s\n", buffer);
-	terminal_cwrite(0x00FF00, "\nKERNEL OK");
+
+	close(fd);
 
 	// Main loop
 	while(1){

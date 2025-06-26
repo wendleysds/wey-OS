@@ -12,6 +12,7 @@ int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* rest
 int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, uint8_t whence);
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor* ffd, void* buffer, uint32_t count);
 int FAT32_write(struct FAT* fat, struct FATFileDescriptor* ffd, const void* buffer, uint32_t size);
+int FAT32_update_file(struct FAT* fat, struct FATFileDescriptor* ffd);
 int FAT32_close(struct FATFileDescriptor* ffd);
 
 #endif

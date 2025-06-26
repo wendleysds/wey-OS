@@ -2,6 +2,7 @@
 #include <io/ata.h>
 #include <memory/kheap.h>
 #include <lib/mem.h>
+#include <drivers/terminal.h>
 
 #include <def/status.h>
 
@@ -94,7 +95,7 @@ int stream_write(struct Stream *stream, const void *buffer, int total){
 		stream->cacheDirt = 1; // Mark cache as dirty
 	}
 
-	return NOT_IMPLEMENTED;
+	return SUCCESS;
 }
 
 int stream_seek(struct Stream *stream, uint32_t sector){

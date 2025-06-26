@@ -183,16 +183,19 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 		}
 
 		if(strncmp((char*)buffer.DIR_Name, filename, 11) == 0){
-			stream_dispose(stream);
-			
+
 			struct FAT32DirectoryEntry* entry = _copy_fat_entry(&buffer);
 			if(!entry){
+				stream_dispose(stream);
 				return NO_MEMORY;
 			}
 
 			enum ItemType type = (buffer.DIR_Attr & 0x10) ? Directory : File;
 			itembuff->type = type;
 			itembuff->file = entry;
+			itembuff->offsetInBytes = stream->unused - sizeof(struct FAT32DirectoryEntry); // Offset in the stream where the entry was found
+
+			stream_dispose(stream);
 
 			if(type == Directory){
 				struct Directory* dir = _create_directory_entry(entry);
@@ -263,6 +266,11 @@ int FAT32_init(struct FAT* fat){
 
 	fat->clusterReadStream = stream_new();
 	if(!fat->clusterReadStream){
+		return NO_MEMORY;
+	}
+
+	fat->writeStream = stream_new();
+	if(!fat->writeStream){
 		return NO_MEMORY;
 	}
 
@@ -359,7 +367,48 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 		return NOT_SUPPORTED; // Writing is only supported for files
 	}
 
-	return NOT_IMPLEMENTED;
+	uint32_t cursor = ffd->cursor;
+		
+	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
+	uint32_t offset = sector * headers.boot.bytesPerSec;
+
+	uint32_t remaining = size;
+	uint32_t totalWritten = 0;
+
+	while(remaining > 0){
+		uint32_t clusterOffset = cursor % CLUSTER_SIZE;
+		uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+		uint32_t toWrite = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
+
+		stream_seek(fat->writeStream, offset + clusterOffset);
+		if(stream_write(fat->writeStream, (uint8_t*)buffer + totalWritten, toWrite) != SUCCESS){
+			return ERROR_IO;
+		}
+
+		remaining -= toWrite;
+		cursor += toWrite;
+		totalWritten += toWrite;
+
+		if(cursor % CLUSTER_SIZE == 0){
+			uint32_t next = _next_cluster(fat, ffd->currentCluster);
+			if(next >= 0x0FFFFFF8){ // End of file
+				break;
+			}
+
+			ffd->currentCluster = next;
+			sector = _cluster_to_lba(ffd->currentCluster);
+			offset = sector * headers.boot.bytesPerSec;
+			
+			stream_flush(fat->writeStream);
+		}
+	}
+
+	stream_flush(fat->writeStream);
+
+	ffd->item->file->DIR_FileSize += size;
+	ffd->cursor += size;
+
+	return totalWritten;
 }
 
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
@@ -369,7 +418,7 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 	uint32_t cursor = ffd->cursor;
 	uint32_t fileSize = ffd->item->file->DIR_FileSize;
 
-	if (cursor >= fileSize) return 0;
+	if (cursor >= fileSize) return READ_FAIL; // Cannot read beyond the end of the file
 	if ((cursor + count) > fileSize)
 		count = fileSize - cursor;
 
@@ -409,7 +458,81 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 }
 
 int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, uint8_t whence){
-	return NOT_IMPLEMENTED;
+	if(!ffd || !ffd->item || ffd->item->type != File){
+		return INVALID_ARG;
+	}
+
+	uint32_t target;
+	switch(whence){
+		case SEEK_SET:
+			target = offset	;	
+			break;
+		case SEEK_CUR:
+			target = ffd->cursor + offset;
+			break;
+		case SEEK_END:
+			if(offset > ffd->item->file->DIR_FileSize){
+				return INVALID_ARG; // Cannot seek beyond file size
+			}
+
+			target = ffd->item->file->DIR_FileSize - offset;
+			break;
+		default:
+			return INVALID_ARG;
+	}
+
+	if(target > ffd->item->file->DIR_FileSize){
+		return INVALID_ARG; // Cannot seek beyond file size
+	}
+
+	uint32_t clusterOffset = target / CLUSTER_SIZE;
+
+	uint32_t cluster = ffd->firstCluster;
+	for(uint32_t i = 0; i < clusterOffset; i++){
+		cluster= _next_cluster(fat, cluster);
+		if(cluster >= 0x0FFFFFF8) {
+			return END_OF_FILE; // Reached end of file
+		}
+	}
+
+	ffd->currentCluster = cluster;
+	ffd->cursor = target;
+
+	return SUCCESS;
+}
+
+int FAT32_update_file(struct FAT* fat, struct FATFileDescriptor* ffd){
+	struct FATItem* item = ffd->item;
+	if(!item || !fat){
+		return INVALID_ARG;
+	}
+
+	struct FAT32DirectoryEntry* entry;
+
+	if(item->type == Directory){
+		if(!item->directory || !item->directory->entry){
+			return NULL_PTR; // Directory entry is not set
+		}
+		
+		entry = item->directory->entry;
+	} else if(item->type == File){
+		entry = item->file;
+	} else {
+		return NOT_SUPPORTED; // Only files and directories can be updated
+	}
+
+	if(!entry){
+		return NULL_PTR;
+	}
+
+	stream_seek(fat->writeStream, item->offsetInBytes);
+	if(stream_write(fat->writeStream, entry, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	stream_flush(fat->writeStream);
+
+	return SUCCESS;
 }
 
 int FAT32_close(struct FATFileDescriptor *ffd){
