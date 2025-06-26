@@ -41,7 +41,7 @@ void vesa_putpixel(struct VideoStructPtr* v, uint16_t x, uint16_t y, uint32_t co
 		case 15: // RGB555
 			*(uint16_t*)(framebuffer + offset) = RGB888_TO_RGB555(r, g, b);
 			break;
-    case 16: // RGB565
+		case 16: // RGB565
 			*(uint16_t*)(framebuffer + offset) = RGB888_TO_RGB565(r, g, b);
 			break;
 		case 24:
@@ -135,7 +135,7 @@ void terminal_putchar(char c, uint32_t color) {
 		vesa_printchar(&font, c, color);
 
 		cursor.x++;
-    if (cursor.x >= (video.width / 8)) {
+	if (cursor.x >= (video.width / 8)) {
 			cursor.y += 1;
 			cursor.x = 0;
 		}
@@ -165,51 +165,51 @@ void terminal_backspace(){
 }
 
 void terminal_vwrite(uint32_t color, const char *restrict format, va_list args) {
-  char buffer[32];
+	char buffer[32];
 
-  for (const char *ptr = format; *ptr; ptr++) {
+	for (const char *ptr = format; *ptr; ptr++) {
 		if (*ptr == '%') {
 			ptr++;
 			switch (*ptr) {
 				case 'c':
 					terminal_putchar(va_arg(args, int), color);
-          break;
-        case 's':
-        	for (char *s = va_arg(args, char*); *s; s++)
+					break;
+				case 's':
+					for (char *s = va_arg(args, char*); *s; s++)
 						terminal_putchar(*s, color);
-          break;
-        case 'd':
-          itoa(va_arg(args, int), buffer, 10);
-          for (char *s = buffer; *s; s++)
-            terminal_putchar(*s, color);
-          break;
-        case 'x':
-          itoa(va_arg(args, int), buffer, 16);
-          for (char *s = buffer; *s; s++)
-            terminal_putchar(*s, color);
-          break;
-        default:
-          terminal_putchar('%', color);
-          terminal_putchar(*ptr, color);
-          break;
+					break;
+				case 'd':
+					itoa(va_arg(args, int), buffer, 10);
+					for (char *s = buffer; *s; s++)
+						terminal_putchar(*s, color);
+					break;
+				case 'x':
+					itoa(va_arg(args, int), buffer, 16);
+					for (char *s = buffer; *s; s++)
+						terminal_putchar(*s, color);
+					break;
+				default:
+					terminal_putchar('%', color);
+					terminal_putchar(*ptr, color);
+					break;
 			}
 		} else {
 			terminal_putchar(*ptr, color);
-    }
-  }
+		}
+	}
 }
 
 void terminal_write(const char *restrict format, ...){
 	va_list args;
-  va_start(args, format);
-  terminal_vwrite(TERMINAL_DEFAULT_COLOR, format, args);
-  va_end(args);
+	va_start(args, format);
+	terminal_vwrite(TERMINAL_DEFAULT_COLOR, format, args);
+	va_end(args);
 }
 
 void terminal_cwrite(uint32_t color, const char *restrict format, ...) {
-  va_list args;
-  va_start(args, format);
-  terminal_vwrite(color, format, args);
-  va_end(args);
+	va_list args;
+	va_start(args, format);
+	terminal_vwrite(color, format, args);
+	va_end(args);
 }
 

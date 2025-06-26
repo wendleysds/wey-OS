@@ -5,6 +5,8 @@ CC = i686-elf-gcc
 
 CFLAGS = -Isrc/include -Wall -Werror
 
+# Debug Flags
+CFLAGS += -g
 # Bare-metal Flags
 CFLAGS += -ffreestanding -nostdlib -nostartfiles
 # Warnig Suppresion Flags
@@ -64,25 +66,24 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 
 SECTOR_SIZE = 512
 
-update-bins: $(TARGET) $(BOOTLOADER_BIN) $(KERNEL_BIN) $(STEP1_BIN)
+# Create kernel.img
+$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+	@echo "Creating os image in $@"
+	mkdir -p $(IMG_DIR)
+	dd if=/dev/zero of=$@ bs=512 count=32768
+	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
+	dd if=$(FAT_SIG) of=$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
+	dd if=$(BOOTLOADER_BIN) of=$@ bs=$(SECTOR_SIZE) seek=6 conv=notrunc 
+	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
+	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=160 conv=notrunc
 	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
-	sudo mount -t vfat $< $(MOUNT_DIR)
+	sudo mount -t vfat $@ $(MOUNT_DIR)
 	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
 	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
 	sudo cp -r home $(MOUNT_DIR)
 	sudo umount $(MOUNT_DIR)
 	@echo "IMG Ready!"
 
-# Create kernel.img
-$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(FAT_SIG) $(FAT_EMPTY)
-	@echo "Creating os image..."
-	mkdir -p $(IMG_DIR)
-	dd if=/dev/zero of=$@ bs=1048576 count=16
-	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
-	dd if=$(FAT_SIG) of=$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
-	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
-	@echo "Created IMG in $@"
-	
 # Create directories
 $(BUILD_DIRS):
 	@echo "Creating Building Directories..."
@@ -154,6 +155,7 @@ all:
 	make
 
 run:
+	make
 	qemu-system-i386 -serial stdio -drive format=raw,file=$(TARGET)
 
 clean:
@@ -161,4 +163,9 @@ clean:
 
 disassembly-img:
 	i686-elf-objdump -D -b binary -m i386 -M intel build/img/kernel.img | less
+
+debug:
+	make update-bins
+	qemu-system-i386 -serial stdio -drive format=raw,file=$(TARGET) -s -S &
+	@echo --QEMU ready for debugging!--
 

@@ -116,7 +116,7 @@ void kmain(){
 	terminal_write("Size: %d\n", statbuff.fileSize);
 	terminal_write("Attr: %d\n", statbuff.attr);
 
-	terminal_write("Content: %s", buffer);
+	terminal_write("Content: %s\n", buffer);
 	terminal_cwrite(0x00FF00, "\nKERNEL OK");
 
 	// Main loop

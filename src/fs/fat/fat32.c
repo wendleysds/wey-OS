@@ -350,9 +350,8 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 	}
 
 	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
-	uint32_t offset = sector * headers.boot.bytesPerSec;
 	
-	return ata_write_sectors(offset, 1, buffer);
+	return ata_write_sectors(sector, 1, buffer);
 	return NOT_IMPLEMENTED;
 }
 
