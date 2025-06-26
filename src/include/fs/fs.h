@@ -16,7 +16,7 @@
 struct FileDescriptor {
 	uint8_t index;
 	uint8_t flags;
-	void* descriptorPtr;	
+	void* descriptorPtr;
 };
 
 struct Stat {

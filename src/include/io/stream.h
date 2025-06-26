@@ -16,9 +16,10 @@ struct Stream{
 
 struct Stream* stream_new();
 int stream_read(struct Stream* stream, void* buffer, int total);
-int stream_write(struct Stream *stream, void *buffer, int total);
-void stream_seek(struct Stream* stream, uint32_t sector);
-void stream_dispose(struct Stream* ptr);
+int stream_write(struct Stream *stream, const void *buffer, int total);
+int stream_seek(struct Stream* stream, uint32_t sector);
+int stream_flush(struct Stream* stream);
+int stream_dispose(struct Stream* ptr);
 
 #endif
 

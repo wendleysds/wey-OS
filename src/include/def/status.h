@@ -1,6 +1,8 @@
 #ifndef _RESULT_STATUS_H
 #define _RESULT_STATUS_H
 
+// Status codes for various operations in the system
+
 // Generic
 #define OK               0
 #define SUCCESS          0
@@ -30,6 +32,7 @@
 #define FS_CORRUPTED    -36
 #define DIR_NOT_FOUND   -37
 #define INVALID_FS      -38
+#define END_OF_FILE     -39
 
 // Time Or State
 #define TIMEOUT         -40

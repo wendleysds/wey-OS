@@ -8,9 +8,11 @@
 #include <drivers/terminal.h>
 #include <io/stream.h>
 #include <stdint.h>
-#include <io/ata.h>
+
 /*
  * Main module for FAT32 parse and handler
+ * This module provides functions to initialize the FAT32 filesystem,
+ * open files, read/write data, and manage directories.
  */
 
 #define CLUSTER_SIZE 4096
@@ -50,7 +52,7 @@ static uint32_t _next_cluster(struct FAT* fat, uint32_t current){
 	return 0xFFFFFFFF;
 }
 
-// set 'out' with the 'name' formated in 8:3
+// Format a filename to fit in FAT32 8.3 format
 static void _format_fat_name(const char* filename, char* out){
 	memset(out, ' ', 11);
 
@@ -123,7 +125,7 @@ static int _create_FATEntry(struct Directory* dir, const char* name, uint32_t at
 	return NOT_IMPLEMENTED;
 }
 
-// Transform a entry in a Directory
+// Transform a FAT32 directory entry into a Directory structure
 static struct Directory* _create_directory_entry(struct FAT32DirectoryEntry* entry){
 	if(!(entry->DIR_Attr & ATTR_DIRECTORY)){
 		return 0x0;
@@ -206,6 +208,37 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 	}
 }
 
+static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* itembuff){
+	if(!fat || !path || strlen(path) == 0){
+		return INVALID_ARG;
+	}
+
+	char pathCopy[PATH_MAX];
+	memset(pathCopy, 0x0, sizeof(pathCopy));
+	strncpy(pathCopy, path, PATH_MAX - 1);
+
+	char* token = strtok(pathCopy, "/");
+	if(!token){
+		return INVALID_ARG;
+	}
+
+	// Set the root directory as the starting point
+	if(_get_item_in_diretory(token, itembuff, &fat->rootDir) != SUCCESS){
+		return FILE_NOT_FOUND;
+	}
+
+	while((token = strtok(0x0, "/"))){
+		if(itembuff->type != Directory){
+			return NOT_SUPPORTED; // Cannot traverse into a file
+		}
+		if(_get_item_in_diretory(token, itembuff, itembuff->directory) != SUCCESS){
+			return FILE_NOT_FOUND;
+		}
+	}
+
+	return SUCCESS;
+}
+
 static int _get_root_directory(struct FAT* fat){
 	fat->rootDir.firstCluster = headers.extended.rootClus;
 	fat->rootDir.currentCluster = headers.extended.rootClus;
@@ -249,7 +282,7 @@ int FAT32_init(struct FAT* fat){
 }
 
 struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint8_t flags){
-	if(strlen(pathname) == 0 || strlen(pathname) > PATH_MAX){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
 		return 0x0;
 	}
 
@@ -258,26 +291,10 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 		return 0x0;
 	}
 
-	char path[PATH_MAX];
-	memset(path, 0x0, sizeof(path)); // remove garbage
-	strcpy(path, pathname);
-
-	char* token = strtok(path, "/");
-
 	struct FATItem itembuff;
 
-	if(_get_item_in_diretory(token, &itembuff, &fat->rootDir) != SUCCESS){
-		kfree(fd);
-		return 0x0;
-	}
-
-	while((token = strtok(0x0, "/"))){
-		if(itembuff.type == Directory){
-			if(_get_item_in_diretory(token, &itembuff, itembuff.directory) == SUCCESS){
-				continue;
-			}
-		}
-
+	int status = _traverse_path(fat, pathname, &itembuff);
+	if(status != SUCCESS){
 		kfree(fd);
 		return 0x0;
 	}
@@ -305,26 +322,15 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 }
 
 int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* restrict statbuf){
-	char path[PATH_MAX];
-	memset(path, 0x0, sizeof(path)); // remove garbage
-	strcpy(path, pathname);
-
-	char* token = strtok(path, "/");
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX || !statbuf){
+		return INVALID_ARG;
+	}
 
 	struct FATItem itembuff;
 
-	if(_get_item_in_diretory(token, &itembuff, &fat->rootDir) != SUCCESS){
-		return FILE_NOT_FOUND;
-	}
-
-	while((token = strtok(0x0, "/"))){
-		if(itembuff.type == Directory){
-			if(_get_item_in_diretory(token, &itembuff, itembuff.directory) == SUCCESS){
-				continue;
-			}
-		}
-
-		return FILE_NOT_FOUND;
+	int status = _traverse_path(fat, pathname, &itembuff);
+	if(status != SUCCESS){
+		return status;
 	}
 
 	struct FAT32DirectoryEntry* entry;
@@ -349,9 +355,10 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 		return INVALID_ARG;
 	}
 
-	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
-	
-	return ata_write_sectors(sector, 1, buffer);
+	if(ffd->item->type != File){
+		return NOT_SUPPORTED; // Writing is only supported for files
+	}
+
 	return NOT_IMPLEMENTED;
 }
 
@@ -401,9 +408,13 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 	return totalRead;
 }
 
+int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, uint8_t whence){
+	return NOT_IMPLEMENTED;
+}
+
 int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd)
-		return NULL_PTR;
+		return INVALID_ARG;
 
 	if(ffd->item->type == Directory){
 		kfree(ffd->item->directory->entry);

@@ -24,7 +24,7 @@ void fs_init() {
 }
 
 static uint8_t _get_next_fd_index(){
-	uint8_t i = 3; // first 3 reserved: std(in, out, err)
+	uint8_t i = 3; // First three indices are reserved for stdin, stdout, and stderr
 	for (; i < FILE_DESCRIPTORS_MAX - 3; i++) {
 		if(fileDescriptors[i] == 0x0)
 			return i;
@@ -82,6 +82,10 @@ int write(int fd, const void *buffer, uint32_t count){
 		return INVALID_ARG;
 	}
 
+	if(fd == 0){
+		return WRITE_FAIL; // Cannot write to stdin
+	}
+
 	struct FileDescriptor* fdPtr = fileDescriptors[fd];
 	if(!fdPtr){
 		return NULL_PTR;
@@ -94,10 +98,23 @@ int write(int fd, const void *buffer, uint32_t count){
 }
 
 int lseek(int fd, int offset, int whence){
-	return NOT_IMPLEMENTED;
+	if(fd < 0 || offset < 0){
+		return INVALID_ARG;
+	}
+
+	struct FileDescriptor* fdPtr = fileDescriptors[fd];
+	if(!fdPtr){
+		return NULL_PTR;
+	}
+
+	return FAT32_seek(&fat, fdPtr->descriptorPtr, offset, whence);
 }
 
 int close(int fd){
+	if(fd <= 3 || fd >= FILE_DESCRIPTORS_MAX){
+		return INVALID_ARG; // Reserved file descriptors cannot be closed
+	}
+
 	struct FileDescriptor* fdPtr = fileDescriptors[fd];
 	if(!fdPtr)
 		return ERROR;
