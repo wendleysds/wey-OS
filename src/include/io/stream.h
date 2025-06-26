@@ -3,8 +3,15 @@
 
 #include <stdint.h>
 
+#define SECTOR_SIZE 512
+
 struct Stream{
 	uint32_t unused;
+	uint32_t size;
+    uint8_t cache[SECTOR_SIZE];
+    uint32_t cachedSectorLBA;
+    uint8_t cacheValid;
+	uint64_t cacheDirt;
 };
 
 struct Stream* stream_new();

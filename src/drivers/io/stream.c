@@ -5,48 +5,49 @@
 
 #include <def/status.h>
 
-#define SECTOR_SIZE 512
-
 struct Stream* stream_new(){
 	struct Stream* s = (struct Stream*)kmalloc(sizeof(struct Stream));
 	if(!s) return 0x0;
 	
 	s->unused = 0;
+	s->cacheDirt = 0;
+	s->cacheValid = 0;
 
 	return s;
 }
 
 int stream_read(struct Stream *stream, void *buffer, int total){
-	if(!stream || !buffer){
+	if(!stream || !buffer || total <= 0){
 		return INVALID_ARG;
 	}
 
-	int status = SUCCESS;
 	int totalRemaining = total;
-	char* bufPtr = (char*)buffer;
+	uint8_t* bufPtr = (uint8_t*)buffer;
 
 	while(totalRemaining > 0){
 		int sector = stream->unused / SECTOR_SIZE;
 		int offset = stream->unused % SECTOR_SIZE;
 
-		int bytesThisSectorCanRead = SECTOR_SIZE - offset;
-		if(bytesThisSectorCanRead > totalRemaining)
-			bytesThisSectorCanRead = totalRemaining;
+		if (!stream->cacheValid || stream->cachedSectorLBA != sector) {
+            int status = ata_read_sectors(sector, 1, stream->cache);
+            if (status != SUCCESS) return status;
 
-		char sectorBuff[SECTOR_SIZE];
-		status = ata_read_sectors(sector, 1, sectorBuff);
-		if(status != SUCCESS)
-			break;
+            stream->cachedSectorLBA = sector;
+            stream->cacheValid = 1;
+        }
 
-		memcpy(bufPtr, sectorBuff + offset, bytesThisSectorCanRead);
+		uint32_t available = SECTOR_SIZE - offset;
+        uint32_t toRead = (totalRemaining < available) ? totalRemaining : available;
+
+		memcpy(bufPtr, stream->cache + offset, toRead);
 
 		// Update pointers and counters
-		bufPtr += bytesThisSectorCanRead;
-		stream->unused += bytesThisSectorCanRead;
-		totalRemaining -= bytesThisSectorCanRead;
+		bufPtr += toRead;
+		stream->unused += toRead;
+		totalRemaining -= toRead;
 	}
 
-	return status;
+	return SUCCESS;
 }
 
 int stream_write(struct Stream *stream, void *buffer, int total){
@@ -59,6 +60,7 @@ int stream_write(struct Stream *stream, void *buffer, int total){
 
 void stream_seek(struct Stream *stream, uint32_t sector){
 	stream->unused = sector;
+	stream->cacheValid = 0;
 }
 
 void stream_dispose(struct Stream *ptr){
