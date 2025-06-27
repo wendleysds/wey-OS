@@ -52,9 +52,46 @@ static uint32_t _next_cluster(struct FAT* fat, uint32_t current){
 	return 0xFFFFFFFF;
 }
 
+static void strToUpper(char* str){
+	for(int i = 0; str[i]; i++){
+		if(str[i] >= 'a' && str[i] <= 'z'){
+			str[i] -= 32; // Convert to uppercase
+		}
+	}
+}
+
 // Format a filename to fit in FAT32 8.3 format
 static void _format_fat_name(const char* filename, char* out){
 	memset(out, ' ', 11);
+
+	if(!filename || strlen(filename) == 0){
+		out[0] = '\0';
+		return;
+	}
+
+	if(strlen(filename) > 11){
+		// If the filename is longer than 11 characters, truncate it
+		strncpy(out, filename, 8);
+		
+		// Copy extension (last 3 chars after dot, if present)
+		const char* dot = strrchr(filename, '.');
+		if (dot && *(dot + 1)) {
+			const char* ext = dot + 1;
+			size_t extLen = strlen(ext);
+			if (extLen > 3) ext += extLen - 3;
+			strncpy(out + 8, ext, 3);
+		} else {
+			memset(out + 8, ' ', 3);
+		}
+		
+		out[6] = '~'; // Indicate that the name is truncated
+		out[7] = '1'; // Add a number to differentiate
+		out[11] = '\0';
+
+		strToUpper(out);
+
+		return;
+	}
 
 	const char* dot = strrchr(filename, '.');
 	uint8_t nameLenght = 0;
@@ -74,11 +111,7 @@ static void _format_fat_name(const char* filename, char* out){
 
 	out[11] = '\0';
 
-	for(int i = 0; i < 11; i++){
-		if(out[i] >= 'a' && out[i] <= 'z'){
-			out[i] -= 32;
-		}
-	}
+	strToUpper(out);
 }
 
 static struct FAT32DirectoryEntry* _copy_fat_entry(struct FAT32DirectoryEntry* entry){
@@ -111,6 +144,9 @@ static int _get_directory_itens_count(struct Directory* dir){
 
 		if(entry.DIR_Name[0] == 0x0) break;
 		if(entry.DIR_Name[0] == 0xE5) continue;
+		if(entry.DIR_Attr & (ATTR_LONG_NAME)) continue; // Long file name entry mask
+
+		
 
 		count++;
 
@@ -154,10 +190,6 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 	if(!stream){
 		return NO_MEMORY;
 	}
-	
-	if(strlen(itemName) > 11){
-		return NOT_SUPPORTED;
-	}
 
 	struct FAT32DirectoryEntry buffer;
 	char filename[12];
@@ -166,20 +198,29 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 	uint32_t lba = _cluster_to_lba(dir->firstCluster);
 	stream_seek(stream, lba* headers.boot.bytesPerSec);
 
+	int itemCount = dir->itensCount;
 	while(1){
 		if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS){
 			stream_dispose(stream);
 			return ERROR_IO;
 		}
 
-		uint8_t firstChar = buffer.DIR_Name[0];
-		if(firstChar == 0x0){
+		if(buffer.DIR_Name[0] == 0x0){
 			stream_dispose(stream);
-			return FAILED;
+			return FILE_NOT_FOUND; // Reached the end of the directory
 		}
 
-		if(firstChar == 0xE5){
+		if(buffer.DIR_Name[0] == 0xE5){
 			continue;
+		}
+
+		if(buffer.DIR_Attr & (ATTR_LONG_NAME)){
+			continue;
+		}
+
+		if(itemCount-- <= 0){
+			stream_dispose(stream);
+			return FILE_NOT_FOUND; // No more items in the directory
 		}
 
 		if(strncmp((char*)buffer.DIR_Name, filename, 11) == 0){
