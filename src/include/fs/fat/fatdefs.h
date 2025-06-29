@@ -73,6 +73,16 @@ struct FAT32DirectoryEntry{
 	uint32_t DIR_FileSize;
 }__attribute__((packed));
 
+struct FAT32FSInfo {
+    uint32_t leadSignature; // "RRaA"
+    uint8_t reserved1[480];
+    uint32_t structSignature; // 0x61417272 ("rrAa")
+    uint32_t freeClusterCount;
+    uint32_t nextFreeCluster;
+    uint8_t reserved2[12];
+    uint32_t trailSignature; // 0xAA550000 (or AA55h in the end)
+} __attribute__((packed));
+
 struct FATLongDirectoryEntry{
 	uint8_t LDIR_Ord;
 	uint16_t LDIR_Name1[5]; // Characters 1-5
@@ -122,7 +132,12 @@ struct FATFileDescriptor{
 
 struct FAT{
 	struct FATHeaders headers;
+	struct FAT32FSInfo fsInfo;
 	struct Directory rootDir;
+
+	uint32_t* table;
+	uint32_t totalClusters;
+	uint32_t firstDataSector;
 
 	// Streams for reading and writing
 	struct Stream* readStream;  // Gerenal Purpose Read Stream

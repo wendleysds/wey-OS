@@ -37,8 +37,8 @@ static uint32_t _next_cluster(struct FAT* fat, uint32_t current){
 	uint32_t entryOffset = offset % secSize;
 	sector *= headers.boot.bytesPerSec;
 
-	stream_seek(fat->readStream, sector);
-	if(stream_read(fat->readStream, buffer, sizeof(buffer)) == SUCCESS){
+	stream_seek(fat->clusterReadStream, sector);
+	if(stream_read(fat->clusterReadStream, buffer, sizeof(buffer)) == SUCCESS){
 		uint32_t nextCluster = 
 			buffer[entryOffset] | 
 			(buffer[entryOffset + 1] << 8) |
@@ -153,10 +153,6 @@ static int _get_directory_itens_count(struct Directory* dir){
 	stream_dispose(stream);
 
 	return count;
-}
-
-static int _create_FATEntry(struct Directory* dir, const char* name, uint32_t attr){
-	return NOT_IMPLEMENTED;
 }
 
 // Transform a FAT32 directory entry into a Directory structure
@@ -316,6 +312,17 @@ int FAT32_init(struct FAT* fat){
 		return ERROR_IO;
 	}
 
+	stream_seek(fat->readStream, 512); 
+	if(stream_read(fat->readStream, &fat->fsInfo, sizeof(fat->fsInfo)) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	if(fat->fsInfo.leadSignature != 0x41615252 || 
+	   fat->fsInfo.structSignature != 0x61417272 || 
+	   fat->fsInfo.trailSignature != 0xAA550000){
+		return INVALID_FS; // Invalid FAT32 filesystem
+	}
+
 	headers = fat->headers;
 	firstDataSector = headers.boot.rsvdSecCnt + (headers.boot.numFATs * headers.extended.FATSz32);
 
@@ -446,6 +453,8 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 	ffd->item->file->DIR_FileSize += size;
 	ffd->cursor += size;
 
+	// update the file entry in the directory
+
 	return totalWritten;
 }
 
@@ -471,8 +480,8 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 		uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
 		uint32_t toRead = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
 
-		stream_seek(fat->clusterReadStream, offset + clusterOffset);
-		if(stream_read(fat->clusterReadStream, (uint8_t*)buffer + totalRead, toRead) != SUCCESS){
+		stream_seek(fat->readStream, offset + clusterOffset);
+		if(stream_read(fat->readStream, (uint8_t*)buffer + totalRead, toRead) != SUCCESS){
 			return ERROR_IO;
 		}
 
