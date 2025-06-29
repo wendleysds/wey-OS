@@ -79,7 +79,7 @@ static void _format_fat_name(const char* filename, char* out){
 			const char* ext = dot + 1;
 			size_t extLen = strlen(ext);
 			if (extLen > 3) ext += extLen - 3;
-			strncpy(out + 8, ext, 3);
+			strcpy(out + 8, ext);
 		} else {
 			memset(out + 8, ' ', 3);
 		}
@@ -145,8 +145,6 @@ static int _get_directory_itens_count(struct Directory* dir){
 		if(entry.DIR_Name[0] == 0x0) break;
 		if(entry.DIR_Name[0] == 0xE5) continue;
 		if(entry.DIR_Attr & (ATTR_LONG_NAME)) continue; // Long file name entry mask
-
-		
 
 		count++;
 
@@ -224,7 +222,6 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 		}
 
 		if(strncmp((char*)buffer.DIR_Name, filename, 11) == 0){
-
 			struct FAT32DirectoryEntry* entry = _copy_fat_entry(&buffer);
 			if(!entry){
 				stream_dispose(stream);

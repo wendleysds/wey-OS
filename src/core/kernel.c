@@ -92,27 +92,19 @@ void kmain(){
 	// Start drivrers
 	//init_keyboard();
 
-	char* filepath = "/home/test.txt";
-	char* toWrite = "Test ";
+	char* filepath = "/home/realylongnamefile.txt";
 
-	struct Stat statbuff;
 	char buffer[512];
 
-	int fd = open("/home/test.txt", O_RDWR);
-	stat(filepath, &statbuff);
-	
-	lseek(fd, statbuff.fileSize, SEEK_SET);
-	
-	for (int i = 0; i < 5; i++)
-	{
-		write(fd, toWrite, strlen(toWrite));
+	int fd = open(filepath, O_RDWR);
+
+	if(fd < 0){
+		panic("Failed to open file '%s'. Error code: %d\n", filepath, fd);
 	}
 
-	lseek(fd, 0, SEEK_SET);
 	read(fd, buffer, sizeof(buffer));
 
-	terminal_write("test.txt:\n");
-
+	terminal_write("realylongnamefile.txt:\n");
 	terminal_write("Content: %s\n", buffer);
 
 	close(fd);
