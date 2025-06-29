@@ -75,6 +75,17 @@ char *strrchr(const char *s, int c) {
 	}
 }
 
+char* strbrk(const char *s, const char *accept){
+	for (; *s; ++s) {
+		for (const char *a = accept; *a; ++a) {
+			if (*s == *a) {
+				return (char *)s;
+			}
+		}
+	}
+	return NULL;
+}
+
 char* strtok(char *restrict s, const char *restrict delim){
 	static char* p = NULL;
 	if(s)
