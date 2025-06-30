@@ -1,7 +1,8 @@
 #ifndef _SERIAL_H
 #define _SERIAL_H
 
-#include <io.h>
+#include <io/ports.h>
+#include <stdarg.h>
 
 #define COM1 0x3F8
 
@@ -19,15 +20,47 @@ int serial_is_transmit_empty() {
 	return inb(COM1 + 5) & 0x20;
 }
 
-void serial_write(char a) {
+void serial_putchar(char a) {
 	while (serial_is_transmit_empty() == 0);
 	outb(COM1, a);
 }
 
-void serial_print(const char* str) {
-	while (*str) {
-		serial_write(*str++);
+void serial_printf(const char* restrict format, ...){
+	va_list args;
+	va_start(args, format);
+	char buffer[32];
+	for (const char *ptr = format; *ptr; ptr++) {
+		if (*ptr == '%') {
+			ptr++;
+			switch (*ptr) {
+				case 'c':
+					serial_putchar(va_arg(args, int));
+					break;
+				case 's':
+					for (char *s = va_arg(args, char*); *s; s++)
+						serial_putchar(*s);
+					break;
+				case 'd':
+					itoa(va_arg(args, int), buffer, 10);
+					for (char *s = buffer; *s; s++)
+						serial_putchar(*s);
+					break;
+				case 'x':
+					itoa(va_arg(args, int), buffer, 16);
+					for (char *s = buffer; *s; s++)
+						serial_putchar(*s);
+					break;
+				default:
+					serial_putchar('%');
+					serial_putchar(*ptr);
+					break;
+			}
+		} else {
+			serial_putchar(*ptr);
+		}
 	}
+
+	va_end(args);
 }
 
 #endif
