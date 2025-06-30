@@ -291,6 +291,10 @@ static int _get_root_directory(struct FAT* fat){
 }
 
 int FAT32_init(struct FAT* fat){
+	if(!fat){
+		return INVALID_ARG;
+	}
+
 	memset(fat, 0x0, sizeof(struct FAT));
 
 	fat->readStream = stream_new();
@@ -298,40 +302,70 @@ int FAT32_init(struct FAT* fat){
 		return NO_MEMORY;
 	}
 
-	fat->clusterReadStream = stream_new();
-	if(!fat->clusterReadStream){
-		return NO_MEMORY;
-	}
-
 	fat->writeStream = stream_new();
 	if(!fat->writeStream){
+		stream_dispose(fat->readStream);
 		return NO_MEMORY;
 	}
 
+	fat->clusterReadStream = stream_new();
+	if(!fat->clusterReadStream){
+		stream_dispose(fat->readStream);
+		stream_dispose(fat->writeStream);
+		return NO_MEMORY;
+	}
+
+	stream_seek(fat->readStream, 0);
 	if(stream_read(fat->readStream, &fat->headers, sizeof(fat->headers)) != SUCCESS){
-		return ERROR_IO;
+		goto fail; // Failed to read the FAT32 headers
 	}
 
 	stream_seek(fat->readStream, 512); 
 	if(stream_read(fat->readStream, &fat->fsInfo, sizeof(fat->fsInfo)) != SUCCESS){
-		return ERROR_IO;
+		goto fail; // Failed to read the FSInfo structure
 	}
 
 	if(fat->fsInfo.leadSignature != 0x41615252 || 
 	   fat->fsInfo.structSignature != 0x61417272 || 
 	   fat->fsInfo.trailSignature != 0xAA550000){
-		return INVALID_FS; // Invalid FAT32 filesystem
+		goto fail; // Invalid FSInfo structure
 	}
 
-	headers = fat->headers;
-	firstDataSector = headers.boot.rsvdSecCnt + (headers.boot.numFATs * headers.extended.FATSz32);
+	uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
+	uint32_t fatSize = fat->headers.extended.FATSz32;
+	uint32_t fatTotalClusters = fatSize * fat->headers.boot.bytesPerSec / 4;
+	uint32_t fatBystes = fatSize * fat->headers.boot.bytesPerSec;
 
-	int status = _get_root_directory(fat);
-	if(status != SUCCESS){
-		return status;
+	uint32_t* fat_table = (uint32_t*)kmalloc(fatBystes);
+	if(!fat_table){
+		goto fail; // Failed to allocate memory for FAT table
+	}
+
+	stream_seek(fat->readStream, fatStartSector * fat->headers.boot.bytesPerSec);
+	if(stream_read(fat->readStream, fat_table, fatBystes) != SUCCESS){
+		kfree(fat_table);
+		goto fail; // Failed to read the FAT table
+	}
+
+	fat->firstDataSector = fatStartSector + (fat->headers.boot.numFATs * fatSize);
+	fat->totalClusters = fatTotalClusters;
+	fat->table = fat_table;
+
+	headers = fat->headers;
+	firstDataSector = fat->firstDataSector;
+
+	if(_get_root_directory(fat) != SUCCESS){
+		kfree(fat_table);
+		goto fail; // Failed to get the root directory
 	}
 
 	return SUCCESS;
+
+fail:
+	stream_dispose(fat->readStream);
+	stream_dispose(fat->writeStream);
+	stream_dispose(fat->clusterReadStream);
+	return FAILED; // Failed to initialize FAT32 filesystem
 }
 
 struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint8_t flags){

@@ -74,7 +74,7 @@ struct FAT32DirectoryEntry{
 }__attribute__((packed));
 
 struct FAT32FSInfo {
-    uint32_t leadSignature; // "RRaA"
+    uint32_t leadSignature; // 0x41615252 ("RRaA")
     uint8_t reserved1[480];
     uint32_t structSignature; // 0x61417272 ("rrAa")
     uint32_t freeClusterCount;
