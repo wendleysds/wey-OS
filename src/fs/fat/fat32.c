@@ -29,27 +29,8 @@ static uint32_t _get_cluster_entry(struct FAT32DirectoryEntry* entry){
 }
 
 static uint32_t _next_cluster(struct FAT* fat, uint32_t current){
-	uint16_t secSize = headers.boot.bytesPerSec;
-	uint8_t buffer[headers.boot.bytesPerSec];
-
-	uint32_t offset = current * 4;
-	uint32_t sector = headers.boot.rsvdSecCnt + (offset / secSize);
-	uint32_t entryOffset = offset % secSize;
-	sector *= headers.boot.bytesPerSec;
-
-	stream_seek(fat->clusterReadStream, sector);
-	if(stream_read(fat->clusterReadStream, buffer, sizeof(buffer)) == SUCCESS){
-		uint32_t nextCluster = 
-			buffer[entryOffset] | 
-			(buffer[entryOffset + 1] << 8) |
-			(buffer[entryOffset + 2] << 16) |
-			(buffer[entryOffset + 3] << 24);
-
-		nextCluster &= 0x0FFFFFFF;
-		return nextCluster;
-	}
-
-	return 0xFFFFFFFF;
+	uint32_t next = fat->table[current];
+	return next & 0x0FFFFFFF; // Mask to get the cluster number
 }
 
 static void strToUpper(char* str){
