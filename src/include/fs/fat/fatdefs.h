@@ -101,9 +101,7 @@ struct FATHeaders{
 
 enum ItemType{
 	File,
-	LongFile,
 	Directory,
-	LongDirectory
 };
 
 struct Directory{
@@ -117,7 +115,6 @@ struct FATItem{
 	enum ItemType type;
 	int offsetInBytes; // LBA of the item for updating
 	union{
-		struct FATLongDirectoryEntry* fileLong;
 		struct FAT32DirectoryEntry* file;
 		struct Directory* directory;
 	};
