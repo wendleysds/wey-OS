@@ -92,8 +92,8 @@ void kmain(){
 	// Start drivrers
 	//init_keyboard();
 
-	char* filepath = "/home/realylongnamefile.txt";
-
+	char* filepath = "/home/chars.txt";
+	char* somethingToWrite = "Something to write";
 	char buffer[512];
 
 	int fd = open(filepath, O_RDWR);
@@ -102,10 +102,13 @@ void kmain(){
 		panic("Failed to open file '%s'. Error code: %d\n", filepath, fd);
 	}
 
-	read(fd, buffer, sizeof(buffer));
+	lseek(fd, 4088, SEEK_SET);
 
-	terminal_write("realylongnamefile.txt:\n");
-	terminal_write("Content: %s\n", buffer);
+	write(fd, somethingToWrite, 19);
+
+	lseek(fd, 4080, SEEK_SET);
+	read(fd, buffer, sizeof(buffer));
+	terminal_write("%s", buffer);
 
 	close(fd);
 

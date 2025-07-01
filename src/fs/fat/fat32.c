@@ -255,7 +255,7 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 			enum ItemType type = (buffer.DIR_Attr & 0x10) ? Directory : File;
 			itembuff->type = type;
 			itembuff->file = entry;
-			itembuff->offsetInBytes = stream->unused - sizeof(struct FAT32DirectoryEntry); // Offset in the stream where the entry was found
+			itembuff->offsetInBytes = stream->cursor - sizeof(struct FAT32DirectoryEntry); // Offset in the stream where the entry was found
 
 			stream_dispose(stream);
 
@@ -500,12 +500,11 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 		totalWritten += toWrite;
 
 		if(cursor % CLUSTER_SIZE == 0){
-			stream_flush(fat->writeStream);
-
 			uint32_t next = _next_cluster(fat, ffd->currentCluster);
 			if(CHK_EOF(next)){
 				next = _reserve_next_cluster(fat);
 				if(next < 0){
+					totalWritten = ERROR;
 					break;
 				}
 
@@ -526,8 +525,6 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 	if(stream_write(fat->writeStream, ffd->item->file, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
 		return ERROR_IO;
 	}
-
-	stream_flush(fat->writeStream);
 
 	return totalWritten;
 }
