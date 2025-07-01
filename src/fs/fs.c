@@ -119,11 +119,6 @@ int close(int fd){
 	struct FileDescriptor* fdPtr = fileDescriptors[fd];
 	if(!fdPtr)
 		return ERROR;
-
-	int status = FAT32_update_file(&fat, fdPtr->descriptorPtr);
-	if(status != SUCCESS){
-		return status; // Return error if updating file failed
-	}
 	
 	FAT32_close(fdPtr->descriptorPtr);
 	kfree(fdPtr);

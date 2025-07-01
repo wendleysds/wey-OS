@@ -519,12 +519,15 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 		}
 	}
 
-	stream_flush(fat->writeStream);
-
 	ffd->item->file->DIR_FileSize += size;
 	ffd->cursor += size;
 
-	// update the file entry in the directory
+	stream_seek(fat->writeStream, ffd->item->offsetInBytes);
+	if(stream_write(fat->writeStream, ffd->item->file, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	stream_flush(fat->writeStream);
 
 	return totalWritten;
 }
@@ -623,38 +626,9 @@ int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, 
 	return SUCCESS;
 }
 
-int FAT32_update_file(struct FAT* fat, struct FATFileDescriptor* ffd){
-	struct FATItem* item = ffd->item;
-	if(!item || !fat){
-		return INVALID_ARG;
-	}
-
-	struct FAT32DirectoryEntry* entry;
-
-	if(item->type == Directory){
-		if(!item->directory || !item->directory->entry){
-			return NULL_PTR; // Directory entry is not set
-		}
-		
-		entry = item->directory->entry;
-	} else if(item->type == File){
-		entry = item->file;
-	} else {
-		return NOT_SUPPORTED; // Only files and directories can be updated
-	}
-
-	if(!entry){
-		return NULL_PTR;
-	}
-
-	stream_seek(fat->writeStream, item->offsetInBytes);
-	if(stream_write(fat->writeStream, entry, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
-		return ERROR_IO;
-	}
-
-	stream_flush(fat->writeStream);
-
-	return SUCCESS;
+// Update the FSInfo and the FAT in the disk
+int FAT32_update(struct FAT* fat){
+	return NOT_IMPLEMENTED;
 }
 
 int FAT32_close(struct FATFileDescriptor *ffd){
