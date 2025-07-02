@@ -4,6 +4,7 @@
 #include <memory/kheap.h>
 #include <lib/mem.h>
 #include <lib/string.h>
+#include <lib/utils.h>
 #include <def/status.h>
 #include <drivers/terminal.h>
 #include <io/stream.h>
@@ -20,11 +21,8 @@
 #define CHK_EOF(cluster) \
 	(cluster >= EOF)
 
-static int firstDataSector = -1; 
-static struct FATHeaders headers;
-
-static uint32_t _cluster_to_lba(uint32_t cluster){
-	return firstDataSector + ((cluster - 2) * headers.boot.secPerClus);
+static uint32_t _cluster_to_lba(struct FAT* fat, uint32_t cluster){
+	return fat->firstDataSector + ((cluster - 2) * fat->headers.boot.secPerClus);
 }
 
 static uint32_t _get_cluster_entry(struct FAT32DirectoryEntry* entry){
@@ -80,13 +78,6 @@ static uint32_t _reserve_next_cluster(struct FAT* fat){
 	return cluster;
 }
 
-static void strToUpper(char* str){
-	for(int i = 0; str[i]; i++){
-		if(str[i] >= 'a' && str[i] <= 'z'){
-			str[i] -= 32; // Convert to uppercase
-		}
-	}
-}
 
 // Format a filename to fit in FAT32 8.3 format
 static void _format_fat_name(const char* filename, char* out){
@@ -116,7 +107,7 @@ static void _format_fat_name(const char* filename, char* out){
 		out[7] = '1'; // Add a number to differentiate
 		out[11] = '\0';
 
-		strToUpper(out);
+		strupper(out);
 
 		return;
 	}
@@ -139,7 +130,7 @@ static void _format_fat_name(const char* filename, char* out){
 
 	out[11] = '\0';
 
-	strToUpper(out);
+	strupper(out);
 }
 
 static struct FAT32DirectoryEntry* _copy_fat_entry(struct FAT32DirectoryEntry* entry){
@@ -152,21 +143,15 @@ static struct FAT32DirectoryEntry* _copy_fat_entry(struct FAT32DirectoryEntry* e
 	return fileEntry;
 }
 
-static int _get_directory_itens_count(struct Directory* dir){
-	uint32_t dirSector = _cluster_to_lba(dir->firstCluster) * headers.boot.bytesPerSec;
-
-	struct Stream* stream = stream_new();
-	if(!stream){
-		return NO_MEMORY;
-	}
+static int _dir_entry_count(struct FAT* fat, struct Directory* dir){
+	uint32_t dirSector = _cluster_to_lba(fat, dir->firstCluster) * fat->headers.boot.bytesPerSec;
 
 	struct FAT32DirectoryEntry entry;
-	stream_seek(stream, dirSector);
+	stream_seek(fat->readStream, dirSector);
 	int count = 0;
 
 	do{
-		if(stream_read(stream, &entry, sizeof(entry)) != SUCCESS){
-			stream_dispose(stream);
+		if(stream_read(fat->readStream, &entry, sizeof(entry)) != SUCCESS){
 			return ERROR_IO;
 		}
 
@@ -178,36 +163,10 @@ static int _get_directory_itens_count(struct Directory* dir){
 
 	} while(1);
 
-	stream_dispose(stream);
-
 	return count;
 }
 
-// Transform a FAT32 directory entry into a Directory structure
-static struct Directory* _create_directory_entry(struct FAT32DirectoryEntry* entry){
-	if(!(entry->DIR_Attr & ATTR_DIRECTORY)){
-		return 0x0;
-	}
-
-	struct Directory* dir = (struct Directory*)kcalloc(sizeof(struct Directory));
-	if(!dir){
-		return 0x0;
-	}
-
-	dir->entry = entry;
-	dir->firstCluster = _get_cluster_entry(entry);
-	dir->currentCluster = dir->firstCluster;
-
-	dir->itensCount = _get_directory_itens_count(dir);
-	if(dir->itensCount < 0){
-		kfree(dir);
-		return 0x0;
-	}
-
-	return dir;
-}
-
-static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struct Directory* dir){
+static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem* itembuff, struct Directory* dir){
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
@@ -217,8 +176,8 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 	char filename[12];
 	_format_fat_name(itemName, filename);
 
-	uint32_t lba = _cluster_to_lba(dir->firstCluster);
-	stream_seek(stream, lba* headers.boot.bytesPerSec);
+	uint32_t lba = _cluster_to_lba(fat, dir->firstCluster);
+	stream_seek(stream, lba* fat->headers.boot.bytesPerSec);
 
 	int itemCount = dir->itensCount;
 	while(1){
@@ -260,9 +219,19 @@ static int _get_item_in_diretory(char* itemName, struct FATItem* itembuff, struc
 			stream_dispose(stream);
 
 			if(type == Directory){
-				struct Directory* dir = _create_directory_entry(entry);
+				struct Directory* dir = (struct Directory*)kcalloc(sizeof(struct Directory));
 				if(!dir){
 					return NO_MEMORY;
+				}
+
+				dir->entry = entry;
+				dir->firstCluster = _get_cluster_entry(entry);
+				dir->currentCluster = dir->firstCluster;
+
+				dir->itensCount = _dir_entry_count(fat, dir);
+				if(dir->itensCount < 0){
+					kfree(dir);
+					return dir->itensCount;
 				}
 
 				itembuff->directory = dir;
@@ -288,7 +257,7 @@ static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* ite
 	}
 
 	// Set the root directory as the starting point
-	if(_get_item_in_diretory(token, itembuff, &fat->rootDir) != SUCCESS){
+	if(_get_item_in_diretory(fat, token, itembuff, &fat->rootDir) != SUCCESS){
 		return FILE_NOT_FOUND;
 	}
 
@@ -296,7 +265,7 @@ static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* ite
 		if(itembuff->type != Directory){
 			return NOT_SUPPORTED; // Cannot traverse into a file
 		}
-		if(_get_item_in_diretory(token, itembuff, itembuff->directory) != SUCCESS){
+		if(_get_item_in_diretory(fat, token, itembuff, itembuff->directory) != SUCCESS){
 			return FILE_NOT_FOUND;
 		}
 	}
@@ -305,10 +274,10 @@ static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* ite
 }
 
 static int _get_root_directory(struct FAT* fat){
-	fat->rootDir.firstCluster = headers.extended.rootClus;
-	fat->rootDir.currentCluster = headers.extended.rootClus;
+	fat->rootDir.firstCluster = fat->headers.extended.rootClus;
+	fat->rootDir.currentCluster = fat->headers.extended.rootClus;
 
-	uint16_t itemCount = _get_directory_itens_count(&fat->rootDir);
+	uint16_t itemCount = _dir_entry_count(fat, &fat->rootDir);
 	if(itemCount < 0)
 		return itemCount;
 
@@ -385,9 +354,6 @@ int FAT32_init(struct FAT* fat){
 	fat->firstDataSector = fatStartSector + (fat->headers.boot.numFATs * fatSize);
 	fat->totalClusters = fatTotalClusters;
 	fat->table = fat_table;
-
-	headers = fat->headers;
-	firstDataSector = fat->firstDataSector;
 
 	if(_get_root_directory(fat) != SUCCESS){
 		kfree(fat_table);
@@ -479,8 +445,8 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 
 	uint32_t cursor = ffd->cursor;
 		
-	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
-	uint32_t offset = sector * headers.boot.bytesPerSec;
+	uint32_t sector = _cluster_to_lba(fat, ffd->currentCluster);
+	uint32_t offset = sector * fat->headers.boot.bytesPerSec;
 
 	uint32_t remaining = size;
 	uint32_t totalWritten = 0;
@@ -513,8 +479,8 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 			}
 
 			ffd->currentCluster = next;
-			sector = _cluster_to_lba(ffd->currentCluster);
-			offset = sector * headers.boot.bytesPerSec;
+			sector = _cluster_to_lba(fat, ffd->currentCluster);
+			offset = sector * fat->headers.boot.bytesPerSec;
 		}
 	}
 
@@ -546,8 +512,8 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 	uint32_t remaining = count;
 	uint32_t totalRead = 0;
 
-	uint32_t sector = _cluster_to_lba(ffd->currentCluster);
-	uint32_t offset = sector * headers.boot.bytesPerSec;
+	uint32_t sector = _cluster_to_lba(fat, ffd->currentCluster);
+	uint32_t offset = sector * fat->headers.boot.bytesPerSec;
 
 	while (remaining > 0) {
 		uint32_t clusterOffset = cursor % CLUSTER_SIZE;
@@ -570,8 +536,8 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 			}
 
 			ffd->currentCluster = next;
-			sector = _cluster_to_lba(ffd->currentCluster);
-			offset = sector * headers.boot.bytesPerSec;
+			sector = _cluster_to_lba(fat, ffd->currentCluster);
+			offset = sector * fat->headers.boot.bytesPerSec;
 		}
 	}
 

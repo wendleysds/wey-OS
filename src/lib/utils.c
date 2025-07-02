@@ -21,3 +21,11 @@ void itoa(int value, char* result, int base){
 
 	result[j] = '\0';
 }
+
+void strupper(char* str){
+	for(int i = 0; str[i]; i++){
+		if(str[i] >= 'a' && str[i] <= 'z'){
+			str[i] -= 32;
+		}
+	}
+}
