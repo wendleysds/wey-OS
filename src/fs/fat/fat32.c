@@ -591,7 +591,21 @@ int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, 
 
 // Update the FSInfo and the FAT in the disk
 int FAT32_update(struct FAT* fat){
-	return NOT_IMPLEMENTED;
+
+	stream_seek(fat->writeStream, 512);
+	if(stream_write(fat->writeStream, &fat->fsInfo, sizeof(fat->fsInfo))){
+		return ERROR_IO;
+	}
+
+	uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
+	uint32_t fatBystes = fat->headers.extended.FATSz32 * fat->headers.boot.bytesPerSec;
+
+	stream_seek(fat->writeStream, fatStartSector * fat->headers.boot.bytesPerSec);
+	if(stream_write(fat->writeStream, fat->table, fatBystes) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	return SUCCESS;
 }
 
 int FAT32_close(struct FATFileDescriptor *ffd){

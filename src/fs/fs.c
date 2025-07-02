@@ -120,7 +120,14 @@ int close(int fd){
 	if(!fdPtr)
 		return ERROR;
 	
+	int status;
+
+	status = FAT32_update(&fat);
+	if(status != SUCCESS)
+		return status;
+		
 	FAT32_close(fdPtr->descriptorPtr);
+
 	kfree(fdPtr);
 	fileDescriptors[fd] = 0x0;
 

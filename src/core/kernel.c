@@ -110,7 +110,7 @@ void kmain(){
 	read(fd, buffer, sizeof(buffer));
 	terminal_write("%s", buffer);
 
-	close(fd);
+	terminal_write("\nClose status %d\n", close(fd));
 
 	// Main loop
 	while(1){
