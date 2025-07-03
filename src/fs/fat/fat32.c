@@ -527,9 +527,9 @@ err:
 	return status;
 }
 
-struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint8_t flags){
+int FAT32_open(struct FAT* fat, void** outPtr, const char *pathname, uint8_t flags){
 	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
-		return 0x0; // Invalid arguments
+		return INVALID_ARG;
 	}
 
 	struct FATItem itembuff;
@@ -537,38 +537,40 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 	
 	if(status == FILE_NOT_FOUND){
 		if(flags & O_CREAT){
-			if(_creaty_entry(fat, pathname) != SUCCESS){
-				return 0x0; // Error on create
+			status = _creaty_entry(fat, pathname);
+			if(status != SUCCESS){
+				return status;
 			}
 
-			if(_traverse_path(fat, pathname, &itembuff) != SUCCESS){
-				return 0x0; // File created not found?
+			status = _traverse_path(fat, pathname, &itembuff);
+			if(status != SUCCESS){
+				return status;
 			}
 		}
 		else{
-			return 0x0; // status != SUCESS
+			return status;
 		}
 	}
 
-	/*
 	if(flags & O_TRUNC){
 		if(flags & O_WRONLY){
-			if(_truncate_entry(fat, &itembuff) != SUCCESS){
+			status = _truncate_entry(fat, &itembuff);
+			if(status != SUCCESS){
 				_dispose_fat_item(&itembuff);
-				return 0x0; // Fail on truncate file
+				return status;
 			}
 		}
-	}*/
+	}
 
 	struct FATFileDescriptor* fd = kmalloc(sizeof(struct FATFileDescriptor));
 	if(!fd){
-		return 0x0;
+		return NO_MEMORY;
 	}
 	
 	struct FATItem* item = (struct FATItem*)kmalloc(sizeof(struct FATItem));
 	if(!item){
 		kfree(fd);
-		return 0x0;
+		return NO_MEMORY;
 	}
 
 	memcpy(item, &itembuff, sizeof(struct FATItem));
@@ -583,8 +585,9 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 	fd->firstCluster = cluster;
 	fd->currentCluster = cluster;
 	fd->cursor = 0;
+	*outPtr = fd;
 
-	return fd;
+	return SUCCESS;
 }
 
 int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* restrict statbuf){

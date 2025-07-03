@@ -7,7 +7,8 @@
 #define O_WRONLY    0x2
 #define O_RDWR      0x3
 #define O_CREAT     0x4
-#define O_DIRECTORY 0x8
+#define O_TRUNC     0x8
+#define O_DIRECTORY 0x10
 
 #define SEEK_SET 0
 #define SEEK_CUR 1

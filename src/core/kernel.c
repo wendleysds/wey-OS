@@ -92,18 +92,19 @@ void kmain(){
 	// Start drivrers
 	//init_keyboard();
 
-	char* filepath = "/home/sus.txt";
-	char* content = "Nice :D";
+	char* filepath = "/home/test.txt";
+	char buffer[512];
 
-	int fd = open(filepath, O_CREAT | O_RDWR);
+	int fd = open(filepath, O_RDWR);
 
 	if(fd < 0){
 		panic("Failed to open file '%s'. Error code: %d\n", filepath, fd);
 	}
 
-	write(fd, content, strlen(content));
+	read(fd, buffer, sizeof(buffer));
+	terminal_write("content: %s\n", buffer);
 
-	terminal_write("\nClose status %d\n", close(fd));
+	close(fd);
 
 	// Main loop
 	while(1){

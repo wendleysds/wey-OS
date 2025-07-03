@@ -1,12 +1,11 @@
-#include "drivers/terminal.h"
-#include "fs/fat/fatdefs.h"
-#include "memory/kheap.h"
+#include <fs/fat/fatdefs.h>
 #include <fs/fs.h>
 #include <fs/file.h>
 #include <fs/fat/fat32.h>
 #include <lib/mem.h>
 #include <lib/string.h>
 #include <core/kernel.h>
+#include <memory/kheap.h>
 #include <def/status.h>
 #include <def/config.h>
 #include <stdint.h>
@@ -38,19 +37,23 @@ int open(const char *pathname, int flags){
 	int p = _get_next_fd_index();
 	if(p == ERROR)
 		return p;
-
-	void* ffd = FAT32_open(&fat, pathname, flags);
-	if(!ffd){
-		return FILE_NOT_FOUND;
-	}
-
+	
 	struct FileDescriptor* fd = (struct FileDescriptor*)kmalloc(sizeof(struct FileDescriptor));
 	if(!fd){
-		FAT32_close(ffd);
 		return NO_MEMORY;
 	}
 
-	fd->descriptorPtr = ffd;
+	memset(fd, 0x0, sizeof(struct FileDescriptor));
+
+	int status = FAT32_open(&fat, &fd->descriptorPtr, pathname, flags);
+	if(status != SUCCESS){
+		kfree(fd);
+		return status;
+	}
+
+	if(fd->descriptorPtr == 0)
+		return NO_MEMORY;
+
 	fd->flags = flags;
 	fd->index = p;
 	fileDescriptors[p] = fd;
