@@ -273,6 +273,55 @@ static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* ite
 	return SUCCESS;
 }
 
+int _remove_entry(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname|| strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	const char* filename = strrchr(pathname, '/') + 1;
+	if(strlen(filename) > 11){
+		return NOT_SUPPORTED;
+	}
+
+	struct FATItem itembuff;
+	int status = _traverse_path(fat, pathname, &itembuff);
+	if(status != SUCCESS){
+		return status;
+	}
+
+	struct FAT32DirectoryEntry* entry;
+
+	if(itembuff.type == Directory){
+		if(itembuff.directory->itensCount != 0){
+			return OP_ABORTED; // Cannot remove non-empty directories
+		}
+
+		entry = itembuff.directory->entry;
+	}
+	else{
+		entry = itembuff.file;
+	}
+
+	entry->DIR_Name[0] = 0xE5;
+	uint32_t curCluster = _get_cluster_entry(entry);
+	while(!(CHK_EOF(curCluster))){
+		uint32_t next = fat->table[curCluster] & 0x0FFFFFFF;
+		fat->table[curCluster] = 0;
+		curCluster = next;
+	}
+
+	stream_seek(fat->writeStream, itembuff.offsetInBytes);
+	if(stream_write(fat->writeStream, entry, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	fat->fsInfo.nextFreeCluster = _get_cluster_entry(entry);
+
+	// Dispose fat item
+
+	return FAT32_update(fat);
+}
+
 static int _get_root_directory(struct FAT* fat){
 	fat->rootDir.firstCluster = fat->headers.extended.rootClus;
 	fat->rootDir.currentCluster = fat->headers.extended.rootClus;
