@@ -166,7 +166,16 @@ static int _dir_entry_count(struct FAT* fat, struct Directory* dir){
 	return count;
 }
 
-static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem* itembuff, struct Directory* dir){
+static void _dispose_fat_item(struct FATItem* item){
+	if(item->type == Directory){
+		kfree(item->directory->entry);
+		kfree(item->directory);
+	}else{
+		kfree(item->file);
+	}
+}
+
+static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem* itembuff, struct Directory* dir, uint8_t autoDispose){
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
@@ -201,10 +210,18 @@ static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem
 
 		if(itemCount-- <= 0){
 			stream_dispose(stream);
+			if(autoDispose){
+				_dispose_fat_item(itembuff);
+			}
 			return FILE_NOT_FOUND; // No more items in the directory
 		}
 
 		if(strncmp((char*)buffer.DIR_Name, filename, 11) == 0){
+
+			if(autoDispose){
+				_dispose_fat_item(itembuff);
+			}
+
 			struct FAT32DirectoryEntry* entry = _copy_fat_entry(&buffer);
 			if(!entry){
 				stream_dispose(stream);
@@ -213,14 +230,13 @@ static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem
 
 			enum ItemType type = (buffer.DIR_Attr & 0x10) ? Directory : File;
 			itembuff->type = type;
-			itembuff->file = entry;
-			itembuff->offsetInBytes = stream->cursor - sizeof(struct FAT32DirectoryEntry); // Offset in the stream where the entry was found
-
+			itembuff->offsetInBytes = stream->cursor - sizeof(struct FAT32DirectoryEntry); // Offset in the stream where the entry was found	
 			stream_dispose(stream);
 
 			if(type == Directory){
 				struct Directory* dir = (struct Directory*)kcalloc(sizeof(struct Directory));
 				if(!dir){
+					kfree(entry);
 					return NO_MEMORY;
 				}
 
@@ -231,10 +247,13 @@ static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem
 				dir->itensCount = _dir_entry_count(fat, dir);
 				if(dir->itensCount < 0){
 					kfree(dir);
+					kfree(entry);
 					return dir->itensCount;
 				}
 
 				itembuff->directory = dir;
+			}else{
+				itembuff->file = entry;		
 			}
 
 			return SUCCESS;
@@ -243,7 +262,7 @@ static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem
 }
 
 static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* itembuff){
-	if(!fat || !path || strlen(path) == 0){
+	if(!fat || !path || strlen(path) > PATH_MAX){
 		return INVALID_ARG;
 	}
 
@@ -257,20 +276,84 @@ static int _traverse_path(struct FAT* fat, const char* path, struct FATItem* ite
 	}
 
 	// Set the root directory as the starting point
-	if(_get_item_in_diretory(fat, token, itembuff, &fat->rootDir) != SUCCESS){
+	if(_get_item_in_diretory(fat, token, itembuff, &fat->rootDir, 0) != SUCCESS){
 		return FILE_NOT_FOUND;
 	}
 
 	while((token = strtok(0x0, "/"))){
 		if(itembuff->type != Directory){
+			_dispose_fat_item(itembuff);
 			return NOT_SUPPORTED; // Cannot traverse into a file
 		}
-		if(_get_item_in_diretory(fat, token, itembuff, itembuff->directory) != SUCCESS){
+		if(_get_item_in_diretory(fat, token, itembuff, itembuff->directory, 1) != SUCCESS){
 			return FILE_NOT_FOUND;
 		}
 	}
 
 	return SUCCESS;
+}
+
+static int _creaty_entry(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	char pathCopy[PATH_MAX];
+	memset(pathCopy, 0x0, sizeof(pathCopy));
+	strncpy(pathCopy, pathname, PATH_MAX - 1);
+
+	char* pathpart = strrchr(pathCopy, '/');
+	char* filename = pathpart + 1;
+	*pathpart = '\0';
+
+	struct FATItem itembuff;
+	struct Directory* dir;
+
+	if(strlen(pathCopy) == 0){
+		dir = &fat->rootDir;
+	}else{
+		int status = _traverse_path(fat, pathCopy, &itembuff);
+		if(status != SUCCESS){
+			return status;
+		}
+
+		if(itembuff.type != Directory){
+			return INVALID_ARG;
+		}
+
+		dir = itembuff.directory;
+	}
+
+	struct FAT32DirectoryEntry buffer;
+	uint32_t lba = _cluster_to_lba(fat, dir->currentCluster);
+	uint32_t offset = lba * fat->headers.boot.bytesPerSec;
+
+	stream_seek(fat->clusterReadStream, offset);
+	while(1){
+		if(stream_read(fat->clusterReadStream, &buffer, sizeof(buffer)) != SUCCESS){
+			return ERROR_IO;
+		}
+
+		if(buffer.DIR_Name[0] != 0x0 && buffer.DIR_Name[0] != 0xE5){
+			continue;
+		}
+
+		memset(&buffer, 0x0, sizeof(buffer));
+
+		char name[12];
+		_format_fat_name(filename, name);
+
+		memcpy(buffer.DIR_Name, name, 11);
+		buffer.DIR_Attr = ATTR_ARCHIVE;
+
+		uint32_t cluster = _reserve_next_cluster(fat);
+
+		// TODO: finish
+
+		break;
+	}
+
+	return NOT_IMPLEMENTED;
 }
 
 int _remove_entry(struct FAT* fat, const char* pathname){
@@ -424,6 +507,12 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 		return 0x0;
 	}
 
+	if(flags & O_CREAT){
+		int status = _creaty_entry(fat, pathname);
+		terminal_write("create status %d\n", status);
+		return 0x0;
+	}
+
 	struct FATFileDescriptor* fd = kmalloc(sizeof(struct FATFileDescriptor));
 	if(!fd){
 		return 0x0;
@@ -431,8 +520,7 @@ struct FATFileDescriptor* FAT32_open(struct FAT* fat, const char *pathname, uint
 
 	struct FATItem itembuff;
 
-	int status = _traverse_path(fat, pathname, &itembuff);
-	if(status != SUCCESS){
+	if(_traverse_path(fat, pathname, &itembuff) != SUCCESS){
 		kfree(fd);
 		return 0x0;
 	}
@@ -661,12 +749,7 @@ int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd)
 		return INVALID_ARG;
 
-	if(ffd->item->type == Directory){
-		kfree(ffd->item->directory->entry);
-		kfree(ffd->item->directory);
-	}else{
-		kfree(ffd->item->file);
-	}
+	_dispose_fat_item(ffd->item);
 
 	kfree(ffd->item);
 	kfree(ffd);

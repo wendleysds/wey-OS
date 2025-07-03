@@ -92,23 +92,13 @@ void kmain(){
 	// Start drivrers
 	//init_keyboard();
 
-	char* filepath = "/home/chars.txt";
-	char* somethingToWrite = "Something to write";
-	char buffer[512];
+	char* filepath = "/home/test.txt";
 
-	int fd = open(filepath, O_RDWR);
+	int fd = open(filepath, O_CREAT);
 
 	if(fd < 0){
 		panic("Failed to open file '%s'. Error code: %d\n", filepath, fd);
 	}
-
-	lseek(fd, 4088, SEEK_SET);
-
-	write(fd, somethingToWrite, 19);
-
-	lseek(fd, 4080, SEEK_SET);
-	read(fd, buffer, sizeof(buffer));
-	terminal_write("%s", buffer);
 
 	terminal_write("\nClose status %d\n", close(fd));
 
