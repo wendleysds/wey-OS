@@ -1,4 +1,5 @@
-TARGET = $(IMG_DIR)/kernel.img
+IMG = $(IMG_DIR)/kernel.img
+TARGET =
 
 # Compilers
 CC = i686-elf-gcc
@@ -67,7 +68,7 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
 	@echo "Creating os image in $@"
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$@ bs=512 count=32768
@@ -78,6 +79,40 @@ $(TARGET): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG)
 	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=160 conv=notrunc
 	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
 	sudo mount -t vfat $@ $(MOUNT_DIR)
+	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
+	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
+	sudo cp -r home $(MOUNT_DIR)
+	sudo umount $(MOUNT_DIR)
+	@echo "IMG Ready!"
+
+check_TARGET:
+	@if [ -z "$(TARGET)" ]; then \
+		echo "ERROR: TARGET is empty!"; \
+		exit 1; \
+	fi
+
+confirm:
+	@echo "==============================="
+	@lsblk -o NAME,SIZE,LABEL,MOUNTPOINT $(TARGET)
+	@echo "Is this the correct target? (Y/n)"
+	@read ans; \
+	if [ "$$ans" != "Y" ] && [ "$$ans" != "y" ] && [ "$$ans" != "" ]; then \
+		echo "Aborted."; \
+		exit 1; \
+	fi
+
+# especify the device: TARGET=/dev/sd#
+build: check_TARGET confirm $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+	sudo umount $(TARGET)* || true
+	@echo "Building in $(TARGET)"
+	sudo dd if=/dev/zero of=$(TARGET) bs=512 count=32768
+	sudo dd if=$(BOOTLOADER_BIN) of=$(TARGET) conv=notrunc
+	sudo dd if=$(FAT_SIG) of=$(TARGET) bs=$(SECTOR_SIZE) seek=1 conv=notrunc
+	sudo dd if=$(BOOTLOADER_BIN) of=$(TARGET) bs=$(SECTOR_SIZE) seek=6 conv=notrunc 
+	sudo dd if=$(FAT_EMPTY) of=$(TARGET) bs=$(SECTOR_SIZE) seek=32 conv=notrunc
+	sudo dd if=$(FAT_EMPTY) of=$(TARGET) bs=$(SECTOR_SIZE) seek=160 conv=notrunc
+	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
+	sudo mount -t vfat $(TARGET) $(MOUNT_DIR)
 	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
 	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
 	sudo cp -r home $(MOUNT_DIR)
@@ -156,7 +191,7 @@ all:
 
 run:
 	make
-	qemu-system-i386 -serial stdio -drive format=raw,file=$(TARGET)
+	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG)
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -166,6 +201,6 @@ disassembly-img:
 
 debug:
 	make update-bins
-	qemu-system-i386 -serial stdio -drive format=raw,file=$(TARGET) -s -S &
+	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG) -s -S &
 	@echo --QEMU ready for debugging!--
 
