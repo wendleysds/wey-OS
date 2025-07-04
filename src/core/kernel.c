@@ -90,28 +90,10 @@ void kmain(){
 	terminal_clear();
 		
 	// Start drivrers
-	//init_keyboard();
-
-	char* filepath = "/home/sus.txt";
-	char content[] = "Something hehe\n";
-
-	char buffer[512];
-
-	int fd = open(filepath, O_CREAT | O_RDWR);
-
-	if(fd < 0){
-		panic("Failed to open file '%s'. Error code: %d\n", filepath, fd);
-	}
-
-	write(fd, content, strlen(content));
-
-	lseek(fd, 0, SEEK_SET);
-	read(fd, buffer, sizeof(buffer));
-
-	terminal_write("writed: %s", buffer);
-
-	close(fd);
-
+	init_keyboard();
+	
+	terminal_cwrite(0xAAAAAA,"Nothing to do\n\n");
+	
 	// Main loop
 	while(1){
 		__asm__ volatile ("hlt");

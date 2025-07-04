@@ -427,7 +427,24 @@ static int _truncate_entry(struct FAT* fat, struct FATItem* item){
 		return INVALID_ARG;
 	}
 
-	return NOT_IMPLEMENTED;
+	struct FAT32DirectoryEntry* entry = item->file;
+
+	entry->DIR_FileSize = 0;
+
+	uint32_t curCluster = _get_cluster_entry(entry);
+	while(!(CHK_EOF(curCluster))){
+		uint32_t next = _next_cluster(fat, curCluster); // fat.table[curCurrent] & 0x0FFFFFFF;
+		terminal_write("[%d]: %d -> 0\n", curCluster, fat->table[curCluster]);
+		fat->table[curCluster] = 0;
+		curCluster = next;
+	}
+
+	stream_seek(fat->writeStream, item->offsetInBytes);
+	if(stream_write(fat->writeStream, entry, sizeof(struct FAT32DirectoryEntry)) != SUCCESS){
+		return ERROR_IO;
+	}
+
+	return FAT32_update(fat);
 }
 
 static int _get_root_directory(struct FAT* fat){
