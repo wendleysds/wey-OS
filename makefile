@@ -91,8 +91,7 @@ check_TARGET:
 		exit 1; \
 	fi
 
-confirm:,
-
+confirm:
 	@lsblk -o NAME,SIZE,LABEL,MOUNTPOINT $(TARGET)
 	@echo "Is this the correct target? (Y/n)"
 	@read ans; \
