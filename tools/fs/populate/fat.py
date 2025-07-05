@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List
+import array
 import struct
 
 @dataclass
@@ -216,7 +217,7 @@ class FATHeaders:
 class FAT:
     headers: FATHeaders
     fsInfo: FAT32FSInfo
-    table: bytes
+    table: array.array
     totalClusters: int
     firstDataSector: int
 
@@ -234,7 +235,8 @@ class FAT:
             firstDataSector = fatStartSector + (headersBoot.numFATs * fatSize)
 
             f.seek(fatStartSector * headersBoot.bytesPerSec, 0)
-            fat_data = f.read(fatBytes)
+            table = array.array("I")
+            table.frombytes(f.read(fatBytes))
 
             f.seek(headersExtended.FSInfo * headersBoot.bytesPerSec, 0)
             content = f.read(512)
@@ -253,7 +255,7 @@ class FAT:
 
             self.headers = FATHeaders(headersBoot, headersExtended)
             self.fsInfo = fsInfo
-            self.table = fat_data
+            self.table = table
             self.totalClusters = fatTotalClusters
             self.firstDataSector = firstDataSector
 

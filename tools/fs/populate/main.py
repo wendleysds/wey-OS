@@ -1,13 +1,24 @@
 from fat import FAT
-import utils
+from typing import List
+import sys
 
-bins_path = "../../../build/bin/"
-img_path = "../../../build/img/kernel.img"
+fat: FAT
 
-fat: FAT = FAT(img_path)
+def help():
+    print("Usage: <img> <option> <dest> <files...>")
+    print("\nOptions:")
+    print("\th: display this message;")
+    print("\tc: copy <files...> in <dest> to <img> file system;")
+    print("\tg: generete <files...> in <dest> to <img> file system;")
+    print("\ti: start a interactive shell with simple commands(mkdir, rmdir, rm, create...) with <img>.")
 
-def generate_root():
-    pass
+def main(argc: int, argv: List[str]):
+    if argc == 1 or argc < 3:
+        if argc == 2 and argv[1] == '-h':
+            help()
+            exit(0)
 
-def copy_binaries():
-    pass
+        print(f"Try: py {argv[0]} -h")
+        exit(1)
+
+main(len(sys.argv), sys.argv)
