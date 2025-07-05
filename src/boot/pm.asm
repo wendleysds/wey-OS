@@ -47,8 +47,6 @@ gdt_descriptor:
 
 [BITS 32]
 
-extern test
-
 init_pm:
 	mov ax, DATA_SEG
 	mov ds, ax
