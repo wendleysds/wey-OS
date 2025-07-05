@@ -77,13 +77,6 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(
 	dd if=$(BOOTLOADER_BIN) of=$@ bs=$(SECTOR_SIZE) seek=6 conv=notrunc 
 	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
 	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=160 conv=notrunc
-	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
-	sudo mount -t vfat $@ $(MOUNT_DIR)
-	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
-	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
-	sudo cp -r home $(MOUNT_DIR)
-	sudo umount $(MOUNT_DIR)
-	@echo "IMG Ready!"
 
 check_TARGET:
 	@if [ -z "$(TARGET)" ]; then \
