@@ -91,8 +91,8 @@ check_TARGET:
 		exit 1; \
 	fi
 
-confirm:
-	@echo "==============================="
+confirm:,
+
 	@lsblk -o NAME,SIZE,LABEL,MOUNTPOINT $(TARGET)
 	@echo "Is this the correct target? (Y/n)"
 	@read ans; \
@@ -102,22 +102,11 @@ confirm:
 	fi
 
 # especify the device: TARGET=/dev/sd#
-build: check_TARGET confirm $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+build_on: check_TARGET confirm $(IMG)
 	sudo umount $(TARGET)* || true
 	@echo "Building in $(TARGET)"
-	sudo dd if=/dev/zero of=$(TARGET) bs=512 count=32768
-	sudo dd if=$(BOOTLOADER_BIN) of=$(TARGET) conv=notrunc
-	sudo dd if=$(FAT_SIG) of=$(TARGET) bs=$(SECTOR_SIZE) seek=1 conv=notrunc
-	sudo dd if=$(BOOTLOADER_BIN) of=$(TARGET) bs=$(SECTOR_SIZE) seek=6 conv=notrunc 
-	sudo dd if=$(FAT_EMPTY) of=$(TARGET) bs=$(SECTOR_SIZE) seek=32 conv=notrunc
-	sudo dd if=$(FAT_EMPTY) of=$(TARGET) bs=$(SECTOR_SIZE) seek=160 conv=notrunc
-	@echo "Mounting $< in $(MOUNT_DIR) and copying files..."
-	sudo mount -t vfat $(TARGET) $(MOUNT_DIR)
-	sudo cp $(STEP1_BIN) $(MOUNT_DIR)
-	sudo cp $(KERNEL_BIN) $(MOUNT_DIR)
-	sudo cp -r home $(MOUNT_DIR)
-	sudo umount $(MOUNT_DIR)
-	@echo "IMG Ready!"
+	sudo dd if=$(IMG) of=$(TARGET)
+	@echo "Builded on $(TARGET)"
 
 # Create directories
 $(BUILD_DIRS):
