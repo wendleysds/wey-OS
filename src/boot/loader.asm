@@ -251,12 +251,12 @@ lba_to_chs:
 	mov byte[Cylinder], al
 	ret
 
-msg_ERRFNOT: db "File not found!", 0
+msg_ERRFNOT: db "Init File not found!", 0
 msg_ERRDISK: db "Disk error!", 0
 msg_ERROR: db "Error", 0
 
 init_folder: db "BOOT       ", 0
-init_file_name: db "STEP1   BIN", 0
+init_file_name: db "INIT    BIN", 0
 
 FileSize: dw 0x0
 

@@ -39,7 +39,7 @@ LINKER_B32_FILE = linker32.ld
 
 # Binaries
 BOOTLOADER_BIN = $(BIN_DIR)/bootloader.bin
-STEP1_BIN = $(BIN_DIR)/step1.bin
+INIT_BIN = $(BIN_DIR)/init.bin
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 
 FAT_SIG = $(BIN_DIR)/FATSignature.bin
@@ -68,7 +68,7 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(STEP1_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
 	@echo "Creating os image in $@"
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$@ bs=512 count=32768
@@ -118,9 +118,9 @@ $(KERNEL_BIN): $(KERNEL32_ENTRY) $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) | $(BIN_DIR
 	@echo "Obj ASM Files:" $(OBJ_ASM32_FILES)
 	$(LD) $(LDFLAGS) -T $(LINKER_B32_FILE) -o $@ $^ --oformat binary
 
-# Step1
-$(STEP1_BIN): $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) | $(BIN_DIR)
-	@echo "Compiling step1 binary..."
+# init
+$(INIT_BIN): $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) | $(BIN_DIR)
+	@echo "Compiling init binary..."
 	@echo "Obj C Files:" $(OBJ_C16_FILES)
 	@echo "Obj ASM Files:" $(OBJ_ASM16_FILES)
 	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $@ $^ --oformat binary
