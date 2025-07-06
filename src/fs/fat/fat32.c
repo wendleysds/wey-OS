@@ -169,10 +169,19 @@ static int _dir_entry_count(struct FAT* fat, struct Directory* dir){
 
 static void _dispose_fat_item(struct FATItem* item){
 	if(item->type == Directory){
-		kfree(item->directory->entry);
-		kfree(item->directory);
+		if(item->directory->entry){
+			kfree(item->directory->entry);
+			item->directory->entry = 0x0;
+		}
+		if(item->directory){
+			kfree(item->directory);
+			item->directory = 0x0;
+		}
 	}else{
-		kfree(item->file);
+		if(item->file){
+			kfree(item->file);
+			item->file = 0x0;
+		}
 	}
 }
 
@@ -311,6 +320,8 @@ static int _creaty_entry(struct FAT* fat, const char* pathname){
 		return NOT_SUPPORTED;
 
 	struct FATItem itembuff;
+	memset(&itembuff, 0x0, sizeof(itembuff));
+
 	struct Directory* dir;
 
 	if(_traverse_path(fat, pathname, &itembuff) == SUCCESS){
@@ -382,6 +393,8 @@ static int _remove_entry(struct FAT* fat, const char* pathname){
 	}
 
 	struct FATItem itembuff;
+	memset(&itembuff, 0x0, sizeof(itembuff));
+
 	int status = _traverse_path(fat, pathname, &itembuff);
 	if(status != SUCCESS){
 		return status;
@@ -550,6 +563,8 @@ int FAT32_open(struct FAT* fat, void** outPtr, const char *pathname, uint8_t fla
 	}
 
 	struct FATItem itembuff;
+	memset(&itembuff, 0x0, sizeof(itembuff));
+
 	int status = _traverse_path(fat, pathname, &itembuff);
 	
 	if(status == FILE_NOT_FOUND){
@@ -613,6 +628,7 @@ int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* rest
 	}
 
 	struct FATItem itembuff;
+	memset(&itembuff, 0x0, sizeof(itembuff));
 
 	int status = _traverse_path(fat, pathname, &itembuff);
 	if(status != SUCCESS){
