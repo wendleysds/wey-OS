@@ -185,7 +185,8 @@ static void _dispose_fat_item(struct FATItem* item){
 	}
 }
 
-static int _get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem* itembuff, struct Directory* dir, uint8_t autoDispose){
+static int 
+_get_item_in_diretory(struct FAT* fat, char* itemName, struct FATItem* itembuff, struct Directory* dir, uint8_t autoDispose){
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
