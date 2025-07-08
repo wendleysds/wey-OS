@@ -31,6 +31,8 @@ BIN_DIR = $(BUILD_DIR)/bin
 IMG_DIR = $(BUILD_DIR)/img
 MOUNT_DIR = $(BUILD_DIR)/mnt
 
+TOOLS_DIR = tools
+
 BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR)
 
 # Files
@@ -68,7 +70,7 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
+$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(FAT_SIG) $(FAT_EMPTY)
 	@echo "Creating os image in $@"
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$@ bs=512 count=32768
@@ -77,6 +79,7 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN) $(FAT_SIG) $(F
 	dd if=$(BOOTLOADER_BIN) of=$@ bs=$(SECTOR_SIZE) seek=6 conv=notrunc 
 	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=32 conv=notrunc
 	dd if=$(FAT_EMPTY) of=$@ bs=$(SECTOR_SIZE) seek=160 conv=notrunc
+	cd $(TOOLS_DIR)/fs/populate && make run
 
 check_TARGET:
 	@if [ -z "$(TARGET)" ]; then \

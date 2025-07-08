@@ -565,7 +565,7 @@ int main()
     char *bBin = "/bin";
 
     char *init = "/boot/init.bin";
-    char *kernel = "/kernel.bin";
+    char *kernel = "/boot/kernel.bin";
 
     char *binInit = "bin/init.bin";
     char *binKernel = "bin/kernel.bin";

@@ -68,6 +68,15 @@ init_pm:
 	add ax, 0x20
 	mov word[DataSector], ax
 
+	push eax
+	mov eax, 0x02
+	mov dword [Cluster], eax
+	pop eax
+
+	mov edx, entry_dir_name
+	call find_file
+
+	mov edx, entry_file_name
 	call find_file
 	jc .err
 
@@ -84,13 +93,15 @@ init_pm:
 
 ;Seach a file with the name iquals [entry_file_name] and get wis desired cluster
 ;
-; [entry_file_name]
+; edx [entry_file_name]
 ;
 ; returns:
 ;   store result in 'Cluster'
 find_file:
 	pushad
-	mov eax, 0x02
+	push edx
+
+	mov eax, dword [Cluster]
 	call cluster_to_lba
 
 	mov ecx, 0x08
@@ -98,6 +109,7 @@ find_file:
 	call ata_lba_read
 
 	mov si, 0x6000
+	pop edx
 
 .next_entry:
 	cmp byte [si], 0x00
@@ -105,7 +117,7 @@ find_file:
 	cmp byte [si], 0xE5
 	je .skip_entry
 
-	mov edi, entry_file_name
+	mov edi, edx
     mov ecx, 11
     push si
     repe cmpsb
@@ -114,7 +126,7 @@ find_file:
 
 .skip_entry:
     add si, 32
-    cmp si, 0x6000 + 512
+    cmp si, 0x6000 + 512 ; firsts 16 entries
 	jb .next_entry
 
 .not_found:
@@ -275,7 +287,8 @@ ata_lba_read:
 	popad
 	ret
 
-entry_file_name: db "KERNEL  BIN"
+entry_dir_name: db "BOOT       ", 0
+entry_file_name: db "KERNEL  BIN", 0
 
 DataSector: dd 0x0
 Cluster: dd 0x0
