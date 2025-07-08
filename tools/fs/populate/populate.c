@@ -29,6 +29,7 @@ struct FileDescriptor
 {
     struct FAT32DirectoryEntry entry;
     uint32_t cursor;
+    uint32_t currentCluster;
 };
 
 static char p[PATH_MAX];
@@ -56,10 +57,6 @@ static int _find_free_cluster(struct FAT *fat)
     if (fat->fsInfo.nextFreeCluster >= fat->headers.extended.rootClus && fat->fsInfo.nextFreeCluster < fat->totalClusters)
     {
         cluster = fat->fsInfo.nextFreeCluster;
-    }
-    else
-    {
-        cluster = fat->headers.extended.rootClus;
         for (; cluster < fat->totalClusters; cluster++)
         {
             if ((fat->table[cluster] & 0x0FFFFFFF) == 0)
@@ -67,20 +64,9 @@ static int _find_free_cluster(struct FAT *fat)
                 return cluster;
             }
         }
-
-        return OUT_OF_BOUNDS;
-    }
-
-    for (; cluster < fat->totalClusters; cluster++)
-    {
-        if ((fat->table[cluster] & 0x0FFFFFFF) == 0)
-        {
-            return cluster;
-        }
     }
 
     cluster = fat->headers.extended.rootClus;
-
     for (; cluster < fat->totalClusters; cluster++)
     {
         if ((fat->table[cluster] & 0x0FFFFFFF) == 0)
@@ -428,7 +414,7 @@ int create(struct FAT *fat, const char *pathname, int attr)
 
         memset(&buffer, 0x0, sizeof(buffer));
         uint32_t cluster = _reserve_next_cluster(fat);
-        fat->table[cluster] = EOF;
+        fat->table[cluster] = FEOF;
 
         char name[12];
 
@@ -455,17 +441,106 @@ int read(struct FAT *fat, const char *buffer, uint32_t size, struct FileDescript
 
 int write(struct FAT *fat, const char *buffer, uint32_t size, struct FileDescriptor *fd)
 {
-    return NOT_IMPLEMENTED;
+    if (!fat || !buffer || size == 0 || !fd)
+    {
+        return INVALID_ARG;
+    }
+
+    if (fd->entry.DIR_Attr & ATTR_DIRECTORY)
+    {
+        return NOT_SUPPORTED; // Cannot write to a directory
+    }
+
+    uint32_t cursor = fd->cursor;
+    uint32_t lba = _LBA(fd->currentCluster);
+
+    uint32_t remaining = size;
+    uint32_t totalWritten = 0;
+
+    uint32_t clusterOffset = cursor % CLUSTER_SIZE;
+    uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+    fseek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+    while(remaining > 0){
+        uint32_t toWrite = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
+        int writed = fwrite((uint8_t*)buffer + totalWritten, 1, toWrite, stream);
+
+        cursor += writed;
+        totalWritten += writed;
+        remaining -= writed;
+        bytesLeftInCluster -= writed;
+
+        if(cursor % CLUSTER_SIZE == 0){
+            uint32_t next = _NEXT_CLUSTER(fd->currentCluster);
+            if(CHK_FEOF(next)){
+                next = _reserve_next_cluster(fat);
+                if(next < 0) return next;
+
+                fat->table[fd->currentCluster] = next;
+                fat->table[next] = FEOF;
+            }
+
+            fd->currentCluster = next;
+
+            clusterOffset = cursor % CLUSTER_SIZE;
+            bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+            lba = _LBA(next);
+            fseek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+        }
+    }
+
+    return update(fat);
 }
 
-int open(struct FAT *fat, const char *pathname, struct FileDescriptor **outFd)
+int open(struct FAT *fat, const char *pathname, struct FileDescriptor *fd)
 {
-    return NOT_IMPLEMENTED;
+    int status = _traverse_path(fat, pathname, &fd->entry);
+    if (status < 0)
+    {
+        return status;
+    }
+
+    fd->cursor = 0;
+    fd->currentCluster = _get_cluster_entry(&fd->entry);
+
+    return SUCCESS;
 }
 
 int _ext_fat_copy(struct FAT *fat, const char *extPath, const char *fatPath)
 {
-    return NOT_IMPLEMENTED;
+    struct FileDescriptor fd;
+    memset(&fd, 0x0, sizeof(fd));
+
+    FILE *f = fopen(extPath, "rb");
+    if (!f)
+    {
+        perror("_ext_fat_copy: Error opening file\n");
+        return -1;
+    }
+
+    int status = open(fat, fatPath, &fd);
+    if (status != SUCCESS)
+    {
+        fprintf(stderr, "Error opening: %s\n", fatPath);
+        fclose(f);
+        return status;
+    }
+
+    char buffer[4096];
+    while (fread(buffer, 1, sizeof(buffer), f) > 0)
+    {
+        status = write(fat, buffer, sizeof(buffer), &fd);
+        if (status != SUCCESS)
+        {
+            fprintf(stderr, "Error Writing on: %s\n", fatPath);
+            fclose(f);
+            return status;
+        }
+    }
+
+    fclose(f);
+    return SUCCESS;
 }
 
 int main()
@@ -490,20 +565,23 @@ int main()
     char *bBin = "/bin";
 
     char *init = "/boot/init.bin";
-    char *kernel = "/boot/kernel.bin";
+    char *kernel = "/kernel.bin";
+
+    char *binInit = "bin/init.bin";
+    char *binKernel = "bin/kernel.bin";
 
     // Create dirs(/boot; /home/; /bin)
-    printf("Create '%s': %d\n", bDir, create(&fat, bDir, ATTR_DIRECTORY));
-    printf("Create '%s': %d\n", bHome, create(&fat, bHome, ATTR_DIRECTORY));
-    printf("Create '%s': %d\n", bBin, create(&fat, bBin, ATTR_DIRECTORY));
+    printf("%s: %d\n", bDir, create(&fat, bDir, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
+    printf("%s: %d\n", bHome, create(&fat, bHome, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
+    printf("%s: %d\n", bBin, create(&fat, bBin, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
 
-    // ZCreate files(/boot/init.bin; /boot/kernel.bin)
-    printf("Create '%s': %d\n", init, create(&fat, init, ATTR_ARCHIVE));
-    printf("Create '%s': %d\n", kernel, create(&fat, kernel, ATTR_ARCHIVE));
+    // Create files(/boot/init.bin; /boot/kernel.bin)
+    printf("%s: %d\n", init, create(&fat, init, ATTR_ARCHIVE | ATTR_SYSTEM | ATTR_READ_ONLY));
+    printf("%s: %d\n", kernel, create(&fat, kernel, ATTR_ARCHIVE | ATTR_SYSTEM | ATTR_READ_ONLY));
 
-    // Copy content(bin/init.bin -> /boot/init.bin; bin/kernel.bin -> /boot/kernel.bin)
-    /*_ext_fat_copy(&fat, get("bin/init.bin"), "/boot/init.bin");
-    _ext_fat_copy(&fat, get("bin/kernel.bin"), "/boot/kernel.bin");*/
+    // Copy/Update content(bin/init.bin -> /boot/init.bin; bin/kernel.bin -> /boot/kernel.bin)
+    printf("%s -> %s: %d\n", binInit, init, _ext_fat_copy(&fat, get(binInit), init));
+    printf("%s -> %s: %d\n", binKernel, kernel, _ext_fat_copy(&fat, get(binKernel), kernel));
 
     fclose(stream);
     return 0;
