@@ -11,9 +11,9 @@ CFLAGS += -g
 # Bare-metal Flags
 CFLAGS += -ffreestanding -nostdlib -nostartfiles
 # Warnig Suppresion Flags
-CFLAGS += -Wno-unused-function -Wno-unused-parameter
+CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-cpp
 # Alignment Flags
-CFLAGS += -falign-jumps -falign-functions -falign-loops
+CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
 # Optimzation Flags
 CFLAGS += -fstrength-reduce -finline-functions
 
