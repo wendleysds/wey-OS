@@ -221,7 +221,7 @@ static int _traverse_path(struct FAT *fat, const char *path, struct FAT32Directo
         return INVALID_ARG;
     }
 
-    int lba = _find_entry(fat, token, fat->rootDir.firstCluster, buff);
+    int lba = _find_entry(fat, token, fat->rootClus, buff);
     if (lba < 0)
     {
         return FILE_NOT_FOUND;
@@ -295,10 +295,7 @@ int _init_fat(struct FAT *fat)
     fat->table = fat_table;
 
     // Root
-    fat->rootDir.firstCluster = fat->headers.extended.rootClus;
-    fat->rootDir.currentCluster = fat->headers.extended.rootClus;
-    fat->rootDir.entry = NULL;
-    fat->rootDir.itensCount = -1;
+    fat->rootClus = fat->headers.extended.rootClus;
 
 err:
     return status;
@@ -380,7 +377,7 @@ int create(struct FAT *fat, const char *pathname, int attr)
 
     if (strlen(pathCopy) == 0)
     {
-        dirCluster = fat->rootDir.firstCluster;
+        dirCluster = fat->rootClus;
     }
     else
     {
@@ -557,6 +554,7 @@ int main()
     if (status != SUCCESS)
     {
         fprintf(stderr, "Error initalizing FAT: %d\n", status);
+        fclose(stream);
         return 1;
     }
 

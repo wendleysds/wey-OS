@@ -99,47 +99,22 @@ struct FATHeaders{
 	struct FAT32HeaderExtended extended;
 }__attribute__((packed));
 
-enum ItemType{
-	File,
-	Directory,
-};
-
-struct Directory{
-	struct FAT32DirectoryEntry* entry;
-	uint16_t itensCount;
-	uint32_t firstCluster;
-	uint32_t currentCluster;
-}__attribute__((packed));
-
-struct FATItem{
-	enum ItemType type;
-	int offsetInBytes; // LBA of the item for updating
-	union{
-		struct FAT32DirectoryEntry* file;
-		struct Directory* directory;
-	};
-}__attribute__((packed));
-
 struct FATFileDescriptor{
-	struct FATItem* item;
+	struct FAT32DirectoryEntry entry;
+	uint32_t dirCluster;
 	uint32_t cursor;
-	uint32_t firstCluster;
+	uint32_t firtCluster;
 	uint32_t currentCluster;
 }__attribute__((packed));
 
 struct FAT{
 	struct FATHeaders headers;
 	struct FAT32FSInfo fsInfo;
-	struct Directory rootDir;
+	uint8_t rootClus;
 
 	uint32_t* table;
 	uint32_t totalClusters;
 	uint32_t firstDataSector;
-
-	// Streams for reading and writing
-	struct Stream* readStream;  // Gerenal Purpose Read Stream
-	struct Stream* writeStream; // General Purpose Write Stream
-	struct Stream* clusterReadStream;
 }__attribute__((packed));
 
 #endif
