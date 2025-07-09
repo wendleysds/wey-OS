@@ -11,4 +11,7 @@ void itoa(int value, char* result, int base);
 // Convert @str to upercase
 void strupper(char* str);
 
+// Format a @filename to fit in FAT32 8.3 format and store in @out[12]
+void format_fat_name(const char* filename, char* out);
+
 #endif
