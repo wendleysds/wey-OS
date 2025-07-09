@@ -70,10 +70,10 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 SECTOR_SIZE = 512
 
 # Create kernel.img
-$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(FAT_SIG) $(FAT_EMPTY)
+$(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN) $(FAT_SIG) $(FAT_EMPTY)
 	@echo "Creating os image in $@"
 	mkdir -p $(IMG_DIR)
-	dd if=/dev/zero of=$@ bs=512 count=32768
+	dd if=/dev/zero of=$@ bs=512 count=65536
 	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
 	dd if=$(FAT_SIG) of=$@ bs=$(SECTOR_SIZE) seek=1 conv=notrunc
 	dd if=$(BOOTLOADER_BIN) of=$@ bs=$(SECTOR_SIZE) seek=6 conv=notrunc 

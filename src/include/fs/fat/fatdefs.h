@@ -103,7 +103,7 @@ struct FATFileDescriptor{
 	struct FAT32DirectoryEntry entry;
 	uint32_t dirCluster;
 	uint32_t cursor;
-	uint32_t firtCluster;
+	uint32_t firstCluster;
 	uint32_t currentCluster;
 }__attribute__((packed));
 

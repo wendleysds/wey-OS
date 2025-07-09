@@ -1,7 +1,9 @@
 #include <lib/utils.h>
+#include <lib/string.h>
+#include <lib/mem.h>
 #include <stdint.h>
 
-void itoa(int value, char* result, uint8_t base){
+void itoa(int value, char* result, int base){
 	const char* digits = "0123456789ABCDEF";
 	char buffer[32];
 	int i = 0, j = 0; 

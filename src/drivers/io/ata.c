@@ -106,7 +106,9 @@ int ata_read_sectors_28(uint32_t lba, uint8_t totalSectors, void* buffer){
 		t = TRIES;
 		do {
 			status = inb(STATUS_REGISTER);
-			if (status & ATA_SR_ERR) return ERROR;
+			if (status & ATA_SR_ERR){
+				return -inb(ERROR_REGISTER);
+			}
 			if (!t--) return TIMEOUT;
 		} while (!(status & ATA_SR_DRQ));
 
