@@ -107,8 +107,23 @@ void display_video_info(){
 	terminal_write("--------------\n\n");
 }
 
-static void scroll_terminal(){
-	// TODO: Implement
+static void scroll_terminal() {
+	if (cursor.y < (video.height / font.heigth))
+		return;
+
+	uint16_t char_height = font.heigth;
+	uint16_t screen_height = video.height;
+	uint32_t row_size = video.pitch * char_height;
+
+	uint8_t* fb = (uint8_t*)video.framebuffer_virtual;
+
+	// Move framebuffer up by one character row
+	memmove(fb, fb + row_size, video.pitch * (screen_height - char_height));
+
+	// Clear the last row
+	memset(fb + video.pitch * (screen_height - char_height), BACKGROUND_COLOR, row_size);
+
+	cursor.y = (screen_height / char_height) - 1;
 }
 
 void terminal_clear() {
