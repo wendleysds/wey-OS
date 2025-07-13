@@ -1,26 +1,28 @@
-#include "def/config.h"
-#include "fs/fs.h"
 #include <fs/fat/fat32.h>
 #include <fs/fat/fatdefs.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <io/stream.h>
+#include <def/status.h>
+#include <def/config.h>
 #include <lib/string.h>
 #include <lib/utils.h>
-#include <def/status.h>
+#include <lib/mem.h>
+#include <memory/kheap.h>
 #include <drivers/terminal.h>
-#include <io/stream.h>
-#include <stdint.h>
-
-/*
- * Main module for FAT32 parse and handler
- * This module provides functions to initialize the FAT32 filesystem,
- * open files, read/write data, and manage directories.
- */
 
 #define CLUSTER_SIZE 4096
 #define EOF 0x0FFFFFF8
+
 #define CHK_EOF(cluster) \
 	(cluster >= EOF)
+
+#define _SEC(lba) \
+    (lba * SECTOR_SIZE)
+
+static uint8_t _fsinfo_sig_valid(struct FAT32FSInfo* fsInfo) {
+	return (fsInfo->leadSignature == 0x41615252 &&
+        	fsInfo->structSignature == 0x61417272 &&
+        	fsInfo->trailSignature == 0xAA550000);
+}
 
 static uint32_t _cluster_to_lba(struct FAT* fat, uint32_t cluster){
 	return fat->firstDataSector + ((cluster - 2) * fat->headers.boot.secPerClus);
@@ -40,7 +42,7 @@ static uint32_t _find_free_cluster(struct FAT* fat){
 	}
 
 	uint32_t cluster;
-	if(fat->fsInfo.nextFreeCluster >= fat->headers.extended.rootClus && fat->fsInfo.nextFreeCluster < fat->totalClusters){
+	if(fat->fsInfo.nextFreeCluster >= fat->rootClus && fat->fsInfo.nextFreeCluster < fat->totalClusters){
 		cluster = fat->fsInfo.nextFreeCluster;
 		for (; cluster < fat->totalClusters; cluster++)
 		{
@@ -50,7 +52,7 @@ static uint32_t _find_free_cluster(struct FAT* fat){
 		}
 	}
 
-	cluster = fat->headers.extended.rootClus;
+	cluster = fat->rootClus;
 	for (; cluster < fat->totalClusters; cluster++)
 	{
 		if(_next_cluster(fat, cluster) == FAT_UNUSED){
@@ -75,7 +77,91 @@ static uint32_t _reserve_next_cluster(struct FAT* fat){
 	return cluster;
 }
 
-static int _free_chain(struct FAT* fat, uint32_t start){
+static int8_t _update(struct FAT* fat){
+	if(!fat){
+		return INVALID_ARG;
+	}
+
+	struct Stream* stream = stream_new();
+	if(!stream){
+		return NO_MEMORY;
+	}
+
+	int16_t status = SUCCESS;
+	uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
+    uint32_t fatBystes = fat->headers.extended.FATSz32 * fat->headers.boot.bytesPerSec;
+
+	if(_fsinfo_sig_valid(&fat->fsInfo)){
+		stream_seek(stream, _SEC(fat->headers.extended.FSInfo), SEEK_SET);
+		if((status = stream_write(stream, &fat->fsInfo, sizeof(fat->fsInfo))) != SUCCESS){
+			status = ERROR_IO;
+			goto out;
+		}
+	}
+
+    stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
+	if((status = stream_write(stream, fat->table, fatBystes)) != SUCCESS){
+		status = ERROR_IO;
+	}
+
+out:
+	stream_dispose(stream);
+    return status;
+}
+
+static int8_t _save_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry, uint32_t dirCluster){
+	if(!entry || dirCluster < 2){
+		return INVALID_ARG;
+	}
+
+	struct Stream* stream = stream_new();
+	if(!stream){
+		return NO_MEMORY;
+	}
+
+	int8_t status = FILE_NOT_FOUND;
+	uint32_t cluster = dirCluster;
+	while (!CHK_EOF(dirCluster)) {
+		uint32_t lba = _cluster_to_lba(fat, cluster);
+		stream_seek(stream, _SEC(lba), SEEK_SET);
+
+		for (uint32_t i = 0; i < (CLUSTER_SIZE / sizeof(struct FAT32DirectoryEntry)); i++) {
+			struct FAT32DirectoryEntry buffer;
+			if (stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				status = ERROR_IO;
+				goto out;
+			}
+
+			if (buffer.DIR_Name[0] == 0x0) {
+				status = FILE_NOT_FOUND;
+				goto out;
+			}
+
+			if (buffer.DIR_Name[0] == 0xE5) {
+				continue;
+			}
+
+			if(memcmp(buffer.DIR_Name, entry->DIR_Name, 11) == 0){
+				stream_seek(stream, -sizeof(buffer), SEEK_CUR);
+				if (stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+					status = ERROR_IO;
+					goto out;
+				}
+
+				status = _update(fat);
+				goto out;
+			}
+		}
+
+		cluster = _next_cluster(fat, cluster);
+	}
+
+out:
+	stream_dispose(stream);
+	return status;
+}
+
+static int8_t _free_chain(struct FAT* fat, uint32_t start){
 	if(!fat || start < 2 || start > fat->totalClusters){
 		return INVALID_ARG;
 	}
@@ -91,7 +177,7 @@ static int _free_chain(struct FAT* fat, uint32_t start){
 		fat->table[cur] = FAT_UNUSED;
 		count++;
 
-		if(CHK_EOF(next)){
+		if(CHK_EOF(next) || next == FAT_UNUSED){
 			break;
 		}
 
@@ -108,54 +194,67 @@ static int _free_chain(struct FAT* fat, uint32_t start){
 
 	fat->fsInfo.nextFreeCluster = start;
 
-	return SUCCESS;
+	return _update(fat);
 }
 
-static int _get_entry(struct FAT* fat, char* itemName, uint32_t dirCluster, struct FAT32DirectoryEntry* entrybuff){
-	if(!fat || !itemName || dirCluster < 2 || dirCluster > fat->totalClusters || !entrybuff){
+static int8_t _find_entry(struct FAT *fat, const char *itemName, uint32_t dirCluster, struct FAT32DirectoryEntry *buff) {
+	if (!fat || !itemName || !buff) {
 		return INVALID_ARG;
 	}
 
-	struct Stream* stream = stream_new();
-	if(!stream){
+	struct Stream *stream = stream_new();
+	if (!stream) {
 		return NO_MEMORY;
 	}
 
 	char filename[12];
-	struct FAT32DirectoryEntry buffer;
-	uint32_t lba = _cluster_to_lba(fat, dirCluster);
-
-	stream_seek(stream, lba);
 	format_fat_name(itemName, filename);
-	while(1){
-		if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS){
-			stream_dispose(stream);
-			return ERROR_IO;
+
+	uint32_t cluster = dirCluster;
+	int status = FILE_NOT_FOUND;
+
+	while (!CHK_EOF(cluster)) {
+		uint32_t lba = _cluster_to_lba(fat, cluster);
+		stream_seek(stream, _SEC(lba), SEEK_SET);
+
+		for (uint32_t i = 0; i < (CLUSTER_SIZE / sizeof(struct FAT32DirectoryEntry)); i++) {
+			struct FAT32DirectoryEntry entry;
+			if (stream_read(stream, &entry, sizeof(entry)) != SUCCESS) {
+				status = ERROR_IO;
+				goto out;
+			}
+
+			if (entry.DIR_Name[0] == 0x0) {
+				status = FILE_NOT_FOUND;
+				goto out;
+			}
+
+			if (entry.DIR_Name[0] == 0xE5) {
+				continue;
+			}
+
+			if (memcmp((char *)entry.DIR_Name, filename, 11) == 0) {
+				memcpy(buff, &entry, sizeof(entry));
+				status = SUCCESS;
+				goto out;
+			}
 		}
 
-		if(buffer.DIR_Name[0] == 0x0){
-			stream_dispose(stream);
-			return FILE_NOT_FOUND;
-		}
-
-		if(buffer.DIR_Name[0] == 0xE5){
-			continue;
-		}
-
-		if (strncmp((char *)buffer.DIR_Name, filename, 11) == 0){
-			memcpy(entrybuff, &buffer, sizeof(struct FAT32DirectoryEntry));
-			stream_dispose(stream);
-			return SUCCESS;
-		}
+		cluster = _next_cluster(fat, cluster);
 	}
+
+out:
+	stream_dispose(stream);
+	return status;
 }
 
-static int _traverse_path(struct FAT* fat, const char* path, int* outDirCluster, struct FAT32DirectoryEntry* entrybuff){
-	if(!fat || !entrybuff || !path || strlen(path) > PATH_MAX){
+static int8_t _traverse_path(struct FAT *fat, const char *path, struct FAT32DirectoryEntry *buff){
+	if(!fat || !buff || !path || strlen(path) > PATH_MAX){
 		return INVALID_ARG;
 	}
 
 	char pathCopy[PATH_MAX];
+	memset(pathCopy, 0x0, sizeof(pathCopy));
 	strncpy(pathCopy, path, PATH_MAX - 1);
 
 	char *token = strtok(pathCopy, "/");
@@ -163,20 +262,17 @@ static int _traverse_path(struct FAT* fat, const char* path, int* outDirCluster,
 		return INVALID_ARG;
 	}
 
-	*outDirCluster = fat->headers.extended.rootClus;
-	int status = _get_entry(fat, token, *outDirCluster, entrybuff);
-	if(status != SUCCESS){
+	int8_t status = SUCCESS;
+	if ((status = _find_entry(fat, token, fat->rootClus, buff)) != SUCCESS){
 		return status;
 	}
 
-	while((token = strtok(NULL, "/"))){
-		if(entrybuff->DIR_Attr & ATTR_ARCHIVE){
+	while ((token = strtok(NULL, "/"))){
+		if(buff->DIR_Attr & ATTR_ARCHIVE){
 			return NOT_SUPPORTED;
 		}
 
-		*outDirCluster = _get_cluster_entry(entrybuff);
-		status = _get_entry(fat, token, *outDirCluster, entrybuff);
-		if(status != SUCCESS){
+		if((status = _find_entry(fat, token, _get_cluster_entry(buff), buff)) != SUCCESS){
 			return status;
 		}
 	}
@@ -184,127 +280,118 @@ static int _traverse_path(struct FAT* fat, const char* path, int* outDirCluster,
 	return status;
 }
 
-static int _update_fat(struct FAT* fat){
-	if(!fat){
-		return INVALID_ARG;
-	}
-
-	struct Stream* stream = stream_new();
-	if(!stream) return NO_MEMORY;
-
-	uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
-	uint32_t fatBystes = fat->headers.extended.FATSz32 * fat->headers.boot.bytesPerSec;
-
-	stream_seek(stream, fat->headers.extended.FSInfo);
-	int status = stream_write(stream, &fat->fsInfo, sizeof(fat->fsInfo));
-	if(status != SUCCESS) goto err;
-
-	stream_seek(stream, fatStartSector);
-	status = stream_write(stream, &fat->table, fatBystes);
-	if(status != SUCCESS) goto err;
-
-err:
-	stream_dispose(stream);
-	return status;
-}
-
-static int _creaty_entry(struct FAT* fat, const char* pathname, int attr){
+static int8_t _create_entry(struct FAT *fat, const char *pathname, int attr){
 	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
 		return INVALID_ARG;
 	}
 
 	char pathCopy[PATH_MAX];
+	memset(pathCopy, 0x0, sizeof(pathCopy));
 	strncpy(pathCopy, pathname, PATH_MAX - 1);
 
-	char *pathpart = strrchr(pathCopy, '/');
-	char *filename = pathpart + 1;
-	*pathpart = '\0';
+	char *slash = strrchr(pathCopy, '/');
+	char *filename = slash + 1;
+	*slash = '\0';
 
-	if (strlen(filename) > 11)
+	if (strlen(filename) > 11){
 		return NOT_SUPPORTED;
+	}
 
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
 	}
 
+	int8_t status = SUCCESS;
+	uint32_t dirCluster = fat->rootClus;
+
 	struct FAT32DirectoryEntry buffer;
-	int dirCluster = 0;
-	if(_traverse_path(fat, pathname, &dirCluster, &buffer) == SUCCESS){
-		return FILE_EXISTS;
+	memset(&buffer, 0, sizeof(buffer));
+
+	if(_traverse_path(fat, pathname, &buffer) == SUCCESS){
+		status = FILE_EXISTS;
+		goto out;
 	}
 
-	if(strlen(pathCopy) == 0){
-		dirCluster = 2;
-	}else{
-		int status = _traverse_path(fat, pathCopy, &dirCluster, &buffer);
-		if(status != SUCCESS){
-			stream_dispose(stream);
-			return status;
+	if(strlen(pathCopy) > 0){
+		if ((status =  _traverse_path(fat, pathCopy, &buffer)) != SUCCESS){
+			goto out;
 		}
 
-		if(buffer.DIR_Attr & ATTR_ARCHIVE){
-			stream_dispose(stream);
-			return INVALID_ARG;
+		if (buffer.DIR_Attr & ATTR_ARCHIVE){
+			status = INVALID_ARG;
+			goto out;
 		}
 
 		dirCluster = _get_cluster_entry(&buffer);
 	}
 
-	uint32_t lba = _cluster_to_lba(fat, dirCluster);
-	stream_seek(stream, lba);
-	while (1)
-	{
-		if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS){
-			stream_dispose(stream);
-			return ERROR_IO;
+	uint32_t cluster = dirCluster;
+	while(1) {
+		uint32_t lba = _cluster_to_lba(fat, cluster);
+		stream_seek(stream, _SEC(lba), SEEK_SET);
+
+		for(uint32_t i = 0; i < (CLUSTER_SIZE / sizeof(struct FAT32DirectoryEntry)); i++) {
+			if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				status = ERROR_IO;
+				goto out;
+			}
+
+			if(buffer.DIR_Name[0] != 0x0 && buffer.DIR_Name[0] != 0xE5){
+				continue;
+			}
+
+			uint32_t _cluster = _reserve_next_cluster(fat);
+			fat->table[_cluster] = EOF;
+
+			char name[12];
+			format_fat_name(filename, name);
+
+			memset(&buffer, 0x0, sizeof(buffer));
+			memcpy(buffer.DIR_Name, name, 11);
+			buffer.DIR_Attr = attr;
+			buffer.DIR_FstClusHI = _cluster >> 16;
+			buffer.DIR_FstClusLO = _cluster;
+
+			stream_seek(stream, -sizeof(buffer), SEEK_CUR);
+			if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				status = ERROR_IO;
+				goto out;
+			}
+
+			status = _update(fat);
+			goto out;
 		}
 
-		if (buffer.DIR_Name[0] != 0x0 && buffer.DIR_Name[0] != 0xE5){
-			continue;
+		cluster = _next_cluster(fat, cluster);
+
+		// Reserve a new cluster for the directory if necessary.
+		if(CHK_EOF((cluster))){
+			uint32_t new = _reserve_next_cluster(fat);
+			if(new == 0xFFFFFFFF){
+				status = OUT_OF_BOUNDS; // FAT Full
+				goto out;
+			}
+
+			fat->table[cluster] = new;
+			fat->table[new] = EOF;
+			cluster = new;
 		}
-
-		memset(&buffer, 0x0, sizeof(buffer));
-		uint32_t cluster = _reserve_next_cluster(fat);
-		fat->table[cluster] = EOF;
-
-		char name[12];
-		format_fat_name(filename, name);
-
-		memcpy(buffer.DIR_Name, name, 11);
-		buffer.DIR_Attr = attr;
-		buffer.DIR_FstClusHI = cluster >> 16;
-		buffer.DIR_FstClusLO = cluster;
-
-		stream_seek(stream, stream->cursor -= sizeof(buffer));
-		if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS){
-			stream_dispose(stream);
-			return ERROR_IO;
-		}
-
-		return _update_fat(fat);
 	}
+
+out:
+	stream_dispose(stream);
+	return status;
 }
 
-static int _remove_entry(struct FAT* fat, const char* pathname){
+static int8_t _remove_entry(struct FAT *fat, const char *pathname){
 	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
 		return INVALID_ARG;
 	}
 
-	const char *filename = strrchr(pathname, '/');
-	if (!filename || strlen(filename + 1) > 11) {
+	const char *filename = strrchr(pathname, '/') + 1;
+	if (strlen(filename) > 11){
 		return NOT_SUPPORTED;
-	}
-
-	struct FAT32DirectoryEntry entry;
-	int dirCluster;
-	int status = _traverse_path(fat, pathname, &dirCluster, &entry);
-	if (status != SUCCESS) {
-		return status;
-	}
-
-	if (entry.DIR_Attr & ATTR_DIRECTORY) {
-		return OP_ABORTED;
 	}
 
 	struct Stream* stream = stream_new();
@@ -312,46 +399,60 @@ static int _remove_entry(struct FAT* fat, const char* pathname){
 		return NO_MEMORY;
 	}
 
-	uint32_t lba = _cluster_to_lba(fat, dirCluster);
-	stream_seek(stream, lba);
-
-	struct FAT32DirectoryEntry buffer;
-	while(1){
-		if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS){
-			stream_dispose(stream);
-			return ERROR_IO;
-		}
-
-		if(memcmp(buffer.DIR_Name, entry.DIR_Name, 11) == 0){
-			buffer.DIR_Name[0] = 0xE5;
-			uint32_t cluster = _get_cluster_entry(&buffer);
-			_free_chain(fat, cluster);
-			fat->fsInfo.nextFreeCluster = cluster;
-
-			stream_seek(stream, stream->cursor - sizeof(buffer)); // Go back
-			if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS){
-				stream_dispose(stream);
-				return ERROR_IO;
-			}
-			break;
-		}
+	int8_t status;
+	struct FAT32DirectoryEntry entry;
+	if ((status = _traverse_path(fat, pathname, &entry)) != SUCCESS)
+	{
+		stream_dispose(stream);
+		return status;
 	}
 
+	if (entry.DIR_Attr & ATTR_DIRECTORY)
+	{
+		stream_dispose(stream);
+		return OP_ABORTED;
+	}
+
+	entry.DIR_Name[0] = 0xE5;
+	_free_chain(fat, _get_cluster_entry(&entry));
+
+	stream_seek(stream, -sizeof(entry), SEEK_CUR);
+	if((status = stream_write(stream, &entry, sizeof(entry))) != SUCCESS){
+		stream_dispose(stream);
+		return status;
+	}
+
+	fat->fsInfo.nextFreeCluster = _get_cluster_entry(&entry);
+
 	stream_dispose(stream);
-	return _update_fat(fat);
+	return _update(fat);
 }
 
-static int _truncate_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry){
+static int8_t _truncate_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry){
 	if(!fat || !entry){
 		return INVALID_ARG;
 	}
 
-	uint32_t cluster = _get_cluster_entry(entry);
-	_free_chain(fat, cluster);
-	fat->table[cluster] = EOF;
-	entry->DIR_FileSize = 0;
+	int8_t status = SUCCESS;
+	uint32_t s = _get_cluster_entry(entry);
+	uint32_t n = _next_cluster(fat, s);
 
-	return SUCCESS;
+	entry->DIR_FileSize = 0;
+	if((status = _free_chain(fat, s)) != SUCCESS){
+		return status;
+	}
+
+	if(_fsinfo_sig_valid(&fat->fsInfo)){
+		if(!CHK_EOF(n)){
+			fat->fsInfo.nextFreeCluster = n;
+		}
+
+		if(fat->fsInfo.freeClusterCount != 0xFFFFFFFF){
+			fat->fsInfo.freeClusterCount--;
+		}
+	}
+
+	return _update(fat);
 }
 
 int FAT32_init(struct FAT* fat){
@@ -359,57 +460,49 @@ int FAT32_init(struct FAT* fat){
 		return INVALID_ARG;
 	}
 
-	memset(fat, 0x0, sizeof(struct FAT));
-
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
 	}
 
-	int status = SUCCESS;
+	int8_t status;
 
-	stream_seek(stream, 0);
-	if(stream_read(stream, &fat->headers, sizeof(fat->headers)) != SUCCESS){
-		status = ERROR_IO;
-		goto err; // Failed to read the FAT32 headers
+	stream_seek(stream, 0, SEEK_SET);
+	if((status = stream_read(stream, &fat->headers, sizeof(fat->headers))) != SUCCESS){
+		goto err;
 	}
 
-	stream_seek(stream, 1); 
-	if(stream_read(stream, &fat->fsInfo, sizeof(fat->fsInfo)) != SUCCESS){
-		status = ERROR_IO;
-		goto err; // Failed to read the FSInfo structure
-	}
-
-	if(fat->fsInfo.leadSignature != 0x41615252 || 
-	   fat->fsInfo.structSignature != 0x61417272 || 
-	   fat->fsInfo.trailSignature != 0xAA550000){
-		status = ERROR_IO;
-		goto err; // Invalid FSInfo structure
+	stream_seek(stream, _SEC(fat->headers.extended.FSInfo), SEEK_SET);
+	if((status = stream_read(stream, &fat->fsInfo,  sizeof(fat->fsInfo))) != SUCCESS){
+		goto err;
 	}
 
 	uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
-	uint32_t fatSize = fat->headers.extended.FATSz32;
-	uint32_t fatTotalClusters = fatSize * fat->headers.boot.bytesPerSec / 4;
-	uint32_t fatBystes = fatSize * fat->headers.boot.bytesPerSec;
+    uint32_t fatSize = fat->headers.extended.FATSz32;
+    uint32_t fatTotalClusters = fatSize * fat->headers.boot.bytesPerSec / 4;
+    uint32_t fatBystes = fatSize * fat->headers.boot.bytesPerSec;
 
-	uint32_t* fat_table = (uint32_t*)kmalloc(fatBystes);
-	if(!fat_table){
-		status = NO_MEMORY;
-		goto err; // Failed to allocate memory for FAT table
+    if (!_fsinfo_sig_valid(&fat->fsInfo)){
+        status = INVALID_FS; // This driver depends the FSInfo to work
+		goto err;
+    }
+
+    uint32_t *table = (uint32_t *)kmalloc(fatBystes);
+    if (!table)
+    {
+        status = NO_MEMORY;
+        goto err;
+    }
+
+	stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
+	if((status = stream_read(stream, table, fatBystes)) != SUCCESS){
+		goto err;
 	}
 
-	stream_seek(stream, fatStartSector);
-	status = stream_read(stream, fat_table, fatBystes);
-	if(status != SUCCESS){
-		kfree(fat_table);
-		//status = ERROR_IO;
-		goto err; // Failed to read the FAT table
-	}
-
-	fat->firstDataSector = fatStartSector + (fat->headers.boot.numFATs * fatSize);
-	fat->totalClusters = fatTotalClusters;
-	fat->table = fat_table;
-	fat->rootClus = fat->headers.extended.rootClus;
+    fat->firstDataSector = fatStartSector + (fat->headers.boot.numFATs * fatSize);
+    fat->totalClusters = fatTotalClusters;
+    fat->table = table;
+    fat->rootClus = fat->headers.extended.rootClus;
 
 err:
 	stream_dispose(stream);
@@ -421,25 +514,47 @@ int FAT32_open(struct FAT* fat, void** outFDPtr, const char *pathname, uint8_t f
 		return INVALID_ARG;
 	}
 
-	int outDirCluster;
 	struct FAT32DirectoryEntry buffer;
 
-	int status = _traverse_path(fat, pathname, &outDirCluster, &buffer);
-	if(status == FILE_NOT_FOUND && (flags & O_CREAT)){
-		status = _creaty_entry(fat, pathname, ATTR_ARCHIVE);
-		if(status != SUCCESS){
+	char dirname[PATH_MAX];
+	memset(dirname, 0x0, sizeof(dirname));
+	strncpy(dirname, pathname, PATH_MAX - 1);
+
+	char *slash = strrchr(dirname, '/');
+	*slash = '\0';
+
+	int8_t status = SUCCESS;
+	uint32_t dirCluster = fat->rootClus;
+	if(strlen(dirname) > 0){
+		if ((status =  _traverse_path(fat, dirname, &buffer)) != SUCCESS){
 			return status;
 		}
-		status = _traverse_path(fat, pathname, &outDirCluster, &buffer);
+
+		if (buffer.DIR_Attr & ATTR_ARCHIVE){
+			return INVALID_ARG;
+		}
+
+		dirCluster = _get_cluster_entry(&buffer);
 	}
+
+	status = _traverse_path(fat, pathname, &buffer);
+	if(status == FILE_NOT_FOUND && (flags & O_CREAT)){
+		if((status = _create_entry(fat, pathname, ATTR_ARCHIVE)) != SUCCESS){
+			return status;
+		}
+
+		status = _traverse_path(fat, pathname, &buffer);
+	}
+
 	if(status != SUCCESS){
 		return status;
 	}
 
 	if(flags & O_TRUNC){
-		status = _truncate_entry(fat, &buffer);
-		if(status != SUCCESS){
-			return status;
+		if(flags & O_WRONLY){
+			if((status = _truncate_entry(fat, &buffer)) != SUCCESS){
+				return status;
+			}
 		}
 	}
 
@@ -450,7 +565,7 @@ int FAT32_open(struct FAT* fat, void** outFDPtr, const char *pathname, uint8_t f
 
 	ffd->firstCluster = _get_cluster_entry(&buffer);
 	ffd->currentCluster = ffd->firstCluster;
-	ffd->dirCluster = outDirCluster;
+	ffd->dirCluster = dirCluster;
 	ffd->entry = buffer;
 	*outFDPtr = (void*)ffd;
 
@@ -462,11 +577,9 @@ int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* rest
 		return INVALID_ARG;
 	}
 
+	int status = SUCCESS;
 	struct FAT32DirectoryEntry entry;
-	int outDir;
-
-	int status = _traverse_path(fat, pathname, &outDir, &entry);
-	if(status != SUCCESS){
+	if((status = _traverse_path(fat, pathname, &entry)) != SUCCESS){
 		return status;
 	}
 
@@ -475,7 +588,7 @@ int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* rest
 	statbuf->creDate = entry.DIR_CrtDate;
 	statbuf->modDate = entry.DIR_WrtTime; 
 
-	return SUCCESS;
+	return status;
 }
 
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uint32_t count){
@@ -483,7 +596,60 @@ int FAT32_read(struct FAT* fat, struct FATFileDescriptor *ffd, void *buffer, uin
 		return INVALID_ARG;
 	}
 
-	return NOT_IMPLEMENTED;
+	if (ffd->entry.DIR_Attr & ATTR_DIRECTORY)
+    {
+        return NOT_SUPPORTED; // Cannot read a directory
+    }
+
+	struct Stream *stream = stream_new();
+	if (!stream) {
+		return NO_MEMORY;
+	}
+
+    uint32_t cursor = ffd->cursor;
+    uint32_t lba = _cluster_to_lba(fat, ffd->currentCluster);
+
+    uint32_t remaining = count;
+    uint32_t totalReaded = 0;
+
+    uint32_t clusterOffset = cursor % CLUSTER_SIZE;
+    uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+	int8_t status = SUCCESS;
+
+    stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+    while(remaining > 0){
+        uint32_t toRead = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
+
+		if((status = stream_read(stream, (uint8_t*)buffer + totalReaded, toRead)) != SUCCESS){
+			status = ERROR_IO;
+			goto out;
+		}
+
+        cursor += toRead;
+        totalReaded += toRead;
+        remaining -= toRead;
+        bytesLeftInCluster -= toRead;
+
+        if(cursor % CLUSTER_SIZE == 0){
+            uint32_t next = _next_cluster(fat, ffd->currentCluster);
+            if(CHK_EOF(next)){
+                status = END_OF_FILE; // Reached end of file
+				goto out;
+            }
+
+            ffd->currentCluster = next;
+            clusterOffset = cursor % CLUSTER_SIZE;
+            bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+            lba = _cluster_to_lba(fat, next);
+            stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+        }
+    }
+
+out:
+	stream_dispose(stream);
+    return totalReaded;
 }
 
 int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, uint8_t whence){
@@ -535,7 +701,78 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
 		return INVALID_ARG;
 	}
 
-	return NOT_IMPLEMENTED;
+	if (ffd->entry.DIR_Attr & ATTR_DIRECTORY)
+    {
+        return NOT_SUPPORTED; // Cannot write to a directory
+    }
+
+	struct Stream *stream = stream_new();
+	if (!stream) {
+		return NO_MEMORY;
+	}
+
+    uint32_t cursor = ffd->cursor;
+    uint32_t lba = _cluster_to_lba(fat, ffd->currentCluster);
+
+    uint32_t remaining = size;
+    uint32_t totalWritten = 0;
+
+    uint32_t clusterOffset = cursor % CLUSTER_SIZE;
+    uint32_t bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+	int8_t status = SUCCESS;
+
+    stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+    while(remaining > 0){
+        uint32_t toWrite = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
+
+		if((status = stream_write(stream, (uint8_t*)buffer + totalWritten, toWrite)) != SUCCESS){
+			status = ERROR_IO;
+			goto out;
+		}
+
+        cursor += toWrite;
+        totalWritten += toWrite;
+        remaining -= toWrite;
+        bytesLeftInCluster -= toWrite;
+		status = totalWritten;
+
+        if(cursor % CLUSTER_SIZE == 0){
+            uint32_t next = _next_cluster(fat, ffd->currentCluster);
+            if(CHK_EOF(next)){
+                next = _reserve_next_cluster(fat);
+                if(next == 0xFFFFFFFF){
+					status = OUT_OF_BOUNDS; // FAT Full
+					goto out;
+				}
+
+                fat->table[ffd->currentCluster] = next;
+                fat->table[next] = EOF;
+            }
+
+            ffd->currentCluster = next;
+
+            clusterOffset = cursor % CLUSTER_SIZE;
+            bytesLeftInCluster = CLUSTER_SIZE - clusterOffset;
+
+            lba = _cluster_to_lba(fat, next);
+            stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+        }
+    }
+
+out:
+	stream_dispose(stream);
+	ffd->entry.DIR_FileSize += totalWritten;
+	ffd->cursor = cursor;
+	if((status = _save_entry(fat, &ffd->entry, ffd->dirCluster)) != SUCCESS){
+		return status;
+	}
+
+	if((status = _update(fat)) != SUCCESS){
+		return status;
+	}
+
+    return totalWritten;
 }
 
 int FAT32_close(struct FATFileDescriptor *ffd){

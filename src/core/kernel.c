@@ -90,10 +90,31 @@ void kmain(){
 	terminal_clear();
 		
 	// Start drivrers
-	init_keyboard();
-	
-	terminal_cwrite(0xAAAAAA,"Nothing to do\n\n");
-	
+	//init_keyboard();
+
+	char* file = "/home/text.txt";
+	int fd = open(file, O_RDWR | O_CREAT);
+
+	if(fd < 0){
+		panic("Error openinig %s: %d\n", file, fd);
+	}
+
+	int bytes = 0;
+	if((bytes = write(fd, "Hello World!\n", 13)) < 0){
+		panic("Error writing to %s: %d\n", file, bytes);
+	}
+
+	lseek(fd, 0, SEEK_SET);
+
+	char buffer[64];
+	if((bytes = read(fd, buffer, sizeof(buffer) - 1)) < 0){
+		panic("Error reading from %s: %d\n", file, bytes);
+	}
+
+	buffer[bytes] = '\0';
+	terminal_cwrite(0x00FF00, "Content: ");
+	terminal_write(buffer);
+
 	// Main loop
 	while(1){
 		__asm__ volatile ("hlt");
