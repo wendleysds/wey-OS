@@ -35,4 +35,8 @@ int64_t _fat32_get_entry_lba(struct FAT* fat, struct FAT32DirectoryEntry* entry,
 int8_t _fat32_truncate_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry);
 int8_t _fat32_free_chain(struct FAT* fat, uint32_t start);
 
+// Name Generation
+void _fat32_append_tilde(char *outname, int n);
+void _fat32_generate_short_name(const char *name, char *out);
+
 #endif
