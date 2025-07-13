@@ -13,10 +13,10 @@ int FAT32_seek(struct FAT* fat, struct FATFileDescriptor* ffd, uint32_t offset, 
 int FAT32_read(struct FAT* fat, struct FATFileDescriptor* ffd, void* buffer, uint32_t count);
 int FAT32_write(struct FAT* fat, struct FATFileDescriptor* ffd, const void* buffer, uint32_t size);
 int FAT32_close(struct FATFileDescriptor* ffd);
-int FAT32_mkdir();
-int FAT32_rmdir();
-int FAT32_create();
-int FAT32_remove();
-int FAT32_setattr();
+
+int FAT32_mkdir(struct FAT* fat, const char* pathname);
+int FAT32_rmdir(struct FAT* fat, const char* pathname);
+int FAT32_create(struct FAT* fat, const char* pathname);
+int FAT32_remove(struct FAT* fat, const char* pathname);
 
 #endif

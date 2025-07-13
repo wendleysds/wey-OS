@@ -12,6 +12,8 @@
 #define CLUSTER_SIZE 4096
 #define EOF 0x0FFFFFF8
 
+#define ILEGAL_CHARS "+,;=[]"
+
 #define CHK_EOF(cluster) \
 	(cluster >= EOF)
 
@@ -109,7 +111,7 @@ out:
     return status;
 }
 
-static int8_t _save_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry, uint32_t dirCluster){
+static int64_t _entry_lba(struct FAT* fat, struct FAT32DirectoryEntry* entry, uint32_t dirCluster){
 	if(!entry || dirCluster < 2){
 		return INVALID_ARG;
 	}
@@ -142,18 +144,40 @@ static int8_t _save_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry, ui
 			}
 
 			if(memcmp(buffer.DIR_Name, entry->DIR_Name, 11) == 0){
-				stream_seek(stream, -sizeof(buffer), SEEK_CUR);
-				if (stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS) {
-					status = ERROR_IO;
-					goto out;
-				}
-
-				status = _update(fat);
-				goto out;
+				stream_dispose(stream);
+				return lba + (i * sizeof(buffer));
 			}
 		}
 
 		cluster = _next_cluster(fat, cluster);
+	}
+
+out:
+	stream_dispose(stream);
+	return status;
+}
+
+static int8_t _save_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry, uint32_t dirCluster){
+	if(!entry || dirCluster < 2){
+		return INVALID_ARG;
+	}
+
+	struct Stream* stream = stream_new();
+	if(!stream){
+		return NO_MEMORY;
+	}
+
+	int8_t status = SUCCESS;
+	int lba = _entry_lba(fat, entry, dirCluster);
+	if(lba < 0){
+		status = lba;
+		goto out;
+	}
+
+	stream_seek(stream, _SEC(lba), SEEK_SET);
+	if (stream_write(stream, entry, sizeof(struct FAT32DirectoryEntry)) != SUCCESS) {
+		status = ERROR_IO;
+		goto out;
 	}
 
 out:
@@ -297,6 +321,10 @@ static int8_t _create_entry(struct FAT *fat, const char *pathname, int attr){
 		return NOT_SUPPORTED;
 	}
 
+	if(filename[0] == '.'){
+		return INVALID_NAME;
+	}
+
 	struct Stream* stream = stream_new();
 	if(!stream){
 		return NO_MEMORY;
@@ -389,7 +417,14 @@ static int8_t _remove_entry(struct FAT *fat, const char *pathname){
 		return INVALID_ARG;
 	}
 
-	const char *filename = strrchr(pathname, '/') + 1;
+	char dirpath[PATH_MAX];
+	memset(dirpath, 0x0, sizeof(dirpath));
+	strncpy(dirpath, pathname, PATH_MAX - 1);
+
+	char *slash = strrchr(dirpath, '/');
+	char *filename = slash + 1;
+	*slash = '\0';
+
 	if (strlen(filename) > 11){
 		return NOT_SUPPORTED;
 	}
@@ -399,30 +434,42 @@ static int8_t _remove_entry(struct FAT *fat, const char *pathname){
 		return NO_MEMORY;
 	}
 
-	int8_t status;
-	struct FAT32DirectoryEntry entry;
-	if ((status = _traverse_path(fat, pathname, &entry)) != SUCCESS)
+	int8_t status = SUCCESS;
+	uint32_t dirCluster = fat->rootClus;
+	struct FAT32DirectoryEntry buffer;
+	if(strlen(dirpath) > 0){
+		if ((status =  _traverse_path(fat, dirpath, &buffer)) != SUCCESS){
+			return status;
+		}
+
+		if (buffer.DIR_Attr & ATTR_ARCHIVE){
+			return INVALID_ARG;
+		}
+
+		dirCluster = _get_cluster_entry(&buffer);
+	}
+
+	if ((status = _traverse_path(fat, pathname, &buffer)) != SUCCESS)
 	{
 		stream_dispose(stream);
 		return status;
 	}
 
-	if (entry.DIR_Attr & ATTR_DIRECTORY)
-	{
+	_free_chain(fat, _get_cluster_entry(&buffer));
+	int lba = _entry_lba(fat, &buffer, dirCluster);
+	if(lba < 0){
 		stream_dispose(stream);
-		return OP_ABORTED;
+		return lba;
 	}
 
-	entry.DIR_Name[0] = 0xE5;
-	_free_chain(fat, _get_cluster_entry(&entry));
-
-	stream_seek(stream, -sizeof(entry), SEEK_CUR);
-	if((status = stream_write(stream, &entry, sizeof(entry))) != SUCCESS){
+	buffer.DIR_Name[0] = 0xE5;
+	stream_seek(stream, _SEC(lba), SEEK_SET);
+	if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS){
 		stream_dispose(stream);
-		return status;
+		return ERROR_IO;
 	}
 
-	fat->fsInfo.nextFreeCluster = _get_cluster_entry(&entry);
+	fat->fsInfo.nextFreeCluster = _get_cluster_entry(&buffer);
 
 	stream_dispose(stream);
 	return _update(fat);
@@ -761,9 +808,15 @@ int FAT32_write(struct FAT *fat, struct FATFileDescriptor *ffd, const void *buff
     }
 
 out:
-	stream_dispose(stream);
-	ffd->entry.DIR_FileSize += totalWritten;
 	ffd->cursor = cursor;
+	if(ffd->cursor > ffd->entry.DIR_FileSize){
+		ffd->entry.DIR_FileSize = ffd->cursor;
+	}else{
+		// TODO: Implement
+		// Recalculate the file size and update EOF if necessary
+	}
+
+	stream_dispose(stream);
 	if((status = _save_entry(fat, &ffd->entry, ffd->dirCluster)) != SUCCESS){
 		return status;
 	}
@@ -777,10 +830,128 @@ out:
 
 int FAT32_close(struct FATFileDescriptor *ffd){
 	if(!ffd){
-		return INVALID_ARG;
+		return NULL_PTR;
 	}
 
 	kfree(ffd);
 
 	return SUCCESS;
+}
+
+int FAT32_mkdir(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	if(strlen(pathname) == 0){
+		return INVALID_ARG;
+	}
+
+	if(strbrk(pathname, ILEGAL_CHARS)){
+		return INVALID_NAME;
+	}
+
+	// TODO: Implement do add '.' and '..' dirs to the new (pathname) directory
+
+	return _create_entry(fat, pathname, ATTR_DIRECTORY);
+}
+
+int FAT32_rmdir(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	int8_t status;
+	struct FAT32DirectoryEntry entry;
+	if((status = _traverse_path(fat, pathname, &entry)) != SUCCESS){
+		return status;
+	}
+
+	if(entry.DIR_Attr & ATTR_ARCHIVE){
+		return NOT_SUPPORTED;
+	}
+
+	struct Stream* stream = stream_new();
+	if(!stream){
+		return NO_MEMORY;
+	}
+
+	uint32_t entryCount = 0;
+	uint32_t cluster = _get_cluster_entry(&entry);
+	int8_t result = SUCCESS;
+
+	while (!CHK_EOF(cluster)) {
+		uint32_t lba = _cluster_to_lba(fat, cluster);
+		stream_seek(stream, _SEC(lba), SEEK_SET);
+
+		for (uint32_t i = 0; i < (CLUSTER_SIZE / sizeof(struct FAT32DirectoryEntry)); i++) {
+			struct FAT32DirectoryEntry dirEntry;
+			if (stream_read(stream, &dirEntry, sizeof(dirEntry)) != SUCCESS) {
+				result = ERROR_IO;
+				goto out;
+			}
+
+			if (dirEntry.DIR_Name[0] == 0x0) {
+				// End of directory entries
+				goto check_empty;
+			}
+
+			if (dirEntry.DIR_Name[0] == 0xE5 || dirEntry.DIR_Name[0] == '.') {
+				continue;
+			}
+
+			entryCount++;
+			if (entryCount > 2) {
+				result = DIR_NOT_EMPTY;
+				goto out;
+			}
+		}
+
+		cluster = _next_cluster(fat, cluster);
+	}
+
+check_empty:
+	if (entryCount > 2) {
+		result = DIR_NOT_EMPTY;
+	} else {
+		result = _remove_entry(fat, pathname);
+	}
+
+out:
+	stream_dispose(stream);
+	return result;
+}
+
+int FAT32_create(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	if(strlen(pathname) == 0){
+		return INVALID_ARG;
+	}
+
+	if(strbrk(pathname, ILEGAL_CHARS)){
+		return INVALID_NAME;
+	}
+
+	return _create_entry(fat, pathname, ATTR_ARCHIVE);
+}
+
+int FAT32_remove(struct FAT* fat, const char* pathname){
+	if(!fat || !pathname || strlen(pathname) > PATH_MAX){
+		return INVALID_ARG;
+	}
+
+	int8_t status;
+	struct FAT32DirectoryEntry entry;
+	if((status = _traverse_path(fat, pathname, &entry)) != SUCCESS){
+		return status;
+	}
+
+	if(entry.DIR_Attr & ATTR_DIRECTORY){
+		return NOT_SUPPORTED; // Cannot remove a directory
+	}
+
+	return _remove_entry(fat, pathname); // Remove a file or directory
 }

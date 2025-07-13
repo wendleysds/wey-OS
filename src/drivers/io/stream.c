@@ -98,11 +98,6 @@ int stream_seek(struct Stream *stream, uint32_t sector, uint8_t whence){
 			break;
 		case SEEK_CUR:
 			stream->cursor += sector;
-
-			int temp = stream->cursor / SECTOR_SIZE;
-			if(stream->cachedSectorLBA != temp){
-				stream->cacheValid = 0;
-			}
 			break;
 		default:
 			return INVALID_ARG; // Invalid whence

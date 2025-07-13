@@ -27,12 +27,8 @@
 #define DISK_NOT_READY  -31
 #define READ_FAIL       -32
 #define WRITE_FAIL      -33
-#define FILE_NOT_FOUND  -34
-#define FILE_EXISTS     -35
-#define FS_CORRUPTED    -36
-#define DIR_NOT_FOUND   -37
-#define INVALID_FS      -38
-#define END_OF_FILE     -39
+#define FS_CORRUPTED    -34
+#define INVALID_FS      -35
 
 // Time Or State
 #define TIMEOUT         -40
@@ -51,5 +47,14 @@
 #define TASK_BLOCKED    -61
 #define TASK_DEAD       -62
 #define INVALID_PID     -63
+
+// File System
+#define FILE_NOT_FOUND  -70
+#define FILE_EXISTS     -71
+#define END_OF_FILE     -72
+#define DIR_NOT_EMPTY   -73
+#define INVALID_FILE    -74
+#define FILE_TOO_LARGE  -75
+#define INVALID_NAME    -76
 
 #endif
