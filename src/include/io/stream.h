@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #define SECTOR_SIZE 512
+#define SEEK_SET 0
+#define SEEK_CUR 1
 
 struct Stream{
 	uint32_t cursor;
@@ -15,7 +17,7 @@ struct Stream{
 struct Stream* stream_new();
 int stream_read(struct Stream* stream, void* buffer, int total);
 int stream_write(struct Stream *stream, const void *buffer, int total);
-int stream_seek(struct Stream* stream, uint32_t sector);
+int stream_seek(struct Stream* stream, uint32_t sector, uint8_t whence);
 int stream_dispose(struct Stream* ptr);
 
 #endif
