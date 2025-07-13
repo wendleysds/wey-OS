@@ -41,3 +41,24 @@ int memcmp(const void* s1, const void* s2, int count){
 	return 0;
 }
 
+void* memmove(void *dest, const void *src, unsigned long n){
+	char *d = (char *)dest;
+	const char *s = (const char *)src;
+
+	if(d < s || d >= s + n) {
+		// Non-overlapping regions, copy forwards
+		while(n--) {
+			*d++ = *s++;
+		}
+	} else {
+		// Overlapping regions, copy backwards
+		d += n;
+		s += n;
+		while(n--) {
+			*(--d) = *(--s);
+		}
+	}
+
+	return dest;
+}
+
