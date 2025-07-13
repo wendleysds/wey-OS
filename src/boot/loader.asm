@@ -17,7 +17,7 @@ BPB_FATSz16     dw 0x00
 BPB_SecPerTrk   dw 0x3F
 BPB_NumHeads    dw 0x10
 BPB_HiddSec     dd 0x00
-BPB_TotSec32    dd 32768 ; 16 MiB / 512 = 32768
+BPB_TotSec32    dd 65536 ; 32 MiB / 512 = 65536
 
 ; FAT32 Extended BPB
 BPB_FATSz32     dd 0x80 ; (128 sectors × 512 = 64 KiB)
