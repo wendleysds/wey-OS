@@ -20,7 +20,7 @@ bios_putchar:
 		push bp
 		mov bp, sp
 
-		mov si, [bp + 6]
+		mov si, word [bp+6]
 
 		mov ax, [si]
 		mov bx, [si+2]
@@ -32,6 +32,10 @@ bios_putchar:
 
 		int 0x%1
 
+		mov si, word [bp+10]
+		cmp si, 0x0
+		je .out
+
 		mov [si], ax
 		mov [si+2], bx
 		mov [si+4], cx
@@ -40,11 +44,9 @@ bios_putchar:
 		mov [si+10], di
 		mov [si+12], es
 
+	.out:
 		pop bp
 		ret
 %endmacro
 
 intcall 10
-intcall 13
-intcall 15
-intcall 16

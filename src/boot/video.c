@@ -7,12 +7,12 @@
 
 #define DEFAULT_MODE 0x13 // 320x200 16
 
-#define DESIRED_RESOLUTION 800, 600, 16        //W, H, BPP
+#define DESIRED_RESOLUTION       800, 600, 16  //W, H, BPP
 #define MOST_COMPATIBILITIE_MODE 640, 480, 16  //W, H, BPP
 
 // Try to find the mode with the desired resolution and bpp.
 // If it doesn't find it, it returns DEFAULT_MODE and fills outinfo with its data.
-static uint16_t findMode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_t x, uint16_t y, uint8_t bpp){
+static uint16_t _find_mode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_t x, uint16_t y, uint8_t bpp){
 	struct biosreg oreg;
 	struct biosreg ireg = { .ax=0x4F01, .ah=0x4F, .es=SEG(outinfo), .di=OFF(outinfo)};
 
@@ -24,13 +24,18 @@ static uint16_t findMode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_t 
 		if(oreg.ax != 0x004F) continue;
 
 		// Check if this is a graphics mode with linear frame buffer support
-    if((outinfo->attributes & 0x90) != 0x90) continue;
+		if((outinfo->attributes & 0x90) != 0x90){
+			continue;
+		}
 
-    // Check if this is a packed pixel or direct color mode
-    if(outinfo->memory_model != 4 && outinfo->memory_model != 6) continue;
+		// Check if this is a packed pixel or direct color mode
+		if(outinfo->memory_model != 4 && outinfo->memory_model != 6){
+			continue;
+		}
 
-		if(x == outinfo->width && y == outinfo->height && bpp == outinfo->bpp)
+		if(x == outinfo->width && y == outinfo->height && bpp == outinfo->bpp){
 			return modes[i];
+		}
 	}
 
 	ireg.cx = DEFAULT_MODE;
@@ -61,11 +66,11 @@ void setup_video(){
 	if(oreg.ax == 0x004f){
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
 
-		uint16_t findedMode = findMode(modes, &info, DESIRED_RESOLUTION);
+		uint16_t findedMode = _find_mode(modes, &info, DESIRED_RESOLUTION);
 
 		// If the mode is the default one, try the most compatibilitie mode
 		if(findedMode == DEFAULT_MODE)
-			findedMode = findMode(modes, &info, MOST_COMPATIBILITIE_MODE);
+			findedMode = _find_mode(modes, &info, MOST_COMPATIBILITIE_MODE);
 
 		ireg.ax = 0x4F02;
 		ireg.bx = findedMode | (1 << 14);
