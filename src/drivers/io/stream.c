@@ -25,8 +25,8 @@ int stream_read(struct Stream *stream, void *buffer, int total){
 	uint8_t* bufPtr = (uint8_t*)buffer;
 
 	while(totalRemaining > 0){
-		uint32_t sector = stream->cursor;
-		uint64_t offset = (stream->cursor * SECTOR_SIZE) % SECTOR_SIZE;
+		uint32_t sector = stream->cursor / SECTOR_SIZE;
+		uint64_t offset = stream->cursor % SECTOR_SIZE;
 
 		// Check if we need to read a new sector into the cache
 		// If the cache is invalid or the sector is different, read it
@@ -63,7 +63,7 @@ int stream_write(struct Stream *stream, const void *buffer, int total){
 
 	while(totalRemaining > 0){
 		uint32_t sector = stream->cursor / SECTOR_SIZE;
-		uint64_t offset = (stream->cursor * SECTOR_SIZE) % SECTOR_SIZE;
+		uint64_t offset = stream->cursor % SECTOR_SIZE;
 
 		char cache[SECTOR_SIZE];
 		int readStatus = ata_read_sectors(sector, 1, cache);
@@ -85,13 +85,29 @@ int stream_write(struct Stream *stream, const void *buffer, int total){
 	return SUCCESS;
 }
 
-int stream_seek(struct Stream *stream, uint32_t sector){
+int stream_seek(struct Stream *stream, uint32_t sector, uint8_t whence){
 	if(!stream || sector < 0){
 		return INVALID_ARG;
 	}
 
-	stream->cursor = sector;
-	stream->cacheValid = 0;
+	switch (whence)
+	{
+		case SEEK_SET:
+			stream->cursor = sector;
+			stream->cacheValid = 0;
+			break;
+		case SEEK_CUR:
+			stream->cursor += sector;
+
+			int temp = stream->cursor / SECTOR_SIZE;
+			if(stream->cachedSectorLBA != temp){
+				stream->cacheValid = 0;
+			}
+			break;
+		default:
+			return INVALID_ARG; // Invalid whence
+			break;
+	}
 
 	return SUCCESS;
 }
