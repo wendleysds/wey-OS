@@ -26,7 +26,6 @@ static int _toupper(int c){
 }
 
 static char _convert_char(char c){
-    const char illegal[] = "\"*+,./:;<=>?[\\]|";
     if(c < 0x20 || strchr(ILLEGAL_CHARS, c)){
         return ILLEGAL_CHARS_REPLACE;
     }
