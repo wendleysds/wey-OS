@@ -422,7 +422,7 @@ int create(struct FAT *fat, const char *pathname, int attr)
         buffer.DIR_FstClusHI = cluster >> 16;
         buffer.DIR_FstClusLO = cluster;
 
-        fseek(stream, _SEC(lba) + sizeof(buffer) * counter, SEEK_SET);
+        fseek(stream, -sizeof(buffer), SEEK_CUR);
         fwrite(&buffer, 1, sizeof(buffer), stream);
 
         return update(fat);
