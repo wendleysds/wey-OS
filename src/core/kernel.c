@@ -115,6 +115,8 @@ void kmain(){
 	terminal_cwrite(0x00FF00, "Content: ");
 	terminal_write(buffer);
 
+	close(fd);
+
 	// Main loop
 	while(1){
 		__asm__ volatile ("hlt");

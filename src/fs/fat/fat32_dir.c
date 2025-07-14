@@ -20,7 +20,7 @@ static int8_t _find_entry(struct FAT *fat, const char *itemName, uint32_t dirClu
 	}
 
 	char filename[12];
-	format_fat_name(itemName, filename);
+	_fat32_generate_short_name(itemName, filename);
 
 	uint32_t cluster = dirCluster;
 	int status = FILE_NOT_FOUND;
@@ -157,7 +157,7 @@ int8_t _fat32_create_entry(struct FAT *fat, const char *pathname, int attr){
 			fat->table[_cluster] = EOF;
 
 			char name[12];
-			format_fat_name(filename, name);
+			_fat32_generate_short_name(filename, name);
 
 			memset(&buffer, 0x0, sizeof(buffer));
 			memcpy(buffer.DIR_Name, name, 11);
