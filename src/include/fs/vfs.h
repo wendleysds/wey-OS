@@ -1,7 +1,7 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
-#include <fs/fs.h>
+#include <fs/file.h>
 #include <stdint.h>
 
 struct inode_operations {
@@ -10,7 +10,7 @@ struct inode_operations {
     int (*unlink)(struct inode *dir, const char *name);
     int (*mkdir)(struct inode *dir, const char *name);
     int (*rmdir)(struct inode *dir, const char *name);
-    int (*stat)(struct inode *dir, const char *name, struct Stat* restrict statbuf);
+    int (*stat)(struct inode *dir, const char *name, struct stat* restrict statbuf);
     int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
 };
 

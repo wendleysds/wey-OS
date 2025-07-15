@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
+struct stat {
+	uint32_t fileSize;
+	uint8_t attr;
+	uint16_t creDate;
+	uint16_t modDate;
+};
+
 struct inode {
     uint32_t ino;
     uint32_t mode;
