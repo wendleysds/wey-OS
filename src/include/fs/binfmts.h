@@ -3,15 +3,15 @@
 
 #include <stdint.h>
 
-struct binfmt{
-    int (*load_binary)(struct binprm *bprm);
-}__attribute__((packet));
-
 struct binprm{
     const char* filename;
     const char* fdpath;
     int argc, envc;
     int fd;
-}__attribute__((packet));
+}__attribute__((packed));
+
+struct binfmt{
+    int (*load_binary)(struct binprm *bprm);
+}__attribute__((packed));
 
 #endif
