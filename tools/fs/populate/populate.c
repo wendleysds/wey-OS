@@ -11,6 +11,10 @@
 #define CLUSTER_START 3000
 #define FEOF 0x0FFFFFF8
 
+#define OPTION 2
+#define PATH1  3
+#define PATH2  4
+
 #define _NEXT_CLUSTER(cur) \
     (fat->table[cur] & 0x0FFFFFFF)
 
@@ -22,6 +26,10 @@
 
 #define _SEC(lba) \
     (lba * fat->headers.boot.bytesPerSec)
+
+#define _EXIT(status, f) \
+        fclose(f);       \
+        return status    \
 
 static FILE *stream;
 
@@ -506,6 +514,7 @@ int open(struct FAT *fat, const char *pathname, struct FileDescriptor *fd)
 
 int _ext_fat_copy(struct FAT *fat, const char *extPath, const char *fatPath)
 {
+    int status = SUCCESS;
     struct FileDescriptor fd;
     memset(&fd, 0x0, sizeof(fd));
 
@@ -513,37 +522,76 @@ int _ext_fat_copy(struct FAT *fat, const char *extPath, const char *fatPath)
     if (!f)
     {
         perror("_ext_fat_copy: Error opening file\n");
-        return -1;
+        return ERROR;
     }
 
-    int status = open(fat, fatPath, &fd);
-    if (status != SUCCESS)
+    if ((status = open(fat, fatPath, &fd)) != SUCCESS)
     {
         fprintf(stderr, "Error opening: %s\n", fatPath);
-        fclose(f);
-        return status;
+        _EXIT(status, f);
     }
 
     char buffer[4096];
     while (fread(buffer, 1, sizeof(buffer), f) > 0)
     {
-        status = write(fat, buffer, sizeof(buffer), &fd);
-        if (status != SUCCESS)
+        if ((status = write(fat, buffer, sizeof(buffer), &fd)) != SUCCESS)
         {
             fprintf(stderr, "Error Writing on: %s\n", fatPath);
-            fclose(f);
-            return status;
+            _EXIT(status, f);
         }
     }
 
-    fclose(f);
-    return SUCCESS;
+    _EXIT(SUCCESS, f);
 }
 
-int main()
+void _create_in_list(struct FAT* fat, int attr, const char** paths){
+    for (int i = 0; paths[i]; i++)
+    {
+        printf("%s: %d\n", paths[i], create(fat, paths[i], attr));
+    }
+    
+}
+
+void _auto_populate(struct FAT* fat){
+    const char* dirs[] = { "/boot", "/home", "/bin",  NULL };
+    const char* files[] = { "/boot/init.bin", "/boot/kernel.bin", NULL };
+
+    _create_in_list(fat, (ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY), dirs);
+    _create_in_list(fat, (ATTR_ARCHIVE | ATTR_SYSTEM | ATTR_READ_ONLY), files);
+
+    char *binInit = "bin/init.bin";
+    char *binKernel = "bin/kernel.bin";
+
+    // Copy/Update content(bin/init.bin -> /boot/init.bin; bin/kernel.bin -> /boot/kernel.bin)
+    printf("%s -> %s: %d\n", binInit, files[0], _ext_fat_copy(fat, get(binInit), files[0]));
+    printf("%s -> %s: %d\n", binKernel, files[1], _ext_fat_copy(fat, get(binKernel), files[1]));
+}
+
+void help() {
+    printf("Usage: <img> <options> <path> <path>\n");
+    printf("Options:\n");
+    printf("\t-h: display this message\n");
+    printf("\t-cf: create file <path1>\n");
+    printf("\t-cd: create directory <path1>\n");
+    printf("\t-de: delete entry <path1>\n");
+    printf("\t-cp: copy file <path1> (local) to <path2> (FAT)\n");
+}
+
+int main(int argc, char** argv)
 {
+    if(argc == 2 && strcmp(argv[1], "-h") == 0){
+        help();
+        return 0;
+    }
+
+    if(argc <= 2){
+        printf("Usage: %s <img> <options> <path> <path>\n", argv[0]);
+        printf("Try: %s -h\n", argv[0]);
+        return 1;
+    }
+
     struct FAT fat;
-    stream = fopen(get("img/kernel.img"), "rb+");
+    stream = fopen(argv[1], "rb+");
     if (!stream)
     {
         perror("Error opening the img!\n");
@@ -554,33 +602,55 @@ int main()
     if (status != SUCCESS)
     {
         fprintf(stderr, "Error initalizing FAT: %d\n", status);
-        fclose(stream);
-        return 1;
+        _EXIT(1, stream);
     }
 
-    char *bDir = "/boot";
-    char *bHome = "/home";
-    char *bBin = "/bin";
+    if(strcmp(argv[OPTION], "-g") == 0){
+        _auto_populate(&fat);
+    }
+    else if(strcmp(argv[OPTION], "-cf") == 0){
+        if(!argv[PATH1] || strlen(argv[PATH1]) == 0){
+            printf("path: <path1> invalid!\n");
+            _EXIT(1, stream);
+        }
 
-    char *init = "/boot/init.bin";
-    char *kernel = "/boot/kernel.bin";
+        int status = create(&fat, argv[PATH1], ATTR_ARCHIVE);
+        printf("Create File: %s!\n", status < 0 ? "failed" : "sucess");
+    }
+    else if(strcmp(argv[OPTION], "-cd") == 0){
+        if(!argv[PATH1] || strlen(argv[PATH1]) == 0){
+            printf("path: <path1> invalid!\n");
+            _EXIT(1, stream);
+        }
 
-    char *binInit = "bin/init.bin";
-    char *binKernel = "bin/kernel.bin";
+        int status = create(&fat, argv[PATH1], ATTR_DIRECTORY);
+        printf("Create Dir: %s!\n", status < 0 ? "failed" : "sucess");
+    }
+    else if(strcmp(argv[OPTION], "-de") == 0){
+        if(!argv[PATH1] || strlen(argv[PATH1]) == 0){
+            printf("path: <path1> invalid!\n");
+            _EXIT(1, stream);
+        }
 
-    // Create dirs(/boot; /home/; /bin)
-    printf("%s: %d\n", bDir, create(&fat, bDir, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
-    printf("%s: %d\n", bHome, create(&fat, bHome, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
-    printf("%s: %d\n", bBin, create(&fat, bBin, ATTR_DIRECTORY | ATTR_SYSTEM | ATTR_READ_ONLY));
+        int status = delete(&fat, argv[PATH1]);
+        printf("Delete: %s!\n", status < 0 ? "failed" : "sucess");
+    }
+    else if(strcmp(argv[OPTION], "-cp") == 0){
+        if(!argv[PATH1] || strlen(argv[PATH1]) == 0){
+            printf("path: <path1> invalid!\n");
+            _EXIT(1, stream);
+        }
 
-    // Create files(/boot/init.bin; /boot/kernel.bin)
-    printf("%s: %d\n", init, create(&fat, init, ATTR_ARCHIVE | ATTR_SYSTEM | ATTR_READ_ONLY));
-    printf("%s: %d\n", kernel, create(&fat, kernel, ATTR_ARCHIVE | ATTR_SYSTEM | ATTR_READ_ONLY));
+        if(!argv[PATH2] || strlen(argv[PATH2]) == 0){
+            printf("path: <path2> invalid!\n");
+            _EXIT(1, stream);
+        }
 
-    // Copy/Update content(bin/init.bin -> /boot/init.bin; bin/kernel.bin -> /boot/kernel.bin)
-    printf("%s -> %s: %d\n", binInit, init, _ext_fat_copy(&fat, get(binInit), init));
-    printf("%s -> %s: %d\n", binKernel, kernel, _ext_fat_copy(&fat, get(binKernel), kernel));
+        int status = _ext_fat_copy(&fat, argv[PATH1], argv[PATH2]);
+        printf("Copy: %s!\n", status < 0 ? "failed" : "success");
+        
+        _EXIT(status, stream);
+    }
 
-    fclose(stream);
-    return 0;
+    _EXIT(0, stream);
 }

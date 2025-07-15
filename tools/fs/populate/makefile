@@ -11,4 +11,4 @@ $(TARGET): populate.c
 	$(CC) $(CFLAGS) $^ -o $(OUT_DIR)/$@
 
 run: $(TARGET)
-	$(OUT_DIR)/$^
+	$(OUT_DIR)/$^  ../../../build/img/kernel.img -g
