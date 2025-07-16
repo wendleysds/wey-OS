@@ -14,6 +14,7 @@
 #define NULL_PTR        -11
 #define OUT_OF_BOUNDS   -12
 #define BAD_ALIGNMENT   -13
+#define INVALID_FORMAT  -14
 
 // Memory
 #define NO_MEMORY       -20
