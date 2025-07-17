@@ -13,13 +13,21 @@ struct Registers {
 } __attribute__((packed));
 
 struct Task {
-    uint16_t id;
+    uint16_t tid;
     struct Registers regs;
     struct Process* process;
-    struct Task* next;
 
     void* userStack;
     uint32_t* kernelStack;
+
+    enum { 
+        TASK_RUNNING, TASK_READY, TASK_WAITING, TASK_FINISHED
+    } state;
+
+    int priority;
+
+    struct Task* next;
+    struct Task* prev;
 } __attribute__((packed));
 
 #endif
