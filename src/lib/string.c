@@ -1,5 +1,7 @@
 #include <lib/string.h>
 #include <lib/mem.h>
+#include <memory/kheap.h>
+#include <lib/mem.h>
 
 #define NULL 0x0
 
@@ -113,5 +115,18 @@ char* strtok(char *restrict s, const char *restrict delim){
 	}
 
 	return t;
+}
+
+char* strdup(const char *s) {
+	if (!s) return NULL;
+	if (*s == '\0') return NULL; // Handle empty string case
+
+	long len = strlen(s);
+	char *copy = (char *)kmalloc(len + 1);
+	if (!copy) return NULL; // Memory allocation failed
+
+	memcpy(copy, s, len);
+	copy[len] = '\0'; // Null-terminate the string
+	return copy;
 }
 

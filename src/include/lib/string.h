@@ -12,5 +12,6 @@ char *strbrk(const char *s, const char *accept);
 char *strtok(char *restrict str, const char *restrict delim);
 int strcmp(const char *s1, const char *s2);
 int strncmp(const char *s1, const char *s2, int maxlen);
+char* strdup(const char *s);
 
 #endif
