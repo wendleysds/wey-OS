@@ -3,12 +3,15 @@
 #include <fs/fs.h>
 #include <fs/file.h>
 #include <memory/kheap.h>
+#include <memory/paging.h>
 #include <lib/mem.h>
 #include <def/status.h>
 
-/*static struct binfmt elf_format = {
+static int load_elf_binarie(struct binprm *bprm);
+
+struct binfmt elf_format = {
     .load_binary = load_elf_binarie
-};*/
+};
 
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
     if (!ehdr) {
@@ -59,7 +62,7 @@ static struct Elf32_Shdr* _get_sheader(struct Elf32_Ehdr* header, int index){
 }
 
 static int load_elf_binarie(struct binprm *bprm){
-    if(!bprm || !bprm->filename || !bprm->fdpath) {
+    if(!bprm || !bprm->filename) {
         return INVALID_ARG;
     }
 
@@ -71,7 +74,7 @@ static int load_elf_binarie(struct binprm *bprm){
     int status = SUCCESS;
 
     struct stat st;
-    if((status = stat(bprm->fdpath, &st)) != SUCCESS) {
+    if((status = stat(bprm->filename, &st)) != SUCCESS) {
         return status; // Failed to get file status
     }
 
@@ -86,12 +89,14 @@ static int load_elf_binarie(struct binprm *bprm){
         return status; // Failed to read the binary
     }
 
-    if((status = _validade_elf_ehdr((struct Elf32_Ehdr*)bprm->mem.loadAddress)) != SUCCESS) {
+    struct Elf32_Ehdr* ehdr = (struct Elf32_Ehdr*)bprm->mem.loadAddress;
+
+    if((status = _validade_elf_ehdr(ehdr)) != SUCCESS) {
         kfree(bprm->mem.loadAddress);
         return status; // Invalid ELF file
     }
 
-
+    // Load program headers
 
     kfree(bprm->mem.loadAddress);
     return NOT_IMPLEMENTED;
