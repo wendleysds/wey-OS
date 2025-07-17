@@ -1,6 +1,7 @@
 #ifndef _FILE_SYSTEM_H
 #define _FILE_SYSTEM_H
 
+#include <fs/file.h>
 #include <stdint.h>
 
 #define O_RDONLY    0x1
@@ -20,17 +21,10 @@ struct FileDescriptor {
 	void* descriptorPtr;
 };
 
-struct Stat {
-	uint32_t fileSize;
-	uint8_t attr;
-	uint16_t creDate;
-	uint16_t modDate;
-};
-
 void fs_init();
 
 int open(const char *pathname, int flags);
-int stat(const char* restrict pathname, struct Stat* restrict statbuf);
+int stat(const char* restrict pathname, struct stat* restrict statbuf);
 int read(int fd, void* buffer, uint32_t count);
 int write(int fd, const void* buffer, uint32_t count);
 int lseek(int fd, int offset, int whence);

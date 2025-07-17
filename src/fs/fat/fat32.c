@@ -1,5 +1,6 @@
 #include <fs/fat/fat32.h>
 #include <fs/fat/fatdefs.h>
+#include <fs/fs.h>
 #include <def/status.h>
 #include <def/config.h>
 #include <lib/string.h>

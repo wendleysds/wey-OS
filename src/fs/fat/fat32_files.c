@@ -1,5 +1,6 @@
 #include <fs/fat/fat32.h>
 #include <fs/fat/fatdefs.h>
+#include <fs/fs.h>
 #include <io/stream.h>
 #include <def/status.h>
 #include <def/config.h>
@@ -121,7 +122,7 @@ int8_t _fat32_truncate_entry(struct FAT* fat, struct FAT32DirectoryEntry* entry)
 	return _fat32_update(fat);
 }
 
-int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct Stat* restrict statbuf){
+int FAT32_stat(struct FAT* fat, const char* restrict pathname, struct stat* restrict statbuf){
 	if(!fat || !statbuf || !pathname || strlen(pathname) > PATH_MAX){
 		return INVALID_ARG;
 	}
