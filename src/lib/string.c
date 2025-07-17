@@ -3,7 +3,7 @@
 #include <memory/kheap.h>
 #include <lib/mem.h>
 
-#define NULL 0x0
+#define NULL ((void *)0)
 
 int strlen(const char *s){
 	const char *p;

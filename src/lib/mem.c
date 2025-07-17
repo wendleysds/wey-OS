@@ -10,7 +10,7 @@ void* memset(void* ptr, int c, unsigned long size){
 	return ptr;
 }
 
-void* memcpy(void* dest, void* src, unsigned long length){
+void* memcpy(void* dest, const void* src, unsigned long length){
 	char *d = (char*)dest;
 	const char *s = (const char*)src;
 
