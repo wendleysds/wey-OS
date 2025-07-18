@@ -23,11 +23,10 @@ struct Process
 
 struct Process *process_get(uint16_t pid);
 struct Process *process_create(const char *name, const char *pwd, int argc, char **argv, int envc, char **envp);
+
 int process_terminate(struct Process *process);
-struct Process* process_current();
 int process_add_task(struct Process *process, struct Task *task);
 int process_remove_task(struct Process *process, struct Task *task);
-int process_switch(struct Process *process);
 int process_chdir(struct Process *process, const char *path);
 
 #endif

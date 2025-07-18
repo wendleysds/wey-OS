@@ -12,6 +12,10 @@ struct Registers {
     uint32_t eflags;
 } __attribute__((packed));
 
+enum TaskState { 
+    TASK_RUNNING, TASK_READY, TASK_WAITING, TASK_FINISHED
+};
+
 struct Task {
     uint16_t tid;
     struct Registers regs;
@@ -20,14 +24,18 @@ struct Task {
     void* userStack;
     uint32_t* kernelStack;
 
-    enum { 
-        TASK_RUNNING, TASK_READY, TASK_WAITING, TASK_FINISHED
-    } state;
+    enum TaskState state;
 
     int priority;
 
     struct Task* next;
     struct Task* prev;
 } __attribute__((packed));
+
+struct Task* task_new(struct Process* proc, void* entry_point);
+void task_dispose(struct Task* task);
+void task_switch(struct Task* current, struct Task* next);
+void task_set_priority(struct Task* task, int priority);
+void task_set_state(struct Task* task, enum TaskState state);
 
 #endif
