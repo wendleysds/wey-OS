@@ -13,7 +13,7 @@ struct Registers {
 } __attribute__((packed));
 
 enum TaskState { 
-    TASK_RUNNING, TASK_READY, TASK_WAITING, TASK_FINISHED
+    TASK_NEW, TASK_RUNNING, TASK_READY, TASK_WAITING, TASK_FINISHED
 };
 
 struct Task {

@@ -12,22 +12,38 @@ static int alloc_tid() {
 }
 
 struct Task* task_new(struct Process* proc, void* entry_point){
+    if(!proc || !entry_point) {
+        return NULL; // Invalid arguments
+    }
+
     struct Task* task = (struct Task*)kmalloc(sizeof(struct Task));
     if (!task) {
         return NULL; // Memory allocation failed
     }
 
+    void* userStack = kmalloc(PROC_STACK_SIZE);
+    if (!userStack) {
+        kfree(task);
+        return NULL; // User stack allocation failed
+    }
+
+    memset(task, 0, sizeof(struct Task));
+    memset(userStack, 0, PROC_STACK_SIZE);
+
     task->tid = alloc_tid();
     task->process = proc;
-    task->userStack = NULL;
+    task->userStack = userStack;
     task->kernelStack = NULL;
-    task->state = TASK_READY;
+    task->state = TASK_NEW;
     task->priority = 0; // Default priority
     task->next = NULL;
+    task->prev = NULL;
 
-    memset(&task->regs, 0x0, sizeof(struct Registers));
-    
+    // Initialize registers
     task->regs.eip = (uint32_t)entry_point;
+    task->regs.esp = PROC_VIRTUAL_STACK_START;
+    task->regs.ss = USER_DATA_SEGMENT;
+    task->regs.cs = USER_CODE_SEGMENT;
 
     process_add_task(proc, task);
 
