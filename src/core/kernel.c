@@ -138,7 +138,7 @@ void panic(const char* fmt, ...){
 
 void kernel_page(){
 	if(!kernel_directory){
-		panic("Kernel page directory is null!");
+		return;
 	}
 
 	kernel_registers();

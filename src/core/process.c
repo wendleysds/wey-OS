@@ -102,11 +102,15 @@ int process_add_task(struct Process *process, struct Task *task){
 
     process->tasks = task;
 
-    return SUCCESS;
+    return NOT_IMPLEMENTED;
 }
 
 int process_remove_task(struct Process *process, struct Task *task){
     if (!process || !task){
+        return INVALID_ARG;
+    }
+
+    if(task->process != process){
         return INVALID_ARG;
     }
 
@@ -119,6 +123,8 @@ int process_remove_task(struct Process *process, struct Task *task){
     if (task->next) {
         task->next->prev = task->prev;
     }
+
+    // TODO: re-link scheduler list pointers
 
     task->next = NULL;
     task->prev = NULL;
@@ -133,6 +139,9 @@ int process_terminate(struct Process *process){
     }
 
     struct Task *task = process->tasks;
+
+    // TODO: re-link scheduler list pointers
+
     while (task) {
         struct Task *next_task = task->next;
         task_dispose(task);

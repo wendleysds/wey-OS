@@ -28,8 +28,14 @@ struct Task {
 
     int priority;
 
+    // Keep track on terminate
     struct Task* next;
     struct Task* prev;
+    
+
+    // for scheduler
+    struct Task* snext;
+    struct Task* sprev;
 } __attribute__((packed));
 
 struct Task* task_new(struct Process* proc, void* entry_point);
