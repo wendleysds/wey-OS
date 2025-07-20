@@ -136,3 +136,11 @@ void panic(const char* fmt, ...){
 	}
 }
 
+void kernel_page(){
+	if(!kernel_directory){
+		panic("Kernel page directory is null!");
+	}
+
+	kernel_registers();
+	paging_switch(kernel_directory);
+}

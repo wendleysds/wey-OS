@@ -116,7 +116,7 @@ void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback){
 }
 
 void interrupt_handler(int interrupt, struct InterruptFrame* frame){
-	kernel_registers();
+	kernel_page();
 
 	if(interrupt_callbacks[interrupt] != 0){
 		interrupt_callbacks[interrupt](frame);

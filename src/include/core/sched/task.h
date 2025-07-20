@@ -34,7 +34,7 @@ struct Task {
 
 struct Task* task_new(struct Process* proc, void* entry_point);
 void task_dispose(struct Task* task);
-void task_switch(struct Task* current, struct Task* next);
+void task_switch(struct Task* next);
 void task_set_priority(struct Task* task, int priority);
 void task_set_state(struct Task* task, enum TaskState state);
 

@@ -1,7 +1,6 @@
 [BITS 32]
 
 global _entry32
-global kernel_registers
 
 extern kmain
 
@@ -44,13 +43,3 @@ _entry32:
 	cli
 	hlt
 	jmp $
-
-kernel_registers:
-  mov ax, DATA_SEG
-  mov ds, ax
-  mov es, ax
-  mov gs, ax
-  mov fs, ax
-  ret
-
-times	512-($ - $$) db 0
