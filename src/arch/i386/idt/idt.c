@@ -65,7 +65,7 @@ static void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selecto
 	desc->offset_2 = (base >> 16) & 0xFFFF;
 }
 
-static void _set_idt(uint8_t interrupt_num, void* address){
+void _set_idt(uint8_t interrupt_num, void* address){
 	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
 }
 
@@ -121,18 +121,16 @@ void interrupt_handler(int interrupt, struct InterruptFrame* frame){
 	if(interrupt_callbacks[interrupt] != 0){
 		interrupt_callbacks[interrupt](frame);
 	}
-	else{
-		if(interrupt < 32){
-			terminal_write(
-				"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-				interrupt, interrupt, _exceptionMessages[interrupt], frame->ip);
+	else if(interrupt < 32){
+		terminal_write(
+			"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
+			interrupt, interrupt, _exceptionMessages[interrupt], frame->ip);
 
-			_print_frame(frame);
+		_print_frame(frame);
 
-			terminal_write("System Halted!\n");
-			while(1){
-				__asm__ volatile ("hlt");
-			}
+		terminal_write("System Halted!\n");
+		while(1){
+			__asm__ volatile ("hlt");
 		}
 	}
 
