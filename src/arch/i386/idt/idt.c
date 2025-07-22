@@ -94,16 +94,16 @@ static void _print_frame(struct InterruptFrame* frame){
     frame->edi, frame->esi, frame->ebp
   );
   terminal_write(
-    "kernelesp 0x%x ebx 0x%x edx 0x%x ecx 0x%x\n", 
-    frame->kernelesp, frame->ebx, frame->edx, frame->ecx
+    "reserved 0x%x ebx 0x%x edx 0x%x ecx 0x%x\n", 
+    frame->reserved, frame->ebx, frame->edx, frame->ecx
   );
   terminal_write(
     "eax 0x%x eip 0x%x\n", 
     frame->eax, frame->ip
   );
   terminal_write(
-    "cs 0x%x eflags 0x%x useresp 0x%x ss 0x%x\n\n", 
-    frame->cs, frame->eflags, frame->useresp, frame->ss
+    "cs 0x%x eflags 0x%x esp 0x%x ss 0x%x\n\n", 
+    frame->cs, frame->eflags, frame->esp, frame->ss
   );
 }
 
