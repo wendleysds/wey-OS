@@ -3,6 +3,7 @@
 
 #include <core/sched/task.h>
 #include <arch/i386/idt.h>
+#include <def/compile.h>
 #include <stdint.h>
 
 void schedule();
@@ -10,7 +11,9 @@ void scheduler_init();
 void schedule_add_task(struct Task* task);
 struct Task* scheduler_pick_next();
 
-void pcb_switch(struct Task* task);
-void pcb_save(struct Task* task, struct InterruptFrame* frame);
+// Process Control Block
+int __must_check pcb_save_current(struct InterruptFrame* frame);
+int pcb_switch(struct Task* task);
+int pcb_page_current();
 
 #endif
