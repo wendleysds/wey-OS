@@ -6,6 +6,25 @@
 static struct Task* _queueHead = 0x0;
 static struct Task* _queueTail = 0x0;
 
+/*
+static struct Task* _waitQueueHead = 0x0;
+static struct Task* _waitQueueTail = 0x0;
+*/
+
+//static uint64_t ticks = 0; // For sleep
+
+static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
+    // TODO: Implement
+}
+
+void schedule(){
+    // TODO: Implement
+}
+
+void scheduler_init(){
+    // TODO: Implement
+}
+
 void schedule_add_task(struct Task* task){
     task->snext = 0x0;
     task->sprev = 0x0;
@@ -42,5 +61,3 @@ struct Task* scheduler_pick_next(){
 
     return next_task;
 }
-
-void schedule();
