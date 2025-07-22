@@ -48,6 +48,7 @@
 #define TASK_BLOCKED    -61
 #define TASK_DEAD       -62
 #define INVALID_PID     -63
+#define NO_TASKS        -64
 
 // File System
 #define FILE_NOT_FOUND  -70

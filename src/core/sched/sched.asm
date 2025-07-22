@@ -6,7 +6,9 @@ pcb_restore:
     ret
 
 pcb_return:
-    iretd
+    ; TODO: Implement
+    ;iretd
+    ret
 
 _restore_gp_regs:
     ret
