@@ -29,6 +29,7 @@ struct Task* task_new(struct Process* proc, void* entry_point){
 
     memset(task, 0, sizeof(struct Task));
     memset(userStack, 0, PROC_STACK_SIZE);
+    memset(task->fileDescriptors, -1, sizeof(task->fileDescriptors));
 
     task->tid = alloc_tid();
     task->process = proc;

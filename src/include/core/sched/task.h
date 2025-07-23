@@ -2,6 +2,7 @@
 #define _TASK_H
 
 #include <core/process.h>
+#include <def/config.h>
 #include <stdint.h>
 
 struct Registers {
@@ -20,18 +21,17 @@ struct Task {
     uint16_t tid;
     struct Registers regs;
     struct Process* process;
+    int fileDescriptors[PROC_FD_MAX];
 
     void* userStack;
     uint32_t* kernelStack;
 
     enum TaskState state;
-
     int priority;
 
     // Keep track on terminate
     struct Task* next;
     struct Task* prev;
-    
 
     // for scheduler
     struct Task* snext;
