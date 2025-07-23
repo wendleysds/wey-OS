@@ -27,8 +27,14 @@ void paging_free_directory(struct PagingDirectory* directory);
 void paging_switch(struct PagingDirectory* directory);
 void enable_paging();
 
+void* paging_align_to_lower(void* addr);
+void* paging_align_address(void* ptr);
+
 int paging_map(struct PagingDirectory* directory, void* virtual, void* physic, uint8_t flags);
 int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags);
+
+// Map a memory range and align with the page size
+int map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags);
 
 #endif
 
