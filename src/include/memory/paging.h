@@ -36,5 +36,7 @@ int paging_map_range(struct PagingDirectory* directory, int count, void* virtual
 // Map a memory range and align with the page size
 int map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags);
 
+void* paging_translate(struct PagingDirectory* directory, void* virt);
+
 #endif
 
