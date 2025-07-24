@@ -70,3 +70,7 @@ int pcb_page_current(){
     user_registers();
     return pcb_switch(current);
 }
+
+struct Task* pcb_current(){
+    return current;
+}
