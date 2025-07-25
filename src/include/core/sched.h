@@ -7,9 +7,15 @@
 #include <stdint.h>
 
 void schedule();
+
 void scheduler_init();
-void schedule_add_task(struct Task* task);
+void scheduler_add_task(struct Task* task);
+void scheduler_remove_task(struct Task* task);
+
 struct Task* scheduler_pick_next();
+
+// Dispatcher
+int __must_check dispatcher_load(struct Task* task);
 
 // Process Control Block
 int __must_check pcb_save_current(struct InterruptFrame* frame);

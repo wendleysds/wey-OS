@@ -4,9 +4,10 @@
 #include <def/status.h>
 #include <memory/paging.h>
 
-static struct Task* current = 0x0;
+static struct Task* _currentTask = 0x0;
 
 extern void pcb_return(struct Registers* regs);
+extern void sheduler_enqueue_auto(struct Task* task);
 
 static void pcb_save(struct Task* task, struct InterruptFrame* frame){
     task->regs.eax = frame->eax;
@@ -27,8 +28,8 @@ static void pcb_save(struct Task* task, struct InterruptFrame* frame){
     task->regs.eflags = frame->eflags;
 }
 
-static int pcb_load(struct Task* task){
-    if(!task || !task->process){
+static inline int pcb_load(struct Task* task){
+    if(!task || (!task->process && task->tid != 0)){
         return INVALID_ARG; // Task null or dont have a process associated
     }
 
@@ -38,16 +39,22 @@ static int pcb_load(struct Task* task){
     return SUCCESS;
 }
 
+int __must_check dispatcher_load(struct Task* task){
+    return pcb_load(task);
+}
+
 int pcb_save_current(struct InterruptFrame* frame){
     if(!frame){
         return INVALID_ARG;
     }
 
-    if(!current){
+    if(!_currentTask){
         return NO_TASKS;
     }
 
-    pcb_save(current, frame);
+    pcb_save(_currentTask, frame);
+
+    sheduler_enqueue_auto(_currentTask);
     return SUCCESS;
 }
 
@@ -60,17 +67,21 @@ int pcb_switch(struct Task* task){
         return NULL_PTR;
     }
 
-    current = task;
+    _currentTask = task;
     paging_switch(task->process->pageDirectory);
 
     return SUCCESS;
 }
 
 int pcb_page_current(){
+    if(!_currentTask){
+        return NULL_PTR;
+    }
+
     user_registers();
-    return pcb_switch(current);
+    return pcb_switch(_currentTask);
 }
 
 struct Task* pcb_current(){
-    return current;
+    return _currentTask;
 }
