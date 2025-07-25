@@ -4,6 +4,7 @@
 #include <io/ports.h>
 #include <lib/mem.h>
 #include <core/kernel.h>
+#include <core/sched.h>
 
 #include <stdint.h>
 
@@ -139,5 +140,6 @@ void interrupt_handler(int interrupt, struct InterruptFrame* frame){
 	}
 
 	outb(0x20, 0x20);
+  pcb_page_current();
 }
 
