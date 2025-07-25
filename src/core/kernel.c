@@ -1,4 +1,5 @@
 #include <core/kernel.h>
+#include <core/sched.h>
 
 #include <drivers/terminal.h>
 #include <drivers/keyboard.h>
@@ -12,14 +13,25 @@
 #include <lib/utils.h>
 #include <lib/string.h>
 
-#include <memory/kheap.h>
-#include <memory/paging.h>
+#include <mmu.h>
 
 #include <def/config.h>
 #include <def/status.h>
 #include <stdint.h>
 
 #include <fs/fs.h>
+
+#define _INIT(msg, init_func) \
+	terminal_write("[    ] "); \
+	terminal_write(msg); \
+	init_func;\
+	terminal_cwrite(0x00FF00, "\r  OK \n");
+
+#define _INIT_MSGF(msg, init_func, ...) \
+	terminal_write("[    ] "); \
+	terminal_write(msg, __VA_ARGS__); \
+	init_func; \
+	terminal_cwrite(0x00FF00, "\r  OK \n");
 
 /* 
  * Main module for the protected-mode kernel code
@@ -41,12 +53,6 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
 	{.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
-static void init_log(const char* msg, void (*init_method)(void)){
-	terminal_write(msg);
-	init_method();
-	terminal_cwrite(0x00FF00, " OK\n");
-}
-
 void kmain(){
 	terminal_init();
 	terminal_clear();
@@ -55,39 +61,45 @@ void kmain(){
 	memset(gdt, 0x00, sizeof(gdt));
 	gdt_structured_to_gdt(gdt, gdt_ptr, TOTAL_GDT_SEGMENTS);
 
-	terminal_write("Loading Global Descriptor Table (GDT)...");
-	gdt_load(gdt, sizeof(gdt) - 1);
-	terminal_cwrite(0x00FF00, " OK\n");
+	_INIT(
+		"Loading Global Descriptor Table (GDT)", 
+		gdt_load(gdt, sizeof(gdt) - 1)
+	);
 
-	init_log("Initializing Interrupt Descriptor Table (IDT)...", init_idt);
-	
-	terminal_write("Initializing PIT(IRQ 0) with %dhz...", TIMER_FREQUENCY);
-	pit_init(TIMER_FREQUENCY);
-	terminal_cwrite(0x00FF00, " OK\n");
-	
-	init_log("Initializing kernel heap...", init_kheap);
+	_INIT(
+		"Initializing Interrupt Descriptor Table (IDT)", 
+		init_idt()
+	);
 
-	terminal_write("Initializing paging...");
+	_INIT(
+		"Initializing Kernel Heap", 
+		init_kheap()
+	);
 
-	uint32_t tableAmount = PAGING_TOTAL_ENTRIES_PER_TABLE;
-	kernel_directory = paging_new_directory(tableAmount, FPAGING_RW | FPAGING_P);
+	_INIT(
+		"Initializing Memory Manager Unit",
+		mmu_init(&kernel_directory);
+	)
 
-	// Test if the kernel page directory is allocated correctly 
-	if(!kernel_directory || kernel_directory->tableCount != tableAmount){
-		terminal_write("\n");
-		panic("Failed to initializing paging!");
-	}
+	_INIT_MSGF(
+		"Initializing PIT(IRQ 0) with %d.0hz", 
+		pit_init(TIMER_FREQUENCY), 
+		TIMER_FREQUENCY
+	);
 
-	paging_switch(kernel_directory);
-	enable_paging();
-	
-	terminal_cwrite(0x00FF00, " OK\n");
+	_INIT(
+		"Initializing File System", 
+		fs_init()
+	);
 
-	fs_init();
+	_INIT(
+		"Initializing Scheduler",
+		scheduler_init();
+	)
 
 	terminal_cwrite(0x00FF00, "\nKERNEL READY!\n");
 
-	terminal_clear();
+	//terminal_clear();
 		
 	// Start drivrers
 	//init_keyboard();
@@ -112,7 +124,7 @@ void kmain(){
 	}
 
 	buffer[bytes] = '\0';
-	terminal_cwrite(0x00FF00, "Content: ");
+	terminal_cwrite(0x00FF00, "\nContent: ");
 	terminal_write(buffer);
 
 	close(fd);
