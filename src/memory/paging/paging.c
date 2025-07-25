@@ -14,7 +14,7 @@
 	((uintptr_t)(phys) & (PAGING_PAGE_SIZE - 1)))
 
 extern void paging_load_directory(uint32_t* addr);
-static uint32_t* currentDirectoryAddr = 0x0;
+static struct PagingDirectory* _currentDirectory = 0x0;
 
 static void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
 	uintptr_t virt = (uintptr_t)virtualAddr;
@@ -100,8 +100,32 @@ struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t flag
 }
 
 void paging_switch(struct PagingDirectory *directory){
+	if(!directory){
+		panic("paging_switch(*directory): Directory is null!");
+	}
+
+	if (_currentDirectory == directory) {
+		return;
+	}
+
+	if (!directory->entry) {
+		panic("paging_switch(*directory): Directory entry is null!");
+	}
+
+	if ((uintptr_t)(directory->entry) & (PAGING_PAGE_SIZE - 1)) {
+		panic("paging_switch(*directory): Directory entry is not page-aligned!");
+	}
+
+	if (directory->tableCount == 0) {
+		panic("paging_switch(*directory): Directory has no tables!");
+	}
+
+	if (directory->tableCount > PAGING_TOTAL_ENTRIES_PER_TABLE) {
+		panic("paging_switch(*directory): Directory table count exceeds 1024!");
+	}
+
 	paging_load_directory(directory->entry);
-	currentDirectoryAddr = directory->entry;
+	_currentDirectory = directory;
 }
 
 void paging_free_directory(struct PagingDirectory *directory){
