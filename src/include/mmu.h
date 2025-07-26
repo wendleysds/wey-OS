@@ -1,10 +1,10 @@
 #ifndef _MEMORY_MAP_H
 #define _MEMORY_MAP_H
 
-#include <memory/heap.h>
-#include <memory/kheap.h>
 #include <memory/paging.h>
+#include <memory/kheap.h>
 #include <lib/mem.h>
+#include <stdint.h>
 
 #define PROT_NONE  0x0
 #define PROT_READ  0x1
@@ -41,5 +41,13 @@ struct mm_struct{
 };
 
 void mmu_init(struct PagingDirectory** kernelDirectory);
+
+struct PagingDirectory* mmu_create_page();
+int mmu_page_switch(struct PagingDirectory* directory);
+int mmu_destroy_page(struct PagingDirectory* directory);
+int mmu_map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags);
+int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint32_t size);
+void* mmu_translate(struct PagingDirectory* directory, void* virt);
+
 
 #endif
