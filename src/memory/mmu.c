@@ -29,11 +29,7 @@ void mmu_init(struct PagingDirectory** kernelDirectory){
 }
 
 struct PagingDirectory* mmu_create_page(){
-	return paging_new_directory(
-		PAGING_TOTAL_ENTRIES_PER_TABLE, 
-		(FPAGING_P | FPAGING_RW | FPAGING_US), 
-		(FPAGING_RW | FPAGING_US)
-	);
+	return paging_new_directory_empty();
 }
 
 int mmu_page_switch(struct PagingDirectory* directory){
