@@ -4,6 +4,8 @@
 #include <memory/kheap.h>
 #include <def/status.h>
 #include <stdint.h>
+#include <drivers/terminal.h>
+#include <io/ports.h>
 
 struct TaskQueue{
     struct Task* head;
@@ -20,6 +22,7 @@ static uint64_t ticks = 0;
 static struct Task _idleTask;
 
 static void _idle_task_entry(){
+    terminal_write("\nHello From idle Task!\n");
     while (1) {
         __asm__ volatile ("hlt");
     }
@@ -40,9 +43,9 @@ static void init_task_idle(){
     memset(_idleTask.fileDescriptors, 0, sizeof(_idleTask.fileDescriptors));
 
     _idleTask.regs.eip = (uintptr_t)_idle_task_entry;
-
     _idleTask.regs.esp = (uintptr_t)_idleTask.kernelStack + PROC_KERNEL_STACK_SIZE;
     _idleTask.regs.ebp = _idleTask.regs.esp;
+    _idleTask.regs.cs = KERNEL_CODE_SELECTOR;
 }
 
 static void _task_enqueue(struct TaskQueue* queue, struct Task* task){
@@ -109,9 +112,10 @@ static void _task_queue_remove(struct TaskQueue* queue, struct Task* task){
 
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
     if(pcb_save_current(frame) == NO_TASKS){
-        return;
+        terminal_cwrite(0xFF0000, "[NO_TASKS]");
     }
 
+    outb(0x20, 0x20);
     schedule();
 }
 
@@ -128,6 +132,7 @@ void schedule(){
 }
 
 void scheduler_init(){
+    init_task_idle();
     idt_register_callback(0x20, _schedule_iqr_PIT_handler);
     ticks = 0;
 }

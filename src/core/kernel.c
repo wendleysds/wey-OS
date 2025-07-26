@@ -27,7 +27,7 @@
 	init_func;\
 	terminal_cwrite(0x00FF00, "\r  OK \n");
 
-#define _INIT_MSGF(msg, init_func, ...) \
+#define _INIT_MSGF(init_func, msg, ...) \
 	terminal_write("[    ] "); \
 	terminal_write(msg, __VA_ARGS__); \
 	init_func; \
@@ -82,8 +82,8 @@ void kmain(){
 	)
 
 	_INIT_MSGF(
-		"Initializing PIT(IRQ 0) with %d.0hz", 
 		pit_init(TIMER_FREQUENCY), 
+		"Initializing PIT(IRQ 0x20) with %d.0hz", 
 		TIMER_FREQUENCY
 	);
 
@@ -98,36 +98,6 @@ void kmain(){
 	)
 
 	terminal_cwrite(0x00FF00, "\nKERNEL READY!\n");
-
-	//terminal_clear();
-		
-	// Start drivrers
-	//init_keyboard();
-
-	char* file = "/home/text.txt";
-	int fd = open(file, O_RDWR | O_CREAT);
-
-	if(fd < 0){
-		panic("Error openinig %s: %d\n", file, fd);
-	}
-
-	int bytes = 0;
-	if((bytes = write(fd, "Hello World!\n", 13)) < 0){
-		panic("Error writing to %s: %d\n", file, bytes);
-	}
-
-	lseek(fd, 0, SEEK_SET);
-
-	char buffer[64];
-	if((bytes = read(fd, buffer, sizeof(buffer) - 1)) < 0){
-		panic("Error reading from %s: %d\n", file, bytes);
-	}
-
-	buffer[bytes] = '\0';
-	terminal_cwrite(0x00FF00, "\nContent: ");
-	terminal_write(buffer);
-
-	close(fd);
 
 	// Main loop
 	while(1){

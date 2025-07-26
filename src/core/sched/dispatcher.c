@@ -30,6 +30,7 @@ static void pcb_save(struct Task* task, struct InterruptFrame* frame){
 
 static inline int pcb_load(struct Task* task){
     if(task->tid == 0){
+        _currentTask = task;
         pcb_return(&task->regs);
         return SUCCESS;
     }
@@ -37,6 +38,8 @@ static inline int pcb_load(struct Task* task){
     if(!task || !task->process){
         return INVALID_ARG; // Task null or dont have a process associated
     }
+
+    _currentTask = task;
 
     pcb_switch(task);
     pcb_return(&task->regs);
