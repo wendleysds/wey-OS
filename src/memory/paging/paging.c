@@ -33,14 +33,18 @@ static uint32_t _get_page(struct PagingDirectory* directory, void* virt){
     return table[tblIndex];
 }
 
+static inline void _invlpg(void* virtAddr){
+	__asm__ volatile("invlpg (%0)" : : "r"(virtAddr) : "memory");
+}
+
 void* paging_translate(struct PagingDirectory* directory, void* virt){
-    uintptr_t lowVirt = (uintptr_t) paging_align_to_lower(virt);
-    uintptr_t difference = (uintptr_t) virt - lowVirt;
+	uintptr_t lowVirt = (uintptr_t)((uintptr_t)virt & ~(PAGING_PAGE_SIZE - 1));
+	uintptr_t difference = (uintptr_t) virt - lowVirt;
 
 	uintptr_t pagePhysic = _get_page(directory, (void*)lowVirt) & _MASK;
 	if (pagePhysic == 0) return NULL;
 
-    return (void*)(pagePhysic + difference);
+	return (void*)(pagePhysic + difference);
 }
 
 void* paging_align_address(void* ptr){
@@ -58,20 +62,22 @@ void* paging_align_to_lower(void* addr){
     return (void*)((uintptr_t)addr & ~(PAGING_PAGE_SIZE - 1));
 }
 
-struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t flags){
-	struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory));
+struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirFlags, uint8_t tblFlags){
+	if(tablesAmount > PAGING_TOTAL_ENTRIES_PER_TABLE){
+		return 0x0; // Invalid tables amount
+	}
 
+	struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory));
 	if(!directory)
 		return 0x0;
 
 	uint32_t* entry = (uint32_t*)kcalloc(sizeof(uint32_t) * tablesAmount);
-
 	if(!entry){
 		kfree(directory);
 		return 0x0;
 	}
 
-	int offset = 0;
+	uint32_t offset = 0;
 
 	for (uint32_t i = 0; i < tablesAmount; i++){
 		PagingTable* table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
@@ -86,11 +92,11 @@ struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t flag
 		}
 
 		for (int j = 0; j < PAGING_TOTAL_ENTRIES_PER_TABLE; j++){
-			table[j] = (offset + (j * PAGING_PAGE_SIZE)) | flags;
+			table[j] = (offset + (j * PAGING_PAGE_SIZE)) | tblFlags;
 		}
 
 		offset += (PAGING_TOTAL_ENTRIES_PER_TABLE * PAGING_PAGE_SIZE);
-		entry[i] = (PagingTable)table | flags;
+		entry[i] = (PagingTable)table | dirFlags | FPAGING_P;
 	}
 
 	directory->entry = entry;
@@ -150,17 +156,24 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 	uint32_t dirIndex, tblIndex;
 	_get_indexes(virtualAddr, &dirIndex, &tblIndex);
 
+	PagingTable* table = 0x0;
 	if(!(directory->entry[dirIndex] & FPAGING_P)){
-		PagingTable* newTable = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
-		if(!newTable){
-			return NO_MEMORY;
-		}
+		if (!table) {
+			table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
+			if (!table){
+				return NO_MEMORY;
+			}
 
-		memset(newTable, 0, sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
-		directory->entry[dirIndex] = (PagingTable)newTable | FPAGING_P | FPAGING_RW | FPAGING_US;
+			directory->entry[dirIndex] = (PagingTable)table | FPAGING_P;
+		}else{
+			table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
+		}
 	}
 
-	PagingTable *table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
+	if (table[tblIndex] & FPAGING_P) {
+		return ALREADY_MAPD;
+	}
+
 	table[tblIndex] = (uint32_t) physicalAddr | flags;
 
 	return SUCCESS;
@@ -179,13 +192,38 @@ int paging_map_range(struct PagingDirectory* directory, int count, void* virtual
 	return SUCCESS;
 }
 
-int map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags){
-	if (_ADDRS_NOT_ALING(virtualAddr, physicalAddr)) {
-        return BAD_ALIGNMENT;
-    }
+int paging_unmap(struct PagingDirectory* directory, void* virtual){
+	uint32_t dirIndex, tblIndex;
+	_get_indexes(virtual, &dirIndex, &tblIndex);
 
-	uint32_t alignedSize = (size + PAGING_PAGE_SIZE - 1) & ~(PAGING_PAGE_SIZE - 1);
-	uint32_t count = alignedSize / PAGING_PAGE_SIZE;
+	if (!(directory->entry[dirIndex] & FPAGING_P)) {
+		return ALREADY_UMAPD;
+	}
 
-	return paging_map_range(directory, count, virtualAddr, physicalAddr, flags);
+	PagingTable *table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
+	table[tblIndex] = 0;
+
+	_invlpg(virtual);
+
+	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
+		if (table[i] & FPAGING_P) {
+			return SUCCESS;
+		}
+	}
+
+	kfree(table);
+	directory->entry[dirIndex] = 0x0;
+
+	return SUCCESS;
+}
+
+int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual){
+	for (int i = 0; i < count; i++) {
+		int status = paging_unmap(directory, virtual);
+		if (status != SUCCESS)
+			return status;
+
+		virtual = (void*)((uintptr_t)virtual + PAGING_PAGE_SIZE);
+	}
+	return SUCCESS;
 }
