@@ -22,6 +22,8 @@
 #define PAGE_FAULT      -22
 #define STACK_OVERFLOW  -23
 #define OUT_OF_VMEM     -24
+#define ALREADY_MAPD    -25
+#define ALREADY_UMAPD   -26
 
 // I/O
 #define ERROR_IO        -30
