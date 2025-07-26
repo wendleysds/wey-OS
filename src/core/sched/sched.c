@@ -111,8 +111,8 @@ static void _task_queue_remove(struct TaskQueue* queue, struct Task* task){
 }
 
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
-    if(pcb_save_current(frame) == NO_TASKS){
-        terminal_cwrite(0xFF0000, "[NO_TASKS]");
+    if(pcb_save_current(frame) == NULL_PTR){
+        panic("pcb_save_current(*frame): Invalid frame pointer!");
     }
 
     outb(0x20, 0x20);

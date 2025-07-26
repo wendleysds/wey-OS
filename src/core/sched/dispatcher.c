@@ -53,7 +53,7 @@ int __must_check dispatcher_load(struct Task* task){
 
 int pcb_save_current(struct InterruptFrame* frame){
     if(!frame){
-        return INVALID_ARG;
+        return NULL_PTR;
     }
 
     if(!_currentTask){
