@@ -182,17 +182,15 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 
 	PagingTable* table = 0x0;
 	if(!(directory->entry[dirIndex] & FPAGING_P)){
-		if (!table) {
-			table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
-			if (!table){
-				return NO_MEMORY;
-			}
-
-			directory->tableCount++;
-			directory->entry[dirIndex] = (PagingTable)table | DEFAULT_DIR_FLAGS;
-		}else{
-			table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
+		table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
+		if (!table){
+			return NO_MEMORY;
 		}
+
+		directory->tableCount++;
+		directory->entry[dirIndex] = (PagingTable)table | DEFAULT_DIR_FLAGS;
+	}else{
+		table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
 	}
 
 	if (table[tblIndex] & FPAGING_P) {
@@ -252,4 +250,19 @@ int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtu
 		virtual = (void*)((uintptr_t)virtual + PAGING_PAGE_SIZE);
 	}
 	return SUCCESS;
+}
+
+uint8_t paging_is_user_pointer_valid(void* ptr){
+    uint32_t dirIndex = ((uintptr_t)ptr >> 22) & 0x3FF;
+    uint32_t tblIndex = ((uintptr_t)ptr >> 12) & 0x3FF;
+
+    uint32_t dir_entry = _currentDirectory->entry[dirIndex];
+    if (!(dir_entry & FPAGING_P) || !(dir_entry & FPAGING_US)){
+		return 0;
+	}
+
+    PagingTable* table = (PagingTable*)(dir_entry & _MASK);
+
+    uint32_t page_entry = table[tblIndex];
+    return (page_entry & FPAGING_P) && (page_entry & FPAGING_US);
 }

@@ -69,3 +69,28 @@ int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint3
 void* mmu_translate(struct PagingDirectory* directory, void* virt){
 	return paging_translate(directory, virt);
 }
+
+uint8_t mmu_user_pointer_valid(void* ptr){
+	if(!ptr){
+		return 0;
+	}
+	
+	return paging_is_user_pointer_valid(ptr);
+}
+
+uint8_t mmu_user_range_valid(const void* userPtr, size_t size){
+    uintptr_t start = (uintptr_t)userPtr;
+    uintptr_t end = start + size;
+
+    if (end < start){
+        return 0;
+	}
+
+    for (uintptr_t addr = start; addr < end; addr += PAGING_PAGE_SIZE){
+        if (!mmu_user_pointer_valid((void*)addr)){
+            return 0;
+		}
+    }
+
+    return 1;
+}

@@ -38,6 +38,7 @@ int paging_unmap(struct PagingDirectory* directory, void* virtual);
 int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual);
 
 void* paging_translate(struct PagingDirectory* directory, void* virt);
+uint8_t paging_is_user_pointer_valid(void* ptr);
 
 #endif
 
