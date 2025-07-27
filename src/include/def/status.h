@@ -24,6 +24,7 @@
 #define OUT_OF_VMEM     -24
 #define ALREADY_MAPD    -25
 #define ALREADY_UMAPD   -26
+#define OVERFLOW        -27
 
 // I/O
 #define ERROR_IO        -30
@@ -44,6 +45,7 @@
 #define NOT_IMPLEMENTED -51
 #define NOT_SUPPORTED   -52
 #define INVALID_STATE   -53
+#define INVALID_PTR     -54
 
 // Mult-task/Processes
 #define TASK_NOT_FOUND  -60
