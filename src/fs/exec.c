@@ -1,7 +1,9 @@
 #include <fs/binfmts.h>
 #include <fs/fs.h>
 #include <fs/file.h>
-#include <memory/kheap.h>
+#include <mmu.h>
+#include <uaccess.h>
+#include <core/sched.h>
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/status.h>
@@ -16,44 +18,97 @@ static struct binfmt* fmts[] = {
 };
 
 static struct binprm* alloc_binprm(int fd, const char* filename) {
-    struct binprm* fmt = (struct binprm*)kmalloc(sizeof(struct binprm));
-    if (!fmt) {
+    struct binprm* bprm = (struct binprm*)kmalloc(sizeof(struct binprm));
+    if (!bprm) {
         return 0x0;
     }
 
-    fmt->filename = filename;
-    fmt->fd = fd;
-    memset(&fmt->mem, 0, sizeof(fmt->mem));
-
-    return fmt;
-}
-
-static int count(int max, const char* argv[]) {
-    int count = 0;
-    while (argv[count] && count < max) {
-        count++;
+    struct mm_struct* mm = (struct mm_struct*)kmalloc(sizeof(struct mm_struct));
+    if(!mm){
+        kfree(bprm);
+        return 0x0;
     }
-    return count;
+
+    struct PagingDirectory* dir = mmu_create_page();
+    if(!dir){
+        kfree(bprm);
+        kfree(mm);
+        return 0x0;
+    }
+
+    char buffer[PATH_MAX];
+    if(copy_string_from_user(buffer, filename, sizeof(buffer)) != SUCCESS){
+        goto err;
+    }
+
+    bprm->filename = strdup(buffer);
+    if(!bprm->filename){
+        goto err;
+    }
+
+    mm->pageDirectory = dir;
+    mm->regions = NULL;
+
+    bprm->mm = mm;
+    bprm->entryPoint = NULL;
+    bprm->loadAddress = NULL;
+
+    bprm->fd = fd;
+    bprm->argc = 0;
+    bprm->envc = 0;
+
+    return bprm;
+
+err:
+    kfree(bprm);
+    kfree(mm);
+    mmu_destroy_page(dir);
+    return 0x0;
 }
 
-static int _exec_binprm(struct binprm* bprm) {
-    if (!bprm || !bprm->filename || bprm->fd < 0) {
+static void destroy_binprm(struct binprm* bprm, uint8_t free_mm){
+    if(free_mm){
+        if(bprm->mm->regions){
+            struct mem_region* region = bprm->mm->regions;
+
+            while(region){
+                struct mem_region* next = region->next;
+                kfree(region);
+                region = next;
+            }
+        }
+
+        mmu_destroy_page(bprm->mm->pageDirectory);
+        kfree(bprm->mm);
+    }
+
+    kfree(bprm->filename);
+    close(bprm->fd);
+    kfree(bprm);
+}
+
+static int exec_binprm(struct binprm* bprm) {
+    if (!bprm || !bprm->filename || bprm->fd < 2) {
         return INVALID_ARG; // Invalid binary parameters
     }
 
-    struct binfmt* fmt = 0x0;
-    for (int i = 0; fmts[i]; i++) {
-        if (fmts[i]->load_binary) {
-            fmt = fmts[i];
+    int res = SUCCESS;
+    struct binfmt* fmt;
+    for (int i = 0; (fmt = fmts[i]); i++){
+        if((res = fmt->load_binary(bprm)) == SUCCESS){
             break;
+        }
+
+        if(res == NO_MEMORY){
+            return res;
         }
     }
 
-    if (!fmt) {
-        return NOT_IMPLEMENTED; // No suitable binary format found
+    if(res != SUCCESS){
+        return INVALID_FILE;
     }
 
-    return NOT_IMPLEMENTED;
+    return SUCCESS;
 }
 
 int exec(const char* pathname, const char* argv[], const char* envp[]) {
@@ -72,12 +127,14 @@ int exec(const char* pathname, const char* argv[], const char* envp[]) {
         return NO_MEMORY; // Failed to allocate binprm
     }
 
-    bprm->argc = count(PROC_ARG_MAX, argv);
-    bprm->envc = count(PROC_ENV_MAX, envp);
+    // Copy argv and envp to the process stack
 
-    // TODO: Handle Args
-
-    int8_t status = _exec_binprm(bprm);
+    int8_t status;
+    if((status = exec_binprm(bprm)) != SUCCESS){
+        destroy_binprm(bprm, 1);
+        close(fd);
+        return status;
+    }
 
     return status;
 }
