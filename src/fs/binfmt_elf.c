@@ -1,10 +1,8 @@
 #include <loaders/elf.h>
 #include <fs/binfmts.h>
 #include <fs/fs.h>
-#include <fs/file.h>
-#include <memory/kheap.h>
-#include <memory/paging.h>
-#include <lib/mem.h>
+#include <mmu.h>
+#include <core/sched.h>
 #include <def/status.h>
 
 static int load_elf_binarie(struct binprm *bprm);
@@ -41,26 +39,6 @@ static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
     return SUCCESS;
 }
 
-static struct Elf32_Phdr* _get_pheader(struct Elf32_Ehdr* header, int index){
-    if (!header || index < 0 || index >= header->e_phnum) {
-        return NULL; // Invalid header or index
-    }
-
-    if (header->e_phoff == 0) {
-        return 0; // No program headers present
-    }
-
-    return (struct Elf32_Phdr*)((char*)header + header->e_phoff) + index;
-}
-
-static struct Elf32_Shdr* _get_sheader(struct Elf32_Ehdr* header, int index){
-    if (!header || index < 0 || index >= header->e_shnum) {
-        return NULL; // Invalid header or index
-    }
-
-    return (struct Elf32_Shdr*)((char*)header + header->e_shoff) + index;
-}
-
 static int load_elf_binarie(struct binprm *bprm){
     if(!bprm || !bprm->filename) {
         return INVALID_ARG;
@@ -78,26 +56,99 @@ static int load_elf_binarie(struct binprm *bprm){
         return status; // Failed to get file status
     }
 
-    bprm->mem.loadAddress = kmalloc(st.fileSize);
-    if(!bprm->mem.loadAddress) {
+    bprm->loadAddress = kmalloc(st.fileSize);
+    void* buffer = bprm->loadAddress;
+
+    if(!buffer) {
         return NO_MEMORY; // Failed to allocate memory for binary
     }
 
     lseek(fd, 0, SEEK_SET); // Reset file descriptor to the beginning
-    if((status = read(fd, bprm->mem.loadAddress, st.fileSize)) != st.fileSize) {
-        kfree(bprm->mem.loadAddress);
+    if((status = read(fd, buffer, st.fileSize)) != st.fileSize) {
+        kfree(buffer);
         return status; // Failed to read the binary
     }
 
-    struct Elf32_Ehdr* ehdr = (struct Elf32_Ehdr*)bprm->mem.loadAddress;
+    struct Elf32_Ehdr* ehdr = (struct Elf32_Ehdr*)buffer;
 
     if((status = _validade_elf_ehdr(ehdr)) != SUCCESS) {
-        kfree(bprm->mem.loadAddress);
+        kfree(buffer);
         return status; // Invalid ELF file
     }
 
-    // Load program headers
+    bprm->entryPoint = (void*)ehdr->e_entry;
 
-    kfree(bprm->mem.loadAddress);
-    return NOT_IMPLEMENTED;
+    struct Elf32_Phdr* phdrs = (struct Elf32_Phdr*)((uint8_t*)buffer + ehdr->e_phoff);
+
+    void** phys_segments = kmalloc(sizeof(void*) * phdrs->p_memsz);
+    if (!phys_segments) {
+        kfree(buffer);
+        return NO_MEMORY;
+    }
+
+    int alloc_counter = 0;
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        struct Elf32_Phdr* phdr = &phdrs[i];
+        if (phdr->p_type != PT_LOAD) {
+            continue;
+        }
+
+        phys_segments[alloc_counter] = kmalloc(phdr->p_memsz);
+        if (!phys_segments[alloc_counter]) {
+            for(int i = 0; i < alloc_counter; i++){
+                kfree(phys_segments[i]);
+            }
+
+            kfree(phys_segments);
+            kfree(buffer);
+            return NO_MEMORY;
+        }
+
+        void* phys_segment = phys_segments[alloc_counter++];
+
+        memcpy(phys_segment, buffer + phdr->p_offset, phdr->p_filesz);
+        memset((char*)phys_segment + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
+
+        uint8_t flags = FPAGING_P | FPAGING_US;
+        if (phdr->p_flags & PF_W) {
+            flags |= FPAGING_RW;
+        }
+
+        void* addr = (void*)phdr->p_vaddr;
+        uint32_t len = phdr->p_memsz;
+
+        status = mmu_map_pages(
+            bprm->mm->pageDirectory,
+            addr,
+            phys_segment,
+            len,
+            flags
+        );
+
+        struct mem_region* region = (struct mem_region*)kmalloc(sizeof(struct mem_region));
+        if (!region || status != SUCCESS) {
+            if(region){
+                kfree(region);
+            }
+
+            for (int j = 0; j < alloc_counter; j++) {
+                kfree(phys_segments[j]);
+            }
+
+            kfree(phys_segments);
+            kfree(buffer);
+            return NO_MEMORY;
+        }
+
+        region->virtualBaseAddress = addr;
+        region->virtualEndAddress  = addr + len;
+        region->flags = flags;
+
+        region->next = bprm->mm->regions;
+        bprm->mm->regions = region;
+    }
+
+    kfree(phys_segments);
+    kfree(buffer);
+    return SUCCESS;
 }
