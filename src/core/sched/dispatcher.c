@@ -39,6 +39,10 @@ static inline int pcb_load(struct Task* task){
         return INVALID_ARG; // Task null or dont have a process associated
     }
 
+    if(_currentTask->tid != 0){
+        sheduler_enqueue_auto(_currentTask);
+    }
+    
     _currentTask = task;
 
     pcb_switch(task);
@@ -61,8 +65,6 @@ int pcb_save_current(struct InterruptFrame* frame){
     }
 
     pcb_save(_currentTask, frame);
-
-    sheduler_enqueue_auto(_currentTask);
     return SUCCESS;
 }
 
