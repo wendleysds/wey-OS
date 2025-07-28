@@ -2,7 +2,7 @@
 #define _PROCESS_H
 
 #include <core/sched/task.h>
-#include <memory/paging.h>
+#include <mmu.h>
 #include <def/config.h>
 #include <stdint.h>
 
@@ -12,13 +12,15 @@ struct Process
     char name[PROC_NAME_MAX];
 
     struct PagingDirectory *pageDirectory;
+    struct mm_struct* mm;
+
     struct Task *tasks;
 
     int argc, envc;
     char **argv;
     char **envp;
 
-    const char *pwd;
+    char *pwd;
 } __attribute__((packed));
 
 struct Process *process_get(uint16_t pid);

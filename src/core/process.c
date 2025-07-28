@@ -1,17 +1,18 @@
 #include <core/process.h>
+#include <core/sched.h>
 #include <core/sched/task.h>
 #include <def/config.h>
 #include <def/status.h>
 #include <lib/string.h>
-#include <memory/paging.h>
+#include <lib/mem.h>
 #include <memory/kheap.h>
+#include <mmu.h>
 
-struct Process* processes[PROC_MAX];
-struct Process* current;
+static struct Process* _processes[PROC_MAX];
 
 static int alloc_pid(){
     for (uint16_t pid = 0; pid < PROC_MAX; pid++) {
-        if (!processes[pid]) {
+        if (!_processes[pid]) {
             return pid + 1;
         }
     }
@@ -21,68 +22,120 @@ static int alloc_pid(){
 struct Process* process_get(uint16_t pid) {
     pid--; // Convert to zero-based index
 
-    if (pid < 0 || pid >= PROC_MAX || !processes[pid]) {
+    if (pid < 0 || pid >= PROC_MAX || !_processes[pid]) {
         return 0x0; // Invalid PID or process not found
     }
-    return processes[pid];
+    
+    return _processes[pid];
 }
 
 struct Process* process_create(const char *name, const char *pwd, int argc, char **argv, int envc, char **envp) {
     if (!name || argc < 0 || envc < 0 || argc > PROC_ARG_MAX || envc > PROC_ENV_MAX) {
-        return 0x0; // Invalid arguments
+        return 0x0;
     }
 
     struct Process *process = (struct Process*)kmalloc(sizeof(struct Process));
     if (!process) {
-        return 0x0; // Memory allocation failed
+        return 0x0;
     }
 
     process->pid = alloc_pid();
-    if( process->pid < 0) {
+    if (process->pid < 0) {
         kfree(process);
         return 0x0;
     }
 
     strncpy(process->name, name, PROC_NAME_MAX - 1);
-    process->name[PROC_NAME_MAX - 1] = '\0'; // Ensure null termination
+    process->name[PROC_NAME_MAX - 1] = '\0';
 
-    process->pageDirectory = paging_new_directory(PAGING_TOTAL_ENTRIES_PER_TABLE, FPAGING_P | FPAGING_RW | FPAGING_US);
+    process->pageDirectory = mmu_create_page();
     if (!process->pageDirectory) {
         kfree(process);
-        return 0x0; // Paging directory creation failed
+        return 0x0;
     }
 
-    process->tasks = 0x0;
-    process->argc = argc;
-    process->envc = envc;
+    process->tasks = NULL;
+    process->pwd = NULL;
 
-    process->argv = (char**)kmalloc(sizeof(char*) * (argc + 1));
-    if (!process->argv) {
-        paging_free_directory(process->pageDirectory);
-        kfree(process);
-        return 0x0; // Memory allocation for argv failed
+    process->argc = argc;
+    process->argv = NULL;
+
+    process->envc = envc;
+    process->envp = NULL;
+
+    // Allocate and copy argv
+    if (argc > 0) {
+        process->argv = (char**)kmalloc(sizeof(char*) * (argc + 1));
+        if (!process->argv) {
+            goto fail;
+        }
+
+        for (int i = 0; i < argc; i++) {
+            process->argv[i] = strdup(argv[i]);
+            if (!process->argv[i]) {
+                for (int j = 0; j < i; j++) kfree(process->argv[j]);
+                kfree(process->argv);
+                process->argv = NULL;
+                goto fail;
+            }
+        }
+
+        process->argv[argc] = NULL;
+    }
+
+    // Allocate and copy envp
+    if (envc > 0) {
+        process->envp = (char**)kmalloc(sizeof(char*) * (envc + 1));
+        if (!process->envp) {
+            goto fail;
+        }
+
+        for (int i = 0; i < envc; i++) {
+            process->envp[i] = strdup(envp[i]);
+            if (!process->envp[i]) {
+                for (int j = 0; j < i; j++) kfree(process->envp[j]);
+                kfree(process->envp);
+                process->envp = NULL;
+                goto fail;
+            }
+        }
+        process->envp[envc] = NULL;
+    }
+
+    // Set working directory
+    process->pwd = pwd ? strdup(pwd) : strdup("/");
+    if (!process->pwd){
+        goto fail;
+    }
+
+    _processes[process->pid - 1] = process;
+    return process;
+
+fail:
+    if (process->argv) {
+        for (int i = 0; i < argc; i++) {
+            if (process->argv[i]) kfree(process->argv[i]);
+        }
+
+        kfree(process->argv);
+    }
+    if (process->envp) {
+        for (int i = 0; i < envc; i++) {
+            if (process->envp[i]) kfree(process->envp[i]);
+        }
+
+        kfree(process->envp);
     }
     
-    for (int i = 0; i < argc; i++) {
-        process->argv[i] = argv[i];
-    }
-    process->argv[argc] = 0x0; // Null-terminate the argv array
-
-    process->envp = (char**)kmalloc(sizeof(char*) * (envc + 1));
-    if (!process->envp) {
-        kfree(process->argv);
-        paging_free_directory(process->pageDirectory);
-        kfree(process);
-        return 0x0; // Memory allocation for envp failed
+    if (process->pwd){
+        kfree(process->pwd);
     }
 
-    for (int i = 0; i < envc; i++) {
-        process->envp[i] = envp[i];
+    if (process->pageDirectory){
+        mmu_destroy_page(process->pageDirectory);
     }
 
-    process->envp[envc] = 0x0; // Null-terminate the envp array
-    process->pwd = pwd ? strdup(pwd) : strdup("/");
-
+    kfree(process);
     return 0x0;
 }
 
@@ -124,7 +177,7 @@ int process_remove_task(struct Process *process, struct Task *task){
         task->next->prev = task->prev;
     }
 
-    // TODO: re-link scheduler list pointers
+    scheduler_remove_task(task);
 
     task->next = NULL;
     task->prev = NULL;
@@ -140,22 +193,23 @@ int process_terminate(struct Process *process){
 
     struct Task *task = process->tasks;
 
-    // TODO: re-link scheduler list pointers
-
     while (task) {
         struct Task *next_task = task->next;
+
+        scheduler_remove_task(task);
+
         task_dispose(task);
         task = next_task;
     }
 
-    paging_free_directory(process->pageDirectory);
+    mmu_destroy_page(process->pageDirectory);
 
     kfree(process->argv);
     kfree(process->envp);
 
     kfree(process);
 
-    processes[process->pid - 1] = NULL; // Mark the process as terminated
+    _processes[process->pid - 1] = NULL; // Mark the process as terminated
     return SUCCESS;
 }
 
