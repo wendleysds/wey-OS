@@ -2,6 +2,7 @@
 #include <core/sched/task.h>
 #include <core/kernel.h>
 #include <memory/kheap.h>
+#include <lib/mem.h>
 #include <def/status.h>
 #include <stdint.h>
 #include <drivers/terminal.h>
