@@ -96,6 +96,9 @@ typedef uint32_t Elf32_Word;  // Unsigned large integer
 #define PT_LOPROC  0x70000000
 #define PT_HIPROC  0x7fffffff
 
+#define PF_X 0x1 // Executable
+#define PF_W 0x2 // Writable
+
 #define ELF32_R_SYM(i) \
     ((i)>>8)
 
