@@ -19,7 +19,6 @@
 struct mem_region {
     uint8_t flags;
     uint32_t size;
-    uint32_t offset;
 
     void* virtualBaseAddress;
     void* virtualEndAddress;
@@ -29,15 +28,9 @@ struct mem_region {
 
 struct mm_struct{
     struct mem_region* regions;
-    void* brk_start;
-    void* brk_end;
+    void* mmapBase; // Next free space
 
-    void* mmap_base;
-
-    void* stack_base;
-    void* stack_end; 
-
-    struct page_directory* pageDirectory;
+    struct PagingDirectory* pageDirectory;
 };
 
 void mmu_init(struct PagingDirectory** kernelDirectory);
