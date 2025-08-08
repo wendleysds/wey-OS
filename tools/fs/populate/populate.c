@@ -1,10 +1,22 @@
-#include <fs/fat/fatdefs.h>
-#include <def/status.h>
-#include <def/config.h>
+#include "fat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+#define PATH_MAX 128
+
+#define SUCCESS          0
+#define ERROR           -2
+#define INVALID_ARG     -10
+#define OUT_OF_BOUNDS   -12
+#define NO_MEMORY       -20
+#define ERROR_IO        -30
+#define OP_ABORTED      -43
+#define NOT_IMPLEMENTED -51
+#define NOT_SUPPORTED   -52
+#define FILE_NOT_FOUND  -70
+#define FILE_EXISTS     -71
 
 #define BUILD_DIR "../../../build/"
 #define CLUSTER_SIZE 4096
@@ -27,6 +39,10 @@
 #define _SEC(lba) \
     (lba * fat->headers.boot.bytesPerSec)
 
+#define _ERROR(f, code) \
+    fclose(f);          \
+    exit(code)          \
+
 #define _EXIT(status, f) \
         fclose(f);       \
         return status    \
@@ -38,6 +54,7 @@ struct FileDescriptor
     struct FAT32DirectoryEntry entry;
     uint32_t cursor;
     uint32_t currentCluster;
+    uint32_t entryLba;
 };
 
 static char p[PATH_MAX];
@@ -186,32 +203,36 @@ static int _find_entry(struct FAT *fat, char *itemName, uint32_t dirCluster, str
     struct FAT32DirectoryEntry buffer;
     char filename[12];
     _format_fat_name(itemName, filename);
+    
+    int counter = -1;
+    uint32_t cluster = dirCluster;
+    uint32_t startlba = _SEC(_LBA(cluster));
+    while (!CHK_FEOF(cluster)) {
+        uint32_t lba = _LBA(cluster);
+        fseek(stream, _SEC(lba), SEEK_SET);
 
-    uint32_t lba = _LBA(dirCluster);
+        for (uint32_t i = 0; i < (CLUSTER_SIZE / sizeof(struct FAT32DirectoryEntry)); i++) {
+            fread(&buffer, 1, sizeof(buffer), stream);
+            counter++;
 
-    fseek(stream, _SEC(lba), SEEK_SET);
-    int counter = 0;
-    int maxTries = 1000; // Entries
-    while (maxTries--)
-    {
-        fread(&buffer, 1, sizeof(buffer), stream);
-        counter++;
+            if (buffer.DIR_Name[0] == 0x0)
+            {
+                return FILE_NOT_FOUND;
+            }
 
-        if (buffer.DIR_Name[0] == 0x0)
-        {
-            return FILE_NOT_FOUND;
+            if (buffer.DIR_Name[0] == 0xE5)
+            {
+                continue;
+            }
+
+            if (strncmp((char *)buffer.DIR_Name, filename, 11) == 0)
+            {
+                memcpy(buff, &buffer, sizeof(struct FAT32DirectoryEntry));
+                return (counter * sizeof(struct FAT32DirectoryEntry)) + startlba;
+            }
         }
 
-        if (buffer.DIR_Name[0] == 0xE5)
-        {
-            continue;
-        }
-
-        if (strncmp((char *)buffer.DIR_Name, filename, 11) == 0)
-        {
-            memcpy(buff, &buffer, sizeof(struct FAT32DirectoryEntry));
-            return (counter * sizeof(struct FAT32DirectoryEntry)) + lba;
-        }
+        cluster = _NEXT_CLUSTER(cluster);
     }
 
     return FILE_NOT_FOUND;
@@ -226,7 +247,11 @@ static int _traverse_path(struct FAT *fat, const char *path, struct FAT32Directo
     char *token = strtok(pathCopy, "/");
     if (!token)
     {
-        return INVALID_ARG;
+        memset(buff, 0, sizeof(*buff));
+        buff->DIR_Attr = ATTR_DIRECTORY | ATTR_HIDDEN;
+        buff->DIR_FstClusHI = fat->rootClus >> 16;
+        buff->DIR_FstClusLO = fat->rootClus & 0xFFFF;
+        return _LBA(fat->rootClus);
     }
 
     int lba = _find_entry(fat, token, fat->rootClus, buff);
@@ -235,14 +260,26 @@ static int _traverse_path(struct FAT *fat, const char *path, struct FAT32Directo
         return FILE_NOT_FOUND;
     }
 
+    uint32_t pcluster = _get_cluster_entry(buff);
     while ((token = strtok(NULL, "/")))
     {
+        if (strcmp(token, ".") == 0) {
+            continue;
+        }
+
+        if (strcmp(token, "..") == 0) {
+            int status = _find_entry(fat, "..", pcluster, buff);
+            if (status < 0) return status;
+            continue;
+        }
+
         if (buff->DIR_Attr & ATTR_ARCHIVE)
         {
             return NOT_SUPPORTED; // Cannot traverse into a file
         }
-
-        lba = _find_entry(fat, token, _get_cluster_entry(buff), buff);
+        
+        pcluster = _get_cluster_entry(buff);
+        lba = _find_entry(fat, token, pcluster, buff);
         if (lba < 0)
         {
             return lba;
@@ -277,7 +314,14 @@ int _init_fat(struct FAT *fat)
         fat->fsInfo.structSignature != 0x61417272 ||
         fat->fsInfo.trailSignature != 0xAA550000)
     {
-        fprintf(stderr, "Invalid FSInfo Sig or not found!\n");
+        printf("Creating FSInfo...\n");
+        memset(&fat->fsInfo, 0x0, sizeof(fat->fsInfo));
+        fat->fsInfo.leadSignature = 0x41615252;
+        fat->fsInfo.structSignature = 0x61417272;
+        fat->fsInfo.trailSignature = 0xAA550000;
+
+        fat->fsInfo.freeClusterCount = fatTotalClusters;
+        fat->fsInfo.nextFreeCluster = CLUSTER_START;
     }
     else
     {
@@ -333,7 +377,7 @@ int delete(struct FAT *fat, const char *pathname)
 
     struct FAT32DirectoryEntry entry;
     int lba = _traverse_path(fat, pathname, &entry);
-    if (lba != SUCCESS)
+    if (lba < 0)
     {
         return lba;
     }
@@ -352,7 +396,7 @@ int delete(struct FAT *fat, const char *pathname)
         curCluster = next;
     }
 
-    fseek(stream, _SEC(lba), SEEK_SET);
+    fseek(stream, lba, SEEK_SET);
     fwrite(&entry, 1, sizeof(entry), stream);
 
     fat->fsInfo.nextFreeCluster = _get_cluster_entry(&entry);
@@ -433,6 +477,29 @@ int create(struct FAT *fat, const char *pathname, int attr)
         fseek(stream, -sizeof(buffer), SEEK_CUR);
         fwrite(&buffer, 1, sizeof(buffer), stream);
 
+        if (attr & ATTR_DIRECTORY) {
+            struct FAT32DirectoryEntry dot = {0}, dotdot = {0};
+
+            // "." (self)
+            memset(&dot, 0, sizeof(dot));
+            memcpy(dot.DIR_Name, ".          ", 11);
+            dot.DIR_Attr = ATTR_DIRECTORY;
+            dot.DIR_FstClusLO = cluster & 0xFFFF;
+            dot.DIR_FstClusHI = cluster >> 16;
+
+            // ".." (parent)
+            memset(&dotdot, 0, sizeof(dotdot));
+            memcpy(dotdot.DIR_Name, "..         ", 11);
+            dotdot.DIR_Attr = ATTR_DIRECTORY;
+            dotdot.DIR_FstClusLO = dirCluster & 0xFFFF;
+            dotdot.DIR_FstClusHI = dirCluster >> 16;
+
+            uint32_t clusterLBA = _LBA(cluster);
+            fseek(stream, _SEC(clusterLBA), SEEK_SET);
+            fwrite(&dotdot, 1, sizeof(dotdot), stream);
+            fwrite(&dot, 1, sizeof(dot), stream);
+        }
+
         return update(fat);
     }
 
@@ -495,6 +562,15 @@ int write(struct FAT *fat, const char *buffer, uint32_t size, struct FileDescrip
         }
     }
 
+    fd->cursor = cursor;
+
+    if(fd->cursor > fd->entry.DIR_FileSize){
+        fd->entry.DIR_FileSize = fd->cursor;
+    }
+
+    fseek(stream, fd->entryLba, SEEK_SET);
+    fwrite(&fd->entry, 1, sizeof(fd->entry), stream);
+
     return update(fat);
 }
 
@@ -508,6 +584,7 @@ int open(struct FAT *fat, const char *pathname, struct FileDescriptor *fd)
 
     fd->cursor = 0;
     fd->currentCluster = _get_cluster_entry(&fd->entry);
+    fd->entryLba = status;
 
     return SUCCESS;
 }
@@ -527,14 +604,21 @@ int _ext_fat_copy(struct FAT *fat, const char *extPath, const char *fatPath)
 
     if ((status = open(fat, fatPath, &fd)) != SUCCESS)
     {
-        fprintf(stderr, "Error opening: %s\n", fatPath);
-        _EXIT(status, f);
+        if(status == FILE_NOT_FOUND){
+            create(fat, fatPath, ATTR_ARCHIVE);
+        }
+
+        if ((status = open(fat, fatPath, &fd)) != SUCCESS){
+            fprintf(stderr, "Error opening: %s\n", fatPath);
+            _EXIT(status, f);
+        }
     }
 
     char buffer[4096];
-    while (fread(buffer, 1, sizeof(buffer), f) > 0)
+    int bytes;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), f)) > 0)
     {
-        if ((status = write(fat, buffer, sizeof(buffer), &fd)) != SUCCESS)
+        if ((status = write(fat, buffer, bytes, &fd)) != SUCCESS)
         {
             fprintf(stderr, "Error Writing on: %s\n", fatPath);
             _EXIT(status, f);
@@ -552,7 +636,45 @@ void _create_in_list(struct FAT* fat, int attr, const char** paths){
     
 }
 
+void _mkfs(struct FAT* fat){
+    uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
+    uint32_t fatSize = fat->headers.extended.FATSz32;
+    uint32_t fatBystes = fatSize * fat->headers.boot.bytesPerSec;
+
+    uint8_t* table = malloc(fatBystes);
+    if(!table){
+        printf("_mkfs(): Malloc failed");
+        _ERROR(stream, 1);
+    }
+
+    memset(table, 0x0, fatBystes);
+
+    table[0] = 0xF8; table[1] = 0xFF; table[2] = 0xFF; table[3] = 0x0F;
+    table[4] = 0xFF; table[5] = 0xFF; table[6] = 0xFF; table[7] = 0x0F;
+    table[8] = 0xFF; table[9] = 0xFF; table[10] = 0xFF; table[11] = 0x0F;
+
+    fseek(stream, _SEC(fatStartSector), SEEK_SET);
+    fwrite(table, 1, fatBystes, stream);
+
+    fseek(stream, _SEC(fatStartSector + fatSize), SEEK_SET);
+    fwrite(table, 1, fatBystes, stream);
+    free(table);
+
+    if (fat->headers.extended.BkBootSec != 0) {
+        char secbuffer[512];
+        fseek(stream, 0, SEEK_SET);
+        fread(secbuffer, 1, sizeof(secbuffer), stream);
+
+        fseek(stream, _SEC(fat->headers.extended.BkBootSec), SEEK_SET);
+        fwrite(secbuffer, 1, sizeof(secbuffer), stream);
+    }
+}
+
 void _auto_populate(struct FAT* fat){
+    _mkfs(fat);
+
+    fat->table[fat->rootClus] = FEOF;
+
     const char* dirs[] = { "/boot", "/home", "/bin",  NULL };
     const char* files[] = { "/boot/init.bin", "/boot/kernel.bin", NULL };
 
@@ -633,7 +755,7 @@ int main(int argc, char** argv)
         }
 
         int status = delete(&fat, argv[PATH1]);
-        printf("Delete: %s!\n", status < 0 ? "failed" : "sucess");
+        printf("Delete: %s! %d\n", status < 0 ? "failed" : "sucess", status);
     }
     else if(strcmp(argv[OPTION], "-cp") == 0){
         if(!argv[PATH1] || strlen(argv[PATH1]) == 0){

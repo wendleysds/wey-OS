@@ -1,10 +1,10 @@
 TARGET = populate.elf
 
 CC = gcc
-CFLAGS = -I../../../src/include
+CFLAGS =
 
 TOOLS_DIR = ../../../build/tools
-OUT_DIR = $(TOOLS_DIR)/populate/
+OUT_DIR = $(TOOLS_DIR)/
 
 $(TARGET): populate.c
 	@mkdir -p $(OUT_DIR)
