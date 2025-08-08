@@ -6,8 +6,8 @@
 // Generic
 #define OK               0
 #define SUCCESS          0
-#define FAILED           1
-#define ERROR           -1
+#define FAILED          -1
+#define ERROR           -2
 
 // Arguments
 #define INVALID_ARG     -10
@@ -15,6 +15,8 @@
 #define OUT_OF_BOUNDS   -12
 #define BAD_ALIGNMENT   -13
 #define INVALID_FORMAT  -14
+#define NOT_EXISTS      -15
+#define NOT_FOUND       -16
 
 // Memory
 #define NO_MEMORY       -20
