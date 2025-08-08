@@ -203,6 +203,12 @@ static int _find_entry(struct FAT *fat, char *itemName, uint32_t dirCluster, str
     struct FAT32DirectoryEntry buffer;
     char filename[12];
     _format_fat_name(itemName, filename);
+
+    if(strcmp(itemName, ".") == 0){
+        memcpy(filename, ".          ", 11);
+    }else if(strcmp(itemName, "..") == 0){
+        memcpy(filename, "..         ", 11);
+    }
     
     int counter = -1;
     uint32_t cluster = dirCluster;
@@ -263,13 +269,13 @@ static int _traverse_path(struct FAT *fat, const char *path, struct FAT32Directo
     uint32_t pcluster = _get_cluster_entry(buff);
     while ((token = strtok(NULL, "/")))
     {
-        if (strcmp(token, ".") == 0) {
-            continue;
-        }
-
         if (strcmp(token, "..") == 0) {
             int status = _find_entry(fat, "..", pcluster, buff);
             if (status < 0) return status;
+            continue;
+        }
+
+        if (strcmp(token, ".") == 0) {
             continue;
         }
 
