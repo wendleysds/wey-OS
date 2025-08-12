@@ -19,7 +19,7 @@ struct device {
 
     int (*read)(struct device* dev, void* buffer, uint32_t size, uint64_t offset);
     int (*write)(struct device* dev, const void* buffer, uint32_t size, uint64_t offset);
-    int (*ioctl)(struct device* dev, uint32_t request, ...);
+    long (*ioctl)(struct device* dev, unsigned int cmd, unsigned long arg);
     int (*close)(struct device* dev);
 };
 
