@@ -7,6 +7,11 @@
 #include <stdint.h>
 #include <drivers/terminal.h>
 #include <io/ports.h>
+#include <arch/i386/pic.h>
+
+#define PIC_TIMER 0x20
+
+extern int __must_check dispatcher_load(struct Task* task);
 
 struct TaskQueue{
     struct Task* head;
@@ -14,9 +19,9 @@ struct TaskQueue{
     int count;
 };
 
-static struct TaskQueue _readyQueue = { NULL, NULL, 0 };
-static struct TaskQueue _waitQueue = { NULL, NULL, 0 };
-static struct TaskQueue _terminateQueue = { NULL, NULL, 0 };
+static struct TaskQueue _readyQueue;
+static struct TaskQueue _waitQueue;
+static struct TaskQueue _terminateQueue;
 
 static uint64_t ticks = 0;
 
@@ -27,7 +32,6 @@ static void _idle_task_entry(){
     while (1) {
         __asm__ volatile ("hlt");
     }
-    
 }
 
 static void init_task_idle(){
@@ -116,7 +120,7 @@ static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
         panic("pcb_save_current(*frame): Invalid frame pointer!");
     }
 
-    outb(0x20, 0x20);
+    pic_send_eoi(PIC_TIMER);
     schedule();
 }
 
@@ -134,7 +138,12 @@ void schedule(){
 
 void scheduler_init(){
     init_task_idle();
-    idt_register_callback(0x20, _schedule_iqr_PIT_handler);
+
+    memset(&_readyQueue, 0x0, sizeof(struct TaskQueue));
+    memset(&_waitQueue, 0x0, sizeof(struct TaskQueue));
+    memset(&_terminateQueue, 0x0, sizeof(struct TaskQueue));
+
+    idt_register_callback(PIC_TIMER, _schedule_iqr_PIT_handler);
     ticks = 0;
 }
 
@@ -145,7 +154,6 @@ void sheduler_enqueue_auto(struct Task* task){
             task->state = TASK_READY;
             _task_enqueue(&_readyQueue, task);
             break;
-
         case TASK_WAITING:
             _task_enqueue(&_waitQueue, task);
             break;
@@ -182,6 +190,11 @@ void scheduler_remove_task(struct Task* task){
     }
 
     _task_queue_remove(queue, task);
+}
+
+void scheduler_sleep_task(struct Task* task){
+    task->state = TASK_WAITING;
+    _task_enqueue(&_waitQueue, task);
 }
 
 struct Task* scheduler_pick_next(){
