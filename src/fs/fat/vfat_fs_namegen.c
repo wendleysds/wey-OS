@@ -17,7 +17,7 @@
 #define ILLEGAL_CHARS "\"*+,./:;<=>?[\\]|"
 #define ILLEGAL_CHARS_REPLACE '_'
 
-static int _toupper(int c){
+static inline int _toupper(int c){
     if(c >= 'a' && c <= 'z'){
         c -= 32;
     }
@@ -25,7 +25,7 @@ static int _toupper(int c){
     return c;
 }
 
-static char _convert_char(char c){
+static inline char _convert_char(char c){
     if(c < 0x20 || strchr(ILLEGAL_CHARS, c)){
         return ILLEGAL_CHARS_REPLACE;
     }
@@ -34,14 +34,14 @@ static char _convert_char(char c){
 }
 
 // Remove spaces on the right
-static void _rtrim(char *str){
+static inline void _rtrim(char *str){
     int len = strlen(str);
     while(len > 0 && str[len - 1] == ' '){
         str[--len] = '\0';
     }
 }
 
-void _fat32_append_tilde(char *outname, int n){
+void fat_name_append_tilde(char *outname, int n){
     char base[MAX_BASENAME + 1] = {0};
     memcpy(base, outname, 8);
     base[MAX_BASENAME] = '\0';
@@ -63,7 +63,7 @@ void _fat32_append_tilde(char *outname, int n){
     memcpy(outname, base, 8);
 }
 
-void _fat32_generate_short_name(const char *name, char *out){
+void fat_name_generate_short(const char *name, char *out){
     char base[MAX_BASENAME + 1] = {0};
     char ext[MAX_EXTENSION + 1] = {0};
     const char *dot = strrchr(name, '.');
