@@ -1,4 +1,5 @@
 #include <arch/i386/idt.h>
+#include <arch/i386/pic.h>
 #include <drivers/terminal.h>
 #include <def/config.h>
 #include <io/ports.h>
@@ -70,10 +71,6 @@ void _set_idt(uint8_t interrupt_num, void* address){
 	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
 }
 
-static void _PIC_clock(struct InterruptFrame* frame){
-	outb(0x20, 0x20);
-}
-
 void init_idt(){
 	memset(idt, 0x0, sizeof(idt));
 	idtr_ptr.limit = sizeof(idt) - 1;
@@ -82,8 +79,6 @@ void init_idt(){
 	for(int i = 0; i < TOTAL_INTERRUPTS; i++){
 		_set_idt(i, interrupt_pointer_table[i]);
 	}
-
-	idt_register_callback(0x20, _PIC_clock);
 
 	load_idt(&idtr_ptr);
 	enable_interrupts();
@@ -135,11 +130,7 @@ void interrupt_handler(int interrupt, struct InterruptFrame* frame){
 		}
 	}
 
-	if(interrupt >= 0x28){
-		outb(0xA0, 0x20);
-	}
-
-	outb(0x20, 0x20);
+	pic_send_eoi(interrupt);
   pcb_page_current();
 }
 

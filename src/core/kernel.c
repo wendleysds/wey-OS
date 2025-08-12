@@ -2,11 +2,10 @@
 #include <core/sched.h>
 
 #include <drivers/terminal.h>
-#include <drivers/keyboard.h>
 
 #include <arch/i386/gdt.h>
 #include <arch/i386/idt.h>
-#include <arch/i386/timer.h>
+#include <arch/i386/pic.h>
 #include <arch/i386/tss.h>
 
 #include <lib/mem.h>
@@ -16,32 +15,41 @@
 #include <mmu.h>
 
 #include <def/config.h>
-#include <def/status.h>
+#include <def/err.h>
 #include <stdint.h>
 
-#include <fs/fs.h>
+#include <fs/vfs.h>
+
+#define _INIT_PANIC(msg, pmsg, init_func, expected) \
+	terminal_cwrite(0x00FF00, "[   ] "); \
+	terminal_write(msg); \
+	if((res = init_func) != expected){ \
+		terminal_cwrite(0xFF0000, "\r %d \n", res); \
+		panic(pmsg); \
+	} else \
+	terminal_cwrite(0x00FF00, "\r  0\n")
 
 #define _INIT(msg, init_func) \
-	terminal_write("[    ] "); \
+	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg); \
 	init_func;\
-	terminal_cwrite(0x00FF00, "\r  OK \n");
+	terminal_cwrite(0x00FF00, "\r  0\n")
 
 #define _INIT_MSGF(init_func, msg, ...) \
-	terminal_write("[    ] "); \
+	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg, __VA_ARGS__); \
 	init_func; \
-	terminal_cwrite(0x00FF00, "\r  OK \n");
+	terminal_cwrite(0x00FF00, "\r  0\n")
 
 /* 
  * Main module for the protected-mode kernel code
  */ 
 
-// Kernel Page
-static struct PagingDirectory* kernel_directory = 0x0;
+extern void load_drivers();
 
-struct TSS tss;
-struct GDT gdt[TOTAL_GDT_SEGMENTS];
+static struct PagingDirectory* kernel_directory = 0x0;
+static struct TSS tss;
+static struct GDT gdt[TOTAL_GDT_SEGMENTS];
 
 // Global Descriptor Table config
 struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
@@ -66,6 +74,12 @@ void kmain(){
 		gdt_load(gdt, sizeof(gdt) - 1)
 	);
 
+	_INIT_MSGF(
+		pic_init(TIMER_FREQUENCY), 
+		"Initializing PIT(IRQ 0x20) with %d.0hz", 
+		TIMER_FREQUENCY
+	);
+
 	_INIT(
 		"Initializing Interrupt Descriptor Table (IDT)", 
 		init_idt()
@@ -78,26 +92,18 @@ void kmain(){
 
 	_INIT(
 		"Initializing Memory Manager Unit",
-		mmu_init(&kernel_directory);
-	)
-
-	_INIT_MSGF(
-		pit_init(TIMER_FREQUENCY), 
-		"Initializing PIT(IRQ 0x20) with %d.0hz", 
-		TIMER_FREQUENCY
+		mmu_init(&kernel_directory)
 	);
 
 	_INIT(
-		"Initializing File System", 
-		fs_init()
+		"Initializing Drivers",
+		load_drivers()
 	);
 
 	_INIT(
 		"Initializing Scheduler",
-		scheduler_init();
-	)
-
-	terminal_cwrite(0x00FF00, "\nKERNEL READY!\n");
+		scheduler_init()
+	);
 
 	// Main loop
 	while(1){
@@ -106,6 +112,7 @@ void kmain(){
 }
 
 void panic(const char* fmt, ...){
+	disable_interrupts();
 	terminal_write("\nPanic!\n  ");
 
 	va_list args;
@@ -116,6 +123,15 @@ void panic(const char* fmt, ...){
 	while(1){
 		__asm__ volatile ("hlt");
 	}
+}
+
+void warning(const char* fmt, ...){
+	terminal_cwrite(0xF0FF00, "\nWarning! ");
+
+	va_list args;
+	va_start(args, fmt);
+	terminal_vwrite(TERMINAL_DEFAULT_COLOR, fmt, args);
+	va_end(args);
 }
 
 void kernel_page(){

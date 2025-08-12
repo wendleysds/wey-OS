@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define IRQ(x) (0x20 + x)
+
 struct InterruptDescriptor{
 	uint16_t offset_1;
 	uint16_t selector;
