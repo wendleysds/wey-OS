@@ -69,6 +69,8 @@ void kmain(){
 	memset(gdt, 0x00, sizeof(gdt));
 	gdt_structured_to_gdt(gdt, gdt_ptr, TOTAL_GDT_SEGMENTS);
 
+	int res;
+
 	_INIT(
 		"Loading Global Descriptor Table (GDT)", 
 		gdt_load(gdt, sizeof(gdt) - 1)
@@ -98,6 +100,13 @@ void kmain(){
 	_INIT(
 		"Initializing Drivers",
 		load_drivers()
+	);
+
+	_INIT_PANIC(
+		"Mounting root",
+		"Failed to mount root!",
+		vfs_mount(device_get_name("hda"), "/", "vfat"),
+		SUCCESS
 	);
 
 	_INIT(
