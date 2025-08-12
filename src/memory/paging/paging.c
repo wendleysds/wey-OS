@@ -17,7 +17,6 @@
 	((uintptr_t)(phys) & (PAGING_PAGE_SIZE - 1)))
 
 extern void paging_load_directory(uint32_t* addr);
-static struct PagingDirectory* _currentDirectory = 0x0;
 
 static void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
 	uintptr_t virt = (uintptr_t)virtualAddr;
@@ -151,7 +150,7 @@ void paging_switch(struct PagingDirectory *directory){
 	}
 
 	if (directory->tableCount > PAGING_TOTAL_ENTRIES_PER_TABLE) {
-		panic("paging_switch(*directory): Directory table count exceeds 1024!");
+		panic("paging_switch(*directory): Directory table count exceeds %d!", PAGING_TOTAL_ENTRIES_PER_TABLE);
 	}
 
 	paging_load_directory(directory->entry);

@@ -8,8 +8,11 @@
 	(((uintptr_t)(virt) & (PAGING_PAGE_SIZE - 1)) || \
 	((uintptr_t)(phys) & (PAGING_PAGE_SIZE - 1)))
 
+struct PagingDirectory* _currentDirectory = 0x0;
+
 void mmu_init(struct PagingDirectory** kernelDirectory){
 	struct PagingDirectory* dir;
+	_currentDirectory = 0x0;
 
 	uint32_t tableAmount = PAGING_TOTAL_ENTRIES_PER_TABLE;
 	dir = paging_new_directory(
