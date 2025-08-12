@@ -3,11 +3,24 @@
 
 #include <stdint.h>
 
+#define S_IFMT  0170000
+#define S_IFLNK 0120000
+#define S_IFREG 0100000
+#define S_IFBLK 0060000
+#define S_IFDIR 0040000
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
 struct stat {
-	uint32_t fileSize;
-	uint8_t attr;
-	uint16_t creDate;
-	uint16_t modDate;
+    uint32_t mode;
+    uint32_t size;
+    uint32_t uid;
+    uint8_t attr;
+    uint32_t atime;
+    uint32_t mtime;
+    uint32_t ctime;
 };
 
 struct inode {
