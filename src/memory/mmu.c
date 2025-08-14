@@ -10,7 +10,7 @@
 
 struct PagingDirectory* _currentDirectory = 0x0;
 
-void mmu_init(struct PagingDirectory** kernelDirectory){
+int mmu_init(struct PagingDirectory** kernelDirectory){
 	struct PagingDirectory* dir;
 	_currentDirectory = 0x0;
 
@@ -22,13 +22,15 @@ void mmu_init(struct PagingDirectory** kernelDirectory){
 	);
 
 	if(!dir || dir->tableCount != tableAmount){
-		panic("Failed to initializing paging!");
+		return NO_MEMORY;
 	}
 
 	*kernelDirectory = dir;
 
 	paging_switch(dir);
 	enable_paging();
+
+	return SUCCESS;
 }
 
 struct PagingDirectory* mmu_create_page(){

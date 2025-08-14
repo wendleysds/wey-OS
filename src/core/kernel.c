@@ -24,22 +24,22 @@
 	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg); \
 	if((res = init_func) != expected){ \
-		terminal_cwrite(0xFF0000, "\r %d \n", res); \
+		terminal_cwrite(0xFF0000, "\r[%d]\n", res); \
 		panic(pmsg); \
 	} else \
-	terminal_cwrite(0x00FF00, "\r  0\n")
+	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
 
 #define _INIT(msg, init_func) \
 	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg); \
 	init_func;\
-	terminal_cwrite(0x00FF00, "\r  0\n")
+	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
 
 #define _INIT_MSGF(init_func, msg, ...) \
 	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg, __VA_ARGS__); \
 	init_func; \
-	terminal_cwrite(0x00FF00, "\r  0\n")
+	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
 
 /* 
  * Main module for the protected-mode kernel code
@@ -87,14 +87,18 @@ void kmain(){
 		init_idt()
 	);
 
-	_INIT(
-		"Initializing Kernel Heap", 
-		init_kheap()
+	_INIT_PANIC(
+		"Initializing Kernel Heap",
+		"Failed to create kernel heap!",
+		init_kheap(),
+		SUCCESS
 	);
 
-	_INIT(
+	_INIT_PANIC(
 		"Initializing Memory Manager Unit",
-		mmu_init(&kernel_directory)
+		"Failed to initializing paging!",
+		mmu_init(&kernel_directory),
+		SUCCESS
 	);
 
 	_INIT(
