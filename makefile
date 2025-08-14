@@ -71,7 +71,7 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 	mkdir -p $(IMG_DIR)
 	dd if=/dev/zero of=$@ bs=512 count=65536
 	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
-	cd $(TOOLS_DIR)/fs/populate && make run
+	$(TOOLS_DIR)/fs/fat/main.py init
 
 # Create directories
 $(BUILD_DIRS):
