@@ -145,9 +145,10 @@ static int fat_mount(struct superblock* sb, struct device* device){
     root_fd->parentDirCluster = root_fd->firstCluster;
 
     memset(&root_fd->entry, 0, sizeof(root_fd->entry));
-    root_fd->entry.attr = ATTR_DIRECTORY;
-    root_fd->entry.FstClusHI = root_fd->firstCluster >> 16;
-    root_fd->entry.FstClusLO = root_fd->firstCluster & 0xFFFF;
+    memcpy(&root_fd->entry, "ROOT       ", 11);
+    root_fd->entry.attr = ATTR_DIRECTORY | ATTR_SYSTEM;
+    root_fd->entry.fstClusHI = root_fd->firstCluster >> 16;
+    root_fd->entry.fstClusLO = root_fd->firstCluster & 0xFFFF;
 
     rootino->i_op = &vfat_fs_iop;
     rootino->i_fop = &vfat_fs_fop;

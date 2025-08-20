@@ -30,7 +30,7 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
                 continue;
             }
 
-            if (buffer.attr & (ATTR_LONG_NAME)){
+            if ((buffer.attr & ATTR_LONG_NAME_MASK) == ATTR_LONG_NAME){
                 continue;
             }
 
@@ -48,17 +48,18 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
         return ERR_PTR(INVALID_ARG);
     }
 
-    struct FATFileDescriptor* fd = (struct FATFileDescriptor*)dir->private_data;
+    struct FATFileDescriptor* dirfd = (struct FATFileDescriptor*)dir->private_data;
 
-    if(fd->entry.attr & ATTR_ARCHIVE){
+    if(!(dirfd->entry.attr & ATTR_DIRECTORY)){
         return ERR_PTR(INVALID_FILE);
     }
 
-    struct FAT* fat = fd->fat;
-    struct Stream* stream = fd->fat->stream;
-    uint32_t cluster = fd->firstCluster; 
+    struct FAT* fat = dirfd->fat;
+    struct Stream* stream = fat->stream;
+    uint32_t cluster = dirfd->firstCluster; 
 
     struct FATLegacyEntry entry;
+    memset(&entry, 0x0, sizeof(entry));
 
     char fname[12];
     memset(fname, 0x0, sizeof(fname));
@@ -90,21 +91,21 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
                 return ERR_PTR(NO_MEMORY);
             }
 
-            struct FATFileDescriptor* fd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
-            if(!fd){
+            struct FATFileDescriptor* newfd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
+            if(!newfd){
                 kfree(inode);
                 return ERR_PTR(NO_MEMORY);
             }
 
-            fd->fat = fat;
-            fd->firstCluster = ((entry.FstClusHI << 16) | entry.FstClusLO);
-            fd->currentCluster = fd->firstCluster;
-            fd->parentDirCluster = cluster;
-            fd->entry = entry;
+            newfd->fat = fat;
+            newfd->firstCluster = ((entry.fstClusHI << 16) | entry.fstClusLO);
+            newfd->currentCluster = newfd->firstCluster;
+            newfd->parentDirCluster = cluster;
+            newfd->entry = entry;
 
             inode->mode = (entry.attr & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
             inode->size = entry.fileSize;
-            inode->private_data = (void*)fd;
+            inode->private_data = (void*)newfd;
 
             inode->i_op = &vfat_fs_iop;
             inode->i_fop = &vfat_fs_fop;
@@ -145,14 +146,9 @@ int fat_rmdir(struct inode *dir, const char* name){
     struct FATFileDescriptor* fd = (struct FATFileDescriptor*)dir->private_data;
     struct FAT* fat = fd->fat;
 
-    int count = _fat_count_entries(fat, fd->firstCluster) - 2; // . and ..
-    if(count < 0){
-        return count;
-    } 
-
-    if(count > 0){
-        return DIR_NOT_EMPTY;
+    if (!(fd->entry.attr & ATTR_DIRECTORY)) {
+        return INVALID_ARG;
     }
 
-    return _fat_remove(fat, name, fd->parentDirCluster);
+    return _fat_remove(fat, name, fd->firstCluster);
 }

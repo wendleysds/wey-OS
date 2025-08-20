@@ -4,9 +4,32 @@
 #include <lib/mem.h>
 #include <lib/string.h>
 
+static inline uint8_t _lfn_chksum(const uint8_t* shortName){
+    uint8_t sum = 0;
+
+    for (uint8_t i = 0; i < 11; i++){
+        // NOTE: The operation is an unsigned char rotate right
+        sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + shortName[i];
+    }
+
+    return sum;
+}
+
+static int _fat_lfn_read(struct Stream* stream, const uint8_t* shortName, size_t entryLBA, char* lfnBuffer, size_t maxSize){
+    return NOT_IMPLEMENTED;
+}
+
+static int _fat_lfn_write(struct Stream* stream, const uint8_t* shortName, size_t entryLBA, char* lfnBuffer, size_t maxSize){
+    return NOT_IMPLEMENTED;
+}
+
 int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int attr){
     if(!fat || !filename){
         return INVALID_ARG;
+    }
+
+    if(strlen(filename) > 11){
+        return NOT_SUPPORTED; // lfn not supported wet
     }
 
     struct Stream* stream = fat->stream;
@@ -28,16 +51,28 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                 return ERROR_IO;
             }
 
+            if((buffer.attr & ATTR_LONG_NAME_MASK) == ATTR_LONG_NAME){
+                continue;
+            }
+
             if(memcmp((char*)buffer.name, name, 11) == 0){
-                collisions++;
+                if (strlen(filename) <= 11){
+                    // TODO: Check if hava an LFN above
+                    // if not
+                        return FILE_EXISTS;
+                }
+
+                // TODO: Parse LFN and compare with filename
+                // if equals
+                //   return FILE_EXISTS
+                // else
+                    fat_name_append_tilde(name, ++collisions);
+                
+                continue;
             }
 
             if(buffer.name[0] != 0x0 && buffer.name[0] != 0xE5){
                 continue;
-            }
-
-            if(collisions > 0){
-                fat_name_append_tilde(name, collisions);
             }
 
             uint32_t _cluster = fat_find_free_cluster(fat);
@@ -54,11 +89,11 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
             buffer.attr = attr;
 
             if(fat->type == FAT_TYPE_32){
-                buffer.FstClusHI = _cluster >> 16;
-                buffer.FstClusLO = _cluster;
+                buffer.fstClusHI = _cluster >> 16;
+                buffer.fstClusLO = _cluster;
             }else{
-                buffer.FstClusHI = 0;
-                buffer.FstClusLO = _cluster;
+                buffer.fstClusHI = 0;
+                buffer.fstClusLO = _cluster;
             }
 
             stream_seek(stream, -sizeof(buffer), SEEK_CUR);
@@ -76,11 +111,11 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                 dot_entry.attr = ATTR_DIRECTORY;
 
                 if(fat->type == FAT_TYPE_32){
-                    dot_entry.FstClusHI = (dirCluster >> 16) & 0xFFFF;
-                    buffer.FstClusLO = dirCluster & 0xFFFF;
+                    dot_entry.fstClusHI = (dirCluster >> 16) & 0xFFFF;
+                    buffer.fstClusLO = dirCluster & 0xFFFF;
                 }else{
-                    dot_entry.FstClusHI = 0;
-                    dot_entry.FstClusLO = dirCluster & 0xFFFF;
+                    dot_entry.fstClusHI = 0;
+                    dot_entry.fstClusLO = dirCluster & 0xFFFF;
                 }
 
                 if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
@@ -91,11 +126,11 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                 memcpy(dot_entry.name, ".          ", 11);
 
                 if(fat->type == FAT_TYPE_32){
-                    dot_entry.FstClusHI = (_cluster >> 16) & 0xFFFF;
-                    buffer.FstClusLO = _cluster & 0xFFFF;
+                    dot_entry.fstClusHI = (_cluster >> 16) & 0xFFFF;
+                    buffer.fstClusLO = _cluster & 0xFFFF;
                 }else{
-                    dot_entry.FstClusHI = 0;
-                    dot_entry.FstClusLO = _cluster & 0xFFFF;
+                    dot_entry.fstClusHI = 0;
+                    dot_entry.fstClusLO = _cluster & 0xFFFF;
                 }
 
                 if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
@@ -157,7 +192,7 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
 				continue;
 			}
 
-            uint32_t fileCluster = ((entry.FstClusHI << 16) | entry.FstClusLO);
+            uint32_t fileCluster = ((entry.fstClusHI << 16) | entry.fstClusLO);
             uint8_t del = 0xE5;
 
             stream_seek(stream, -sizeof(entry), SEEK_CUR);
@@ -214,9 +249,9 @@ int fat_getattr(struct inode *dir, const char *name, struct stat* restrict statb
     statbuf->uid = 0;
     statbuf->attr = fd->entry.attr;
     
-    statbuf->atime = fd->entry.LstAccDate;
-    statbuf->mtime = fd->entry.WrtDate;
-    statbuf->ctime = fd->entry.CrtDate;
+    statbuf->atime = fd->entry.lstAccDate;
+    statbuf->mtime = fd->entry.wrtDate;
+    statbuf->ctime = fd->entry.crtDate;
 
     return NOT_IMPLEMENTED;
 }

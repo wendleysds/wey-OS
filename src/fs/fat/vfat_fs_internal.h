@@ -24,13 +24,13 @@
 #define ATTR_ARCHIVE 0x20
 
 #define ATTR_LONG_NAME \
-	ATTR_READ_ONLY | ATTR_HIDDEN \
-	| ATTR_SYSTEM |ATTR_VOLUME_ID
+	(ATTR_READ_ONLY | ATTR_HIDDEN \
+	| ATTR_SYSTEM |ATTR_VOLUME_ID)
 
 #define ATTR_LONG_NAME_MASK \
-	ATTR_READ_ONLY | ATTR_HIDDEN \
+	(ATTR_READ_ONLY | ATTR_HIDDEN \
 	|ATTR_SYSTEM |ATTR_VOLUME_ID \
-	|ATTR_DIRECTORY |ATTR_ARCHIVE
+	|ATTR_DIRECTORY |ATTR_ARCHIVE)
 
 typedef enum {
 	FAT_TYPE_12,
@@ -86,14 +86,14 @@ struct FATLegacyEntry{
 	uint8_t name[11];
 	uint8_t attr;
 	uint8_t NTRes;
-	uint8_t CrtTimeTenth;
-	uint16_t CrtTime;
-	uint16_t CrtDate;
-	uint16_t LstAccDate;
-	uint16_t FstClusHI;
-	uint16_t WrtTime;
-	uint16_t WrtDate;
-	uint16_t FstClusLO;
+	uint8_t crtTimeTenth;
+	uint16_t crtTime;
+	uint16_t crtDate;
+	uint16_t lstAccDate;
+	uint16_t fstClusHI;
+	uint16_t wrtTime;
+	uint16_t wrtDate;
+	uint16_t fstClusLO;
 	uint32_t fileSize;
 }__attribute__((packed));
 
@@ -108,14 +108,14 @@ struct FAT32FSInfo {
 } __attribute__((packed));
 
 struct FATLongEntry{
-	uint8_t Ord;
-	uint16_t Name1[5]; // Characters 1-5
-	uint8_t Attr; // Must be ATTR_LONG_NAME
-	uint8_t Type;
-	uint8_t Chksum;
-	uint16_t Name2[6]; // Characters 6-11
-	uint16_t FstClusLO; // Must be 0
-	uint16_t Name3[2]; // Characters 12-13
+	uint8_t ord;
+	uint16_t name1[5]; // Characters 1-5
+	uint8_t attr; // Must be ATTR_LONG_NAME
+	uint8_t type;
+	uint8_t chksum;
+	uint16_t name2[6]; // Characters 6-11
+	uint16_t fstClusLO; // Must be 0
+	uint16_t name3[2]; // Characters 12-13
 }__attribute__((packed));
 
 struct FATHeaders{
