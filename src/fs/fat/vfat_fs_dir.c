@@ -143,12 +143,29 @@ int fat_rmdir(struct inode *dir, const char* name){
         return INVALID_ARG;
     }
 
-    struct FATFileDescriptor* fd = (struct FATFileDescriptor*)dir->private_data;
-    struct FAT* fat = fd->fat;
+    struct FATFileDescriptor* dfd = (struct FATFileDescriptor*)dir->private_data;
+    struct FAT* fat = dfd->fat;
 
-    if (!(fd->entry.attr & ATTR_DIRECTORY)) {
+    if (!(dfd->entry.attr & ATTR_DIRECTORY)) {
         return INVALID_ARG;
     }
 
-    return _fat_remove(fat, name, fd->firstCluster);
+    struct inode* tinode = fat_lookup(dir, name);
+    if(IS_ERR(tinode)){
+        return PTR_ERR(tinode);
+    }
+
+    struct FATFileDescriptor* tfd = (struct FATFileDescriptor*)tinode->private_data; 
+    int itensCount = _fat_count_entries(fat, tfd->firstCluster);
+    inode_dispose(tinode);
+
+    if(IS_STAT_ERR(itensCount)){
+        return itensCount;
+    }
+
+    if((itensCount - 2) > 0){
+        return DIR_NOT_EMPTY;
+    }
+
+    return _fat_remove(fat, name, dfd->firstCluster);
 }
