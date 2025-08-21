@@ -624,9 +624,6 @@ class FATFS:
         name = tokens[len(tokens)-1]
         dirs = path[:-len('/' + name)]
 
-        if dirs == '':
-            return None
-
         entry = self.walk('/' if dirs == '' else dirs)
         if not entry:
             return None
