@@ -1,5 +1,5 @@
 #include <fs/binfmts.h>
-#include <fs/file.h>
+#include <fs/vfs.h>
 #include <mmu.h>
 #include <uaccess.h>
 #include <core/sched.h>
