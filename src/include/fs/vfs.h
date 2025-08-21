@@ -102,6 +102,13 @@ int vfs_create(const char *restrict path, uint16_t mode);
 int vfs_unlink(const char *restrict path);
 int vfs_mkdir(const char *restrict path);
 int vfs_rmdir(const char *restrict path);
+
+int vfs_read(struct file *file, void *buffer, uint32_t size);
+int vfs_lseek(struct file *file, int offset, int whence);
+int vfs_write(struct file *file, const void *buffer, uint32_t size);
+int vfs_close(struct file *file);
+int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 
 int vfs_register_filesystem(struct filesystem* fs);
