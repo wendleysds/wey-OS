@@ -89,7 +89,7 @@ int vfs_mount(struct device *device, const char *mountpoint, const char *filesys
         return NO_MEMORY;
     }
 
-    struct mount* mnt = (struct mount*)kcalloc(sizeof(struct mount));
+    struct mount* mnt = (struct mount*)kcalloc(sizeof(struct mount), 1);
     if(!mnt){
         kfree(sb);
         return NO_MEMORY;

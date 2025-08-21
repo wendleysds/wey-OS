@@ -83,7 +83,7 @@ uint8_t mmu_user_pointer_valid(void* ptr){
 	return paging_is_user_pointer_valid(ptr);
 }
 
-uint8_t mmu_user_range_valid(const void* userPtr, size_t size){
+uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size){
     uintptr_t start = (uintptr_t)userPtr;
     uintptr_t end = start + size;
 

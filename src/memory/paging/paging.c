@@ -49,21 +49,6 @@ void* paging_translate(struct PagingDirectory* directory, void* virt){
 	return (void*)(pagePhysic + difference);
 }
 
-void* paging_align_address(void* ptr){
-	uintptr_t addr = (uintptr_t)ptr;
-	if (addr & (PAGING_PAGE_SIZE - 1))
-	{
-		addr = (addr + PAGING_PAGE_SIZE - 1) & ~(PAGING_PAGE_SIZE - 1);
-		return (void*)addr;
-	}
-
-	return ptr;
-}
-
-void* paging_align_to_lower(void* addr){
-    return (void*)((uintptr_t)addr & ~(PAGING_PAGE_SIZE - 1));
-}
-
 struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirFlags, uint8_t tblFlags){
 	if(tablesAmount > PAGING_TOTAL_ENTRIES_PER_TABLE || tablesAmount < 0){
 		return 0x0; // Invalid tables amount
@@ -73,11 +58,11 @@ struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirF
 		return paging_new_directory_empty();
 	}
 
-	struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory));
+	struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory), 1);
 	if(!directory)
 		return 0x0;
 
-	uint32_t* entry = (uint32_t*)kcalloc(sizeof(uint32_t) * tablesAmount);
+	uint32_t* entry = (uint32_t*)kcalloc(sizeof(uint32_t), tablesAmount);
 	if(!entry){
 		kfree(directory);
 		return 0x0;
@@ -86,7 +71,7 @@ struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirF
 	uint32_t offset = 0;
 
 	for (uint32_t i = 0; i < tablesAmount; i++){
-		PagingTable* table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
+		PagingTable* table = (PagingTable*)kcalloc(sizeof(PagingTable), PAGING_TOTAL_ENTRIES_PER_TABLE);
 		if(!table){
 			for(uint32_t j = 0; j < i; j++){
 				kfree((void*)(entry[j] & _MASK));
@@ -112,12 +97,12 @@ struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirF
 }
 
 struct PagingDirectory* paging_new_directory_empty(){
-    struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory));
+    struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory), 1);
     if (!directory){
 		return NULL;
 	}
 
-    directory->entry = (uint32_t*)kcalloc(sizeof(uint32_t) * PAGING_TOTAL_ENTRIES_PER_TABLE);
+    directory->entry = (uint32_t*)kcalloc(sizeof(uint32_t), PAGING_TOTAL_ENTRIES_PER_TABLE);
     if (!directory->entry) {
         kfree(directory);
         return NULL;
@@ -181,7 +166,7 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 
 	PagingTable* table = 0x0;
 	if(!(directory->entry[dirIndex] & FPAGING_P)){
-		table = (PagingTable*)kcalloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
+		table = (PagingTable*)kcalloc(sizeof(PagingTable), PAGING_TOTAL_ENTRIES_PER_TABLE);
 		if (!table){
 			return NO_MEMORY;
 		}
