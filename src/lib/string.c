@@ -21,7 +21,10 @@ int strnlen(const char *s, int maxlen){
 }
 
 char* strcpy(char *restrict dst, const char *restrict src){
-	memcpy((void*)dst, (void*)src, strlen(src));
+	size_t len = strlen(src);
+	memcpy((void*)dst, (void*)src, len);
+	dst[len] = '\0';
+
 	return dst;
 }
 
