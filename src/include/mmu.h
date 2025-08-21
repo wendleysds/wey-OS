@@ -44,6 +44,6 @@ int mmu_map_pages(struct PagingDirectory* directory, void* virtualAddr, void* ph
 int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint32_t size);
 void* mmu_translate(struct PagingDirectory* directory, void* virt);
 uint8_t mmu_user_pointer_valid(void* ptr);
-uint8_t mmu_user_range_valid(const void* userPtr, size_t size);
+uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size);
 
 #endif

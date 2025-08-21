@@ -12,7 +12,7 @@ int copy_from_user(void* kdst, const void* usrc, uint64_t size){
 
     pcb_page_current();
 
-    if (!mmu_user_range_valid(usrc, size)){
+    if (!mmu_user_pointer_valid_range(usrc, size)){
         kernel_page();
         return INVALID_PTR;
     }
@@ -30,7 +30,7 @@ int copy_to_user(const void* ksrc, void* udst, uint64_t size){
 
     pcb_page_current();
 
-    if (!mmu_user_range_valid(udst, size)){
+    if (!mmu_user_pointer_valid_range(udst, size)){
         kernel_page();
         return INVALID_PTR;
     }
@@ -48,7 +48,7 @@ int copy_string_from_user(char* kdst, const char* usrc, int len){
 
     pcb_page_current();
 
-    if (!mmu_user_range_valid(usrc, len)){
+    if (!mmu_user_pointer_valid_range(usrc, len)){
         kernel_page();
         return INVALID_PTR;
     }
@@ -76,7 +76,7 @@ int copy_string_to_user(const char* ksrc, char* sdst, int len){
 
     pcb_page_current();
 
-    if (!mmu_user_range_valid(sdst, len)){
+    if (!mmu_user_pointer_valid_range(sdst, len)){
         sdst[0] = '\0';
         kernel_page();
         return INVALID_PTR;
