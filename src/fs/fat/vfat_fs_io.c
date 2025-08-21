@@ -13,7 +13,7 @@ static int fat_entry_update(struct FAT* fat, uint32_t dirCluster, struct FATLega
         return lba;
     }
 
-    stream_seek(stream, _SEC(lba), SEEK_SET);
+    stream_seek(stream, lba, SEEK_SET);
     if (stream_write(stream, entry, sizeof(struct FATLegacyEntry)) != SUCCESS) {
         return ERROR_IO;
     }
@@ -38,6 +38,14 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
     uint32_t lba = fat_cluster_to_lba(fat, fd->currentCluster);
 
     uint32_t remaining = count;
+
+	if(remaining > fd->entry.fileSize - cursor){
+		remaining = fd->entry.fileSize - cursor;
+		if(remaining == 0){
+			return END_OF_FILE; // Reached end of file
+		}
+	}
+
     uint32_t totalReaded = 0;
 
     uint32_t clusterOffset = cursor % fd->fat->clusterSize;

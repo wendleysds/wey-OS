@@ -179,7 +179,7 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
             }
 
             if(buffer.fstClusLO == entry->fstClusLO && buffer.fstClusHI == entry->fstClusHI){
-                return lba + (i * sizeof(buffer));
+                return _SEC(lba) + (i * sizeof(buffer)) ;
             }
         }
 
