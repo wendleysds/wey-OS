@@ -1,10 +1,63 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
-#include <fs/file.h>
 #include <memory/kheap.h>
 #include <device.h>
 #include <stdint.h>
+
+#define FMODE_READ   0x1
+#define FMODE_WRITE  0x2
+#define FMODE_LSEEK  0x4
+#define FMODE_EXEC   0x8
+
+#define S_IFMT  00170000
+#define S_IFREG  0001000
+#define S_IFDIR  0002000
+#define S_IFCHR  0004000
+
+#define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
+struct inode {
+    uint32_t ino;
+    uint32_t mode;
+    uint32_t size;
+    void *private_data;
+
+    struct inode_operations *i_op;
+    struct file_operations *i_fop;
+};
+
+struct file {
+    struct inode *inode;
+    uint32_t pos;
+    uint32_t flags;
+    void *private_data;
+
+    struct file_operations *f_op;
+};
+
+struct stat {
+    uint32_t mode;
+    uint32_t size;
+    uint32_t uid;
+    uint8_t attr;
+    uint32_t atime;
+    uint32_t mtime;
+    uint32_t ctime;
+};
+
+struct file_operations {
+    int (*read)(struct file *file, void *buffer, uint32_t count);
+    int (*write)(struct file *file, const void *buffer, uint32_t count);
+    int (*lseek)(struct file *file, int offset, int whence);
+    int (*close)(struct file *file);
+};
 
 struct inode_operations {
     struct inode* (*lookup)(struct inode *dir, const char *name);
@@ -50,7 +103,6 @@ int vfs_unlink(const char *restrict path);
 int vfs_mkdir(const char *restrict path);
 int vfs_rmdir(const char *restrict path);
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
-int vfs_setattr(const char *restrict path, uint16_t attr);
 
 int vfs_register_filesystem(struct filesystem* fs);
 int vfs_unregister_filesystem(struct filesystem* fs);
