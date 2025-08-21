@@ -207,7 +207,7 @@ int fat_close(struct file *file){
         return INVALID_ARG;
     }
 
-    return NOT_IMPLEMENTED;
+    return OK; // No specific close operation needed for FAT files
 }
 
 int fat_update(struct FAT* fat){
