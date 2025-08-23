@@ -20,6 +20,10 @@ struct Stream* stream_new(struct device* device);
 int stream_read(struct Stream* stream, void* buffer, int total);
 int stream_write(struct Stream *stream, const void *buffer, int total);
 int stream_seek(struct Stream* stream, uint64_t sector, uint8_t whence);
+static inline uint64_t stream_tell(struct Stream* stream){
+	return stream->cursor;
+}
+
 int stream_dispose(struct Stream* ptr);
 
 #endif
