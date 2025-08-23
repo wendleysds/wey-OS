@@ -1,6 +1,7 @@
 #ifndef _KEYBOARD_H
 #define _KEYBOARD_H
 
-void init_keyboard();
+void keyboard_init();
+void keyboard_read(char* buffer, int size);
 
 #endif
