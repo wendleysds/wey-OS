@@ -16,4 +16,7 @@
 #define asmlinkage __attribute__((regparm(0)))
 #define stringfy(s) #s
 
+#define __packed __attribute__((packed))
+#define __cdecl __attribute__((cdecl))
+
 #endif

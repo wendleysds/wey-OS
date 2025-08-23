@@ -38,4 +38,9 @@ static inline long __must_check PTR_ERR_OR_ZERO(const void *ptr)
 		return 0;
 }
 
+static inline void * __must_check ERR_CAST(const void *ptr)
+{
+	return (void *) ptr;
+}
+
 #endif
