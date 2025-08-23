@@ -146,7 +146,7 @@ void paging_free_directory(struct PagingDirectory *directory){
 	for(size_t i = 0; i < directory->tableCount; i++){
 		PagingTable tableEntry = directory->entry[i];
 
-		if(!tableEntry & FPAGING_P){
+		if(tableEntry & FPAGING_P){
 			PagingTable* table = (PagingTable*)(tableEntry & _MASK);
 			kfree(table);
 		}
@@ -177,9 +177,10 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 		table = (PagingTable*)(directory->entry[dirIndex] & _MASK);
 	}
 
-	if (table[tblIndex] & FPAGING_P) {
+	// For removed for testing
+	/*if (table[tblIndex] & FPAGING_P) {
 		return ALREADY_MAPD;
-	}
+	}*/
 
 	table[tblIndex] = (uint32_t) physicalAddr | flags;
 
