@@ -17,12 +17,14 @@
 #define MAP_ANONYMOUS 0x4
 
 struct mem_region {
-    uint8_t flags;
-    uint32_t size;
-
+	void* physBaseAddress;
     void* virtualBaseAddress;
     void* virtualEndAddress;
+	
+	uint32_t size;
+	uint8_t flags;
 
+	uint8_t isPrivite;
     struct mem_region* next;
 }__attribute__((packed));
 
@@ -45,5 +47,11 @@ int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint3
 void* mmu_translate(struct PagingDirectory* directory, void* virt);
 uint8_t mmu_user_pointer_valid(void* ptr);
 uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size);
+
+struct mem_region* vma_lookup(struct mm_struct* mm, void* virtualAddr);
+int vma_add(struct mm_struct* mm, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags, uint8_t isPrivate);
+int vma_remove(struct mm_struct* mm, void* virtualAddr, uint32_t size);
+int vma_clean(struct mm_struct* mm);
+int vma_destroy(struct mm_struct* mm);
 
 #endif
