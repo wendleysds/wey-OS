@@ -3,38 +3,46 @@
 #include <memory/kheap.h>
 #include <lib/mem.h>
 #include <def/config.h>
-
+#include <def/err.h>
 #include <stdint.h>
 
 static uint16_t next_tid = 1;
-static int alloc_tid() {
+static inline int alloc_tid() {
     return next_tid++; // Increment and return the next TID
 }
 
 struct Task* task_new(struct Process* proc, void* entry_point){
     if(!proc || !entry_point) {
-        return NULL; // Invalid arguments
+        return ERR_PTR(INVALID_ARG);
     }
 
     struct Task* task = (struct Task*)kmalloc(sizeof(struct Task));
     if (!task) {
-        return NULL; // Memory allocation failed
+        return ERR_PTR(NO_MEMORY);
     }
 
     void* userStack = kmalloc(PROC_STACK_SIZE);
     if (!userStack) {
         kfree(task);
-        return NULL; // User stack allocation failed
+        return ERR_PTR(NO_MEMORY);
+    }
+
+    void* kernelStack = kmalloc(PROC_KERNEL_STACK_SIZE);
+    if (!kernelStack) {
+        kfree(userStack);
+        kfree(task);
+        return ERR_PTR(NO_MEMORY);
     }
 
     memset(task, 0, sizeof(struct Task));
     memset(userStack, 0, PROC_STACK_SIZE);
+    memset(kernelStack, 0, PROC_KERNEL_STACK_SIZE);
     memset(task->fileDescriptors, 0, sizeof(task->fileDescriptors));
 
     task->tid = alloc_tid();
     task->process = proc;
     task->userStack = userStack;
-    task->kernelStack = NULL;
+    task->kernelStack = kernelStack;
     task->state = TASK_NEW;
     task->priority = 0; // Default priority
     task->next = NULL;
