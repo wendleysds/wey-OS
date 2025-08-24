@@ -253,7 +253,7 @@ int fat_getattr(struct inode *dir, const char *name, struct stat* restrict statb
     statbuf->mtime = fd->entry.wrtDate;
     statbuf->ctime = fd->entry.crtDate;
 
-    return NOT_IMPLEMENTED;
+    return SUCCESS;
 }
 
 int fat_setarrt(struct inode *dir, const char *name, uint16_t attr){
