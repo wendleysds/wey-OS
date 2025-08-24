@@ -18,12 +18,11 @@ struct IDTr_ptr{
 	uint32_t base;
 }__attribute__((packed));
 
-struct InterruptFrame {
-	uint32_t edi, esi, ebp;
-	uint32_t reserved;
+struct InterruptFrame {	
+	uint32_t edi, esi, ebp, kesp;
 	uint32_t ebx, edx, ecx, eax;
-	uint32_t ip, cs;
-	uint32_t eflags;
+	uint32_t int_no, err_code;
+	uint32_t eip, cs, eflags;
 	uint32_t esp, ss;
 } __attribute__((packed));
 

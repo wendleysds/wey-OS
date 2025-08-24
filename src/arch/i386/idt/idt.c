@@ -6,6 +6,7 @@
 #include <lib/mem.h>
 #include <core/kernel.h>
 #include <core/sched.h>
+#include <def/compile.h>
 
 #include <stdint.h>
 
@@ -80,27 +81,37 @@ void init_idt(){
 		_set_idt(i, interrupt_pointer_table[i]);
 	}
 
+	_set_idt_gate(0x80, (uint32_t)interrupt_pointer_table[0x80], KERNEL_CODE_SELECTOR, 0xEE); // syscall gate
+
 	load_idt(&idtr_ptr);
 	enable_interrupts();
 }
 
 static void _print_frame(struct InterruptFrame* frame){
-  terminal_write( 
-    "\nedi 0x%x esi 0x%x ebp 0x%x\n", 
-    frame->edi, frame->esi, frame->ebp
-  );
-  terminal_write(
-    "reserved 0x%x ebx 0x%x edx 0x%x ecx 0x%x\n", 
-    frame->reserved, frame->ebx, frame->edx, frame->ecx
-  );
-  terminal_write(
-    "eax 0x%x eip 0x%x\n", 
-    frame->eax, frame->ip
-  );
-  terminal_write(
-    "cs 0x%x eflags 0x%x esp 0x%x ss 0x%x\n\n", 
-    frame->cs, frame->eflags, frame->esp, frame->ss
-  );
+	terminal_write(
+		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n", 
+		frame->eax, frame->ebx, frame->ecx, frame->edx
+	);
+
+	terminal_write( 
+		"edi 0x%x esi 0x%x esp 0x%x ebp 0x%x\n", 
+		frame->edi, frame->esp, frame->esi, frame->ebp
+	);
+
+	terminal_write(
+		"ip 0x%x cs 0x%x ss 0x%x\n", 
+		frame->eip, frame->cs, frame->ss
+	);
+
+	terminal_write(
+		"eflags 0x%x kesp 0x%x\n", 
+		frame->eflags, frame->kesp
+	);
+
+	terminal_write(
+		"int 0x%x err 0x%x\n", 
+		frame->int_no, frame->err_code
+	);
 }
 
 void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback){
@@ -111,8 +122,15 @@ void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback){
 	interrupt_callbacks[interrupt] = callback;
 }
 
-void interrupt_handler(int interrupt, struct InterruptFrame* frame){
+void __cdecl interrupt_handler(struct InterruptFrame* frame){
 	kernel_page();
+
+	int interrupt = frame->int_no;
+
+	if(interrupt == 0x80){
+		terminal_write("Syscall interrupt 0x80 called!\n");
+		_print_frame(frame); // for testing
+	}
 
 	if(interrupt_callbacks[interrupt] != 0){
 		interrupt_callbacks[interrupt](frame);
@@ -120,7 +138,7 @@ void interrupt_handler(int interrupt, struct InterruptFrame* frame){
 	else if(interrupt < 32){
 		terminal_write(
 			"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-			interrupt, interrupt, _exceptionMessages[interrupt], frame->ip);
+			interrupt, interrupt, _exceptionMessages[interrupt], frame->eip);
 
 		_print_frame(frame);
 
