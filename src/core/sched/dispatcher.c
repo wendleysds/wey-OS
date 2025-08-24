@@ -20,7 +20,7 @@ static void pcb_save(struct Task* task, struct InterruptFrame* frame){
 
     task->regs.ebp = frame->ebp;
     task->regs.esp = frame->esp;
-    task->regs.eip = frame->ip;
+    task->regs.eip = frame->eip;
 
     task->regs.edi = frame->edi;
     task->regs.esi = frame->esi;
@@ -39,7 +39,7 @@ static inline int pcb_load(struct Task* task){
         return INVALID_ARG; // Task null or dont have a process associated
     }
 
-    if(_currentTask->tid != 0){
+    if(_currentTask && _currentTask->tid != 0){
         sheduler_enqueue_auto(_currentTask);
     }
     
@@ -53,6 +53,10 @@ static inline int pcb_load(struct Task* task){
 
 int __must_check dispatcher_load(struct Task* task){
     return pcb_load(task);
+}
+
+void pcb_set(struct Task* t){
+	_currentTask = t;
 }
 
 int pcb_save_current(struct InterruptFrame* frame){
@@ -73,17 +77,21 @@ int pcb_switch(struct Task* task){
         return INVALID_ARG; // Task null or dont have a process associated
     }
 
-    if(!task->process->pageDirectory){
+    if(!task->process->mm->pageDirectory){
         return NULL_PTR;
     }
 
     _currentTask = task;
-    paging_switch(task->process->pageDirectory);
+    paging_switch(task->process->mm->pageDirectory);
 
     return SUCCESS;
 }
 
 int pcb_page_current(){
+	if(!scheduling){
+		return NOT_READY;
+	}
+
     if(!_currentTask){
         return NULL_PTR;
     }

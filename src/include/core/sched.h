@@ -6,9 +6,12 @@
 #include <def/compile.h>
 #include <stdint.h>
 
+extern uint8_t scheduling;
+
 void schedule();
 
 void scheduler_init();
+void scheduler_start();
 void scheduler_add_task(struct Task* task);
 void scheduler_remove_task(struct Task* task);
 void scheduler_sleep_task(struct Task* task);

@@ -23,12 +23,12 @@ static struct TaskQueue _readyQueue;
 static struct TaskQueue _waitQueue;
 static struct TaskQueue _terminateQueue;
 
-static uint64_t ticks = 0;
+static volatile uint64_t ticks = 0;
+uint8_t scheduling = 0; // Started?
 
 static struct Task _idleTask;
 
 static void _idle_task_entry(){
-    terminal_write("\nHello From idle Task!\n");
     while (1) {
         __asm__ volatile ("hlt");
     }
@@ -136,15 +136,24 @@ void schedule(){
     }
 }
 
+void scheduler_start(){
+	if(scheduling){
+		return;
+	}
+
+	idt_register_callback(PIC_TIMER, _schedule_iqr_PIT_handler);
+    ticks = 0;
+	scheduling = 1;
+}
+
 void scheduler_init(){
     init_task_idle();
 
-    memset(&_readyQueue, 0x0, sizeof(struct TaskQueue));
+	memset(&_readyQueue, 0x0, sizeof(struct TaskQueue));
     memset(&_waitQueue, 0x0, sizeof(struct TaskQueue));
     memset(&_terminateQueue, 0x0, sizeof(struct TaskQueue));
 
-    idt_register_callback(PIC_TIMER, _schedule_iqr_PIT_handler);
-    ticks = 0;
+	scheduling = 0;
 }
 
 void sheduler_enqueue_auto(struct Task* task){
