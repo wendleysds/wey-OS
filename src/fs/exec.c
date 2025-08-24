@@ -24,7 +24,7 @@ static void destroy_binprm(struct binprm* bprm, uint8_t free_mm){
 }
 
 static int exec_binprm(struct binprm* bprm) {
-    if (!bprm || !bprm->filename || bprm->fd < 2) {
+    if (!bprm || !bprm->filename) {
         return INVALID_ARG; // Invalid binary parameters
     }
 
