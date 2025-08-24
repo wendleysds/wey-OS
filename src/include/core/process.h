@@ -11,7 +11,6 @@ struct Process
     uint16_t pid;
     char name[PROC_NAME_MAX];
 
-    struct PagingDirectory *pageDirectory;
     struct mm_struct* mm;
 
     struct Task *tasks;

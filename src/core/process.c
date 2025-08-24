@@ -2,7 +2,7 @@
 #include <core/sched.h>
 #include <core/sched/task.h>
 #include <def/config.h>
-#include <def/status.h>
+#include <def/err.h>
 #include <lib/string.h>
 #include <lib/mem.h>
 #include <memory/kheap.h>
@@ -30,28 +30,35 @@ struct Process* process_get(uint16_t pid) {
 }
 
 struct Process* process_create(const char *name, const char *pwd, int argc, char **argv, int envc, char **envp) {
-    if (!name || argc < 0 || envc < 0 || argc > PROC_ARG_MAX || envc > PROC_ENV_MAX) {
+    if (!name || argc < 0 || envc < 0 || argc > PROC_ARG_MAX || envc > PROC_ARG_MAX) {
         return 0x0;
     }
 
     struct Process *process = (struct Process*)kmalloc(sizeof(struct Process));
     if (!process) {
-        return 0x0;
+        return ERR_PTR(NO_MEMORY);
     }
 
     process->pid = alloc_pid();
     if (process->pid < 0) {
         kfree(process);
-        return 0x0;
+        return ERR_PTR(OUT_OF_BOUNDS);
     }
 
     strncpy(process->name, name, PROC_NAME_MAX - 1);
     process->name[PROC_NAME_MAX - 1] = '\0';
 
-    process->pageDirectory = mmu_create_page();
-    if (!process->pageDirectory) {
+	process->mm = (struct mm_struct*)kzalloc(sizeof(struct mm_struct));
+	if(!process->mm){
+		kfree(process);
+        return ERR_PTR(NO_MEMORY);
+	}
+
+    process->mm->pageDirectory = mmu_create_page();
+    if (!process->mm->pageDirectory) {
         kfree(process);
-        return 0x0;
+		kfree(process->mm);
+        return ERR_PTR(NO_MEMORY);
     }
 
     process->tasks = NULL;
@@ -131,12 +138,16 @@ fail:
         kfree(process->pwd);
     }
 
-    if (process->pageDirectory){
-        mmu_destroy_page(process->pageDirectory);
+    if (process->mm){
+		if(process->mm->pageDirectory){
+        	mmu_destroy_page(process->mm->pageDirectory);
+		}
+
+		kfree(process->mm);
     }
 
     kfree(process);
-    return 0x0;
+    return ERR_PTR(NO_MEMORY);
 }
 
 int process_add_task(struct Process *process, struct Task *task){
@@ -202,7 +213,7 @@ int process_terminate(struct Process *process){
         task = next_task;
     }
 
-    mmu_destroy_page(process->pageDirectory);
+	vma_destroy(process->mm);
 
     kfree(process->argv);
     kfree(process->envp);
