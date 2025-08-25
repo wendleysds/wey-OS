@@ -87,6 +87,11 @@ void kmain(){
 		init_idt()
 	);
 
+	while(1){
+		__asm__ volatile ("hlt");
+	}
+
+
 	_INIT_PANIC(
 		"Initializing Kernel Heap",
 		"Failed to create kernel heap!",

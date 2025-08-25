@@ -1,28 +1,54 @@
 ENTRY(_entry32)
 OUTPUT_FORMAT(binary)
 
-SECTIONS{
-	. = 1M;
+KERNEL_PHYS_BASE = 0x00100000;
+KERNEL_VIRT_BASE = 0xC0000000;
 
-	.text : ALIGN(4096){
-		*(.text)
-	}
+SECTIONS
+{
+  . = KERNEL_PHYS_BASE;
 
-	.asm : ALIGN(4096){
-		*(.asm)
-	}
+  .boot ALIGN(4096) : AT(ADDR(.boot)) {
+    __boot_start = .;
+    *(.text.boot*) *(.rodata.boot*) *(.data.boot*) *(.bss.boot*) *(COMMON)
+    __boot_end = .;
+  }
 
-	.rodata : ALIGN(4096){
-		*(.rodata)
-	}
+  __file_off_after_boot = . - KERNEL_PHYS_BASE;
 
-	.data : ALIGN(4096){
-		*(.data)
-	}
+  . = KERNEL_VIRT_BASE + __file_off_after_boot;
 
-	.bss : ALIGN(4096){
-		*(COMMON)
-		*(.bss)
-	}
+  .text ALIGN(4096) : AT(ADDR(.text) - KERNEL_VIRT_BASE + KERNEL_PHYS_BASE) {
+    __kernel_text_start = .;
+    *(.text*)
+    __kernel_text_end = .;
+  }
+
+  .rodata ALIGN(4096) : AT(ADDR(.rodata) - KERNEL_VIRT_BASE + KERNEL_PHYS_BASE) {
+    __kernel_rodata_start = .;
+    *(.rodata*)
+    __kernel_rodata_end = .;
+  }
+
+  .data ALIGN(4096) : AT(ADDR(.data) - KERNEL_VIRT_BASE + KERNEL_PHYS_BASE) {
+    __kernel_data_start = .;
+    *(.data*)
+    __kernel_data_end = .;
+  }
+
+  .bss ALIGN(4096) (NOLOAD) : AT(ADDR(.bss) - KERNEL_VIRT_BASE + KERNEL_PHYS_BASE) {
+    __kernel_bss_start = .;
+    *(COMMON) *(.bss*)
+    __kernel_bss_end = .;
+  }
+
+  __kernel_high_start = ADDR(.text);
+  __kernel_high_end   = .;
+
+  __kernel_phys_start = LOADADDR(.text);
+  __kernel_phys_end   = LOADADDR(.bss) + SIZEOF(.bss);
+  __kernel_phys_size  = (__kernel_phys_end - __kernel_phys_start + 0xFFF) & ~0xFFF;
+
+  __kernel_high_base  = KERNEL_VIRT_BASE;
 }
 
