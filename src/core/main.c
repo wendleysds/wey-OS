@@ -1,5 +1,6 @@
 #include <memory/paging.h>
 #include <def/config.h>
+#include <def/compile.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -7,35 +8,12 @@
 #define __section(x) __attribute__((section(x)))
 #define _MASK 0xFFFFF000
 
-__section(".text.boot")
-static void* memset(void* ptr, int c, unsigned long size){
-	char* temp = (char*) ptr;
+uintptr_t allocAddr __section(".bss.boot");
+size_t allocOff __section(".bss.boot");
 
-	for(unsigned long i = 0; i < size; i++){
-		temp[i] = (char) c;
-	}
-
-	return ptr;
-}
-
-__section(".text.boot")
-static void* memcpy(void* dest, const void* src, unsigned long length){
-	char *d = (char*)dest;
-	const char *s = (const char*)src;
-
-	if(d < s){
-		while(length--){
-			*d++ = *s++;
-		}
-	}
-	else{
-		while(length--){
-			*(d + length) = *(s + length);
-		}
-	}
-
-	return d;
-}
+#define _MALLOC_INIT(addr) \
+	allocAddr = addr; \
+	allocOff = 0
 
 __section(".text.boot")
 void* bumb_alloc(void* start, size_t* off, size_t size){
@@ -47,7 +25,10 @@ void* bumb_alloc(void* start, size_t* off, size_t size){
 	return (void*)ret;
 }
 
-#define malloc(size) bumb_alloc((void*)allocAddr, &allocOff, size)
+__section(".text.boot")
+static inline void* malloc(size_t size){
+	return bumb_alloc((void*)allocAddr, &allocOff, size);
+}
 
 __section(".text.boot")
 static void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
@@ -76,23 +57,36 @@ static void _map_range(struct PagingDirectory* directory, int count, void* virtu
 	}
 }
 
-extern void _ldir(uint32_t*);
-extern void _epg();
+__section(".text.boot")
+static inline void _ldir(uint32_t* val) {
+	__asm__ __volatile__ (
+			"mov %0, %%cr3"
+      :
+      : "r"(val)
+      : "memory"
+  );
+}
+
+__section(".text.boot")
+static inline void _epg(void) {
+	__asm__ __volatile__ (
+			"mov %%cr0, %%eax\n\t"
+      "or  $0x80000000, %%eax\n\t"
+      "mov %%eax, %%cr0"
+      :
+      :
+      : "eax", "memory"
+  );
+}
 
 __section(".text.boot") 
-static void map_kernel_high(){
-	uintptr_t allocAddr = HEAP_ADDRESS;
-	size_t allocOff = 0;
-
-	// Allocate Directory
+static struct PagingDirectory* _pag_dir_new(uint32_t tablesAmount){
 	struct PagingDirectory* directory = malloc(sizeof(struct PagingDirectory));
-	uint32_t tablesAmount = PAGING_TOTAL_ENTRIES_PER_TABLE;
 	uint32_t* entry = (uint32_t*)malloc(sizeof(uint32_t) * tablesAmount);
 
 	uint32_t offset = 0;
 	uint8_t flags = (FPAGING_P | FPAGING_RW);
 
-	// Allocate tables
 	for (uint32_t i = 0; i < tablesAmount; i++){
 		PagingTable* table = (PagingTable*)malloc(sizeof(PagingTable) * PAGING_TOTAL_ENTRIES_PER_TABLE);
 
@@ -108,33 +102,41 @@ static void map_kernel_high(){
 	directory->entry = entry;
 	directory->tableCount = tablesAmount;
 
-	// Map high
+	return directory;
+}
+
+__section(".text.boot") 
+static void map_kernel_high(){
+
+	struct PagingDirectory* dir = _pag_dir_new(PAGING_TOTAL_ENTRIES_PER_TABLE);
 	
+	// Map high
 	extern uintptr_t __kernel_phys_start;
 	extern uintptr_t __kernel_phys_end;
 	extern uintptr_t __kernel_high_start;
-
 	
 	size_t kernel_size = (size_t)&__kernel_phys_end - (size_t)&__kernel_phys_start;
 	size_t kernel_pages = (kernel_size + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
 
 	_map_range(
-			directory, 
+			dir, 
 			kernel_pages,
 			(void*)&__kernel_high_start,
       (void*)&__kernel_phys_start,
-      flags
+			(FPAGING_P | FPAGING_RW)
 	);
 	
-	_ldir(directory->entry);
+	_ldir(dir->entry);
 }
-
-extern void kmain(void);
 
 __section(".text.boot") 
 void main(){
+	_MALLOC_INIT(HEAP_ADDRESS);
+
 	map_kernel_high();
 	_epg();
+
+	extern __no_return void kmain(void);
 
 	void (*jmp_kmain)(void) = (void(*)(void))((uintptr_t)&kmain);
 	jmp_kmain();

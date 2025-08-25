@@ -3,7 +3,6 @@ section .text.boot
 
 global _entry32
 
-;extern kmain
 extern main
 
 CODE_SEG equ 0x08
@@ -21,26 +20,7 @@ _entry32:
 
 	jmp CODE_SEG:main
 
-  ;jmp CODE_SEG:kmain
-
 	cli
 	hlt
 	jmp $
 
-
-global _ldir
-global _epg
-
-_ldir:
-	push ebp
-	mov ebp, esp
-	mov eax, [ebp+8]
-	mov cr3, eax
-	pop ebp
-	ret
-
-_epg:
-	mov eax, cr0
-	or eax, 0x80000000
-	mov cr0, eax
-	ret
