@@ -1,3 +1,4 @@
+#include "drivers/terminal.h"
 #include <mmu.h>
 #include <core/kernel.h>
 #include <def/status.h>

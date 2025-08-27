@@ -110,11 +110,10 @@ static void map_kernel_high(){
 
 	struct PagingDirectory* dir = _pag_dir_new(PAGING_TOTAL_ENTRIES_PER_TABLE);
 	
-	// Map high
 	extern uintptr_t __kernel_phys_start;
 	extern uintptr_t __kernel_phys_end;
 	extern uintptr_t __kernel_high_start;
-	
+
 	size_t kernel_size = (size_t)&__kernel_phys_end - (size_t)&__kernel_phys_start;
 	size_t kernel_pages = (kernel_size + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
 
@@ -125,13 +124,13 @@ static void map_kernel_high(){
       (void*)&__kernel_phys_start,
 			(FPAGING_P | FPAGING_RW)
 	);
-	
+
 	_ldir(dir->entry);
 }
 
 __section(".text.boot") 
 void main(){
-	_MALLOC_INIT(HEAP_ADDRESS);
+	_MALLOC_INIT(_TEMP_PAGE_DIRECTORY_ADDRESS);
 
 	map_kernel_high();
 	_epg();

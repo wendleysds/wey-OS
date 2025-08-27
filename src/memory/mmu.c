@@ -1,7 +1,10 @@
+#include "def/status.h"
 #include <mmu.h>
 #include <memory/paging.h>
+#include <def/config.h>
 #include <def/err.h>
 #include <core/kernel.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <arch/i386/idt.h>
 #include <drivers/terminal.h>
@@ -14,26 +17,86 @@
 struct PagingDirectory* _currentDirectory = 0x0;
 
 int mmu_init(struct PagingDirectory** kernelDirectory){
-	struct PagingDirectory* dir;
-	_currentDirectory = 0x0;
-
-	uint32_t tableAmount = PAGING_TOTAL_ENTRIES_PER_TABLE;
-	dir = paging_new_directory(
-		tableAmount, 
-		(FPAGING_P | FPAGING_RW), 
+	struct PagingDirectory* tmpdir = (struct PagingDirectory*)_TEMP_PAGE_DIRECTORY_ADDRESS;
+	
+	mmu_map_pages(
+		tmpdir, 
+		(void*)HEAP_VIRT_BASE, 
+		(void*)HEAP_PHYS_BASE, 
+		HEAP_SIZE_BYTES, 
 		(FPAGING_P | FPAGING_RW)
 	);
 
-	if(!dir || dir->tableCount != tableAmount){
-		return NO_MEMORY;
-	}
+	mmu_map_pages(
+		tmpdir, 
+		(void*)HEAP_TABLE_VIRT_BASE, 
+		(void*)HEAP_TABLE_PHYS_BASE, 
+		(HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE), 
+		(FPAGING_P | FPAGING_RW)
+	);
 
-	*kernelDirectory = dir;
-
-	paging_switch(dir);
+	paging_switch(tmpdir);
 	enable_paging();
 
-	return SUCCESS;
+	struct PagingDirectory* dir = paging_new_directory(PAGING_TOTAL_ENTRIES_PER_TABLE, (FPAGING_P | FPAGING_RW), (FPAGING_P | FPAGING_RW));
+	if(IS_ERR_OR_NULL(dir)){
+		return PTR_ERR(dir);
+	}
+
+	// Map Kernel
+	extern uintptr_t __kernel_phys_start;
+	extern uintptr_t __kernel_phys_end;
+	extern uintptr_t __kernel_high_start;
+
+	size_t kernel_size = (size_t)&__kernel_phys_end - (size_t)&__kernel_phys_start;
+
+	int res = mmu_map_pages(
+			dir,
+			(void*)&__kernel_high_start,
+      (void*)&__kernel_phys_start,
+			kernel_size,
+			(FPAGING_P | FPAGING_RW)
+	);
+
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	// Map Heap Table
+	res = mmu_map_pages(
+		dir, 
+		(void*)HEAP_TABLE_VIRT_BASE, 
+		(void*)HEAP_TABLE_PHYS_BASE, 
+		(HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE), 
+		(FPAGING_P | FPAGING_RW)
+	);
+
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	// Map heap
+	res = mmu_map_pages(
+		dir, 
+		(void*)HEAP_VIRT_BASE, 
+		(void*)HEAP_PHYS_BASE, 
+		HEAP_SIZE_BYTES, 
+		(FPAGING_P | FPAGING_RW)
+	);
+
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	/*extern void paging_load_directory(uint32_t* addr);
+
+	uint32_t* dirPhysAddr = (uint32_t*)mmu_translate(dir, dir->entry);
+	paging_load_directory(dirPhysAddr);
+
+	*kernelDirectory = dir;
+	_currentDirectory = dir;*/
+
+	return NOT_IMPLEMENTED;
 }
 
 struct PagingDirectory* mmu_create_page(){

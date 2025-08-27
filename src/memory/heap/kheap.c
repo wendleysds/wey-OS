@@ -16,11 +16,10 @@ static struct Heap kernelHeap;
 static struct HeapTable kernelHeapTable;
 
 int init_kheap(){
-	kernelHeapTable.blockEntries = (uint8_t*) HEAP_TABLE_ADDRESS;
-	kernelHeapTable.total = HEAP_BSIZE / HEAP_BLOCK_SIZE;
+	kernelHeapTable.blockEntries = (uint8_t*) HEAP_TABLE_VIRT_BASE;
+	kernelHeapTable.total = HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE;
 
-	void* end = (void*)(HEAP_ADDRESS + HEAP_BSIZE);
-	return create_heap(&kernelHeap, &kernelHeapTable, (void*)HEAP_ADDRESS, end);
+	return create_heap(&kernelHeap, &kernelHeapTable, (void*)HEAP_VIRT_BASE, (void*)HEAP_VIRT_END);
 }
 
 void* kmalloc(size_t size){

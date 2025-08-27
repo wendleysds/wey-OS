@@ -13,6 +13,7 @@
 #include <lib/string.h>
 
 #include <mmu.h>
+#include <memory/kheap.h>
 
 #include <def/config.h>
 #include <def/err.h>
@@ -86,12 +87,7 @@ void kmain(){
 		"Initializing Interrupt Descriptor Table (IDT)", 
 		init_idt()
 	);
-
-	while(1){
-		__asm__ volatile ("hlt");
-	}
-
-
+	
 	_INIT_PANIC(
 		"Initializing Kernel Heap",
 		"Failed to create kernel heap!",
@@ -105,6 +101,10 @@ void kmain(){
 		mmu_init(&kernel_directory),
 		SUCCESS
 	);
+
+	while(1){
+		__asm__ volatile ("hlt");
+	}
 
 	_INIT(
 		"Initializing Drivers",
