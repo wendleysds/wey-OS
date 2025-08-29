@@ -90,7 +90,9 @@ void terminal_init(){
 	cursor.x = 0;
 	cursor.enabled = 1;
 
-	video.framebuffer_virtual = video.framebuffer_physical;
+	if(!video.framebuffer_virtual){
+		video.framebuffer_virtual = video.framebuffer_physical;
+	}
 
 	font.width = 8;
 	font.heigth = 16;
@@ -193,13 +195,18 @@ void terminal_vwrite(uint32_t color, const char *restrict format, va_list args) 
 					for (char *s = va_arg(args, char*); *s; s++)
 						terminal_putchar(*s, color);
 					break;
+				case 'u':
+					utoa(va_arg(args, unsigned int), buffer, 10);
+					for (char *s = buffer; *s; s++)
+						terminal_putchar(*s, color);
+					break;
 				case 'd':
 					itoa(va_arg(args, int), buffer, 10);
 					for (char *s = buffer; *s; s++)
 						terminal_putchar(*s, color);
 					break;
 				case 'x':
-					itoa(va_arg(args, int), buffer, 16);
+					utoa(va_arg(args, unsigned int), buffer, 16);
 					for (char *s = buffer; *s; s++)
 						terminal_putchar(*s, color);
 					break;

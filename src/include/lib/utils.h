@@ -7,5 +7,7 @@
 
 // Convert @value to @base (16, 8, 10, 2) and store in @result 
 void itoa(int value, char* result, int base);
+void utoa(unsigned int value, char* result, int base);
 
 #endif
+

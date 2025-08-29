@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 void itoa(int value, char* result, int base){
-	const char* digits = "0123456789ABCDEF";
+	const char* digits = "0123456789abcdef";
 	char buffer[32];
 	int i = 0, j = 0; 
 
@@ -24,3 +24,21 @@ void itoa(int value, char* result, int base){
 
 	result[j] = '\0';
 }
+
+void utoa(unsigned int value, char* result, int base){
+	const char* digits = "0123456789abcdef";
+	char buffer[32];
+	int i = 0, j = 0; 
+
+	do {
+		buffer[i++] = digits[value % base];
+		value /= base;
+	} while(value);
+
+	while(i > 0){
+		result[j++] = buffer[--i];
+	}
+
+	result[j] = '\0';
+}
+
