@@ -18,83 +18,50 @@ struct PagingDirectory* _currentDirectory = 0x0;
 
 int mmu_init(struct PagingDirectory** kernelDirectory){
 	struct PagingDirectory* tmpdir = (struct PagingDirectory*)_TEMP_PAGE_DIRECTORY_ADDRESS;
-	
-	mmu_map_pages(
-		tmpdir, 
-		(void*)HEAP_VIRT_BASE, 
-		(void*)HEAP_PHYS_BASE, 
-		HEAP_SIZE_BYTES, 
-		(FPAGING_P | FPAGING_RW)
-	);
-
-	mmu_map_pages(
-		tmpdir, 
-		(void*)HEAP_TABLE_VIRT_BASE, 
-		(void*)HEAP_TABLE_PHYS_BASE, 
-		(HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE), 
-		(FPAGING_P | FPAGING_RW)
-	);
-
 	paging_switch(tmpdir);
-	enable_paging();
 
-	struct PagingDirectory* dir = paging_new_directory(PAGING_TOTAL_ENTRIES_PER_TABLE, (FPAGING_P | FPAGING_RW), (FPAGING_P | FPAGING_RW));
-	if(IS_ERR_OR_NULL(dir)){
-		return PTR_ERR(dir);
-	}
+	struct PagingDirectory* dir = mmu_create_page();
 
-	// Map Kernel
 	extern uintptr_t __kernel_phys_start;
 	extern uintptr_t __kernel_phys_end;
 	extern uintptr_t __kernel_high_start;
 
 	size_t kernel_size = (size_t)&__kernel_phys_end - (size_t)&__kernel_phys_start;
 
-	int res = mmu_map_pages(
+	uint8_t flags = (FPAGING_P | FPAGING_RW);
+
+	mmu_map_pages(
 			dir,
-			(void*)&__kernel_high_start,
-      (void*)&__kernel_phys_start,
+			(void*)&__kernel_high_start, 
+			(void*)&__kernel_phys_start, 
 			kernel_size,
-			(FPAGING_P | FPAGING_RW)
+			flags
 	);
 
-	if(IS_STAT_ERR(res)){
-		return res;
-	}
-
-	// Map Heap Table
-	res = mmu_map_pages(
+	mmu_map_pages(
 		dir, 
 		(void*)HEAP_TABLE_VIRT_BASE, 
 		(void*)HEAP_TABLE_PHYS_BASE, 
 		(HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE), 
-		(FPAGING_P | FPAGING_RW)
+		flags
 	);
 
-	if(IS_STAT_ERR(res)){
-		return res;
-	}
+	extern struct VideoStructPtr* _get_video();
+	struct VideoStructPtr* vPtr = _get_video();
 
-	// Map heap
-	res = mmu_map_pages(
-		dir, 
-		(void*)HEAP_VIRT_BASE, 
-		(void*)HEAP_PHYS_BASE, 
-		HEAP_SIZE_BYTES, 
-		(FPAGING_P | FPAGING_RW)
+	mmu_map_pages(
+			dir,
+			(void*)KERNEL_FB_VIRT_BASE,
+			(void*)vPtr->framebuffer_physical,
+			(vPtr->height * vPtr->width * (vPtr->bpp / 2)),
+			flags
 	);
 
-	if(IS_STAT_ERR(res)){
-		return res;
+	paging_switch(dir);
+
+	while(1){
+		__asm__ volatile ("hlt");
 	}
-
-	/*extern void paging_load_directory(uint32_t* addr);
-
-	uint32_t* dirPhysAddr = (uint32_t*)mmu_translate(dir, dir->entry);
-	paging_load_directory(dirPhysAddr);
-
-	*kernelDirectory = dir;
-	_currentDirectory = dir;*/
 
 	return NOT_IMPLEMENTED;
 }
