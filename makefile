@@ -29,10 +29,11 @@ OBJ_DIR = $(BUILD_DIR)/objs
 BIN_DIR = $(BUILD_DIR)/bin
 IMG_DIR = $(BUILD_DIR)/img
 MOUNT_DIR = $(BUILD_DIR)/mnt
+SYMBOLS_DIR = $(BUILD_DIR)/symbols
 
 TOOLS_DIR = tools
 
-BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR)
+BUILD_DIRS = $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR) $(SYMBOLS_DIR)
 
 # Files
 LINKER_B16_FILE = linker16.ld
@@ -75,8 +76,7 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 
 # Create directories
 $(BUILD_DIRS):
-	@echo "Creating Building Directories..."
-	mkdir -p $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR) $(IMG_DIR) $(MOUNT_DIR)
+	mkdir -p $@
 
 # Compile files
 # Bootlodaer
@@ -144,8 +144,13 @@ clean:
 disassembly-img:
 	i686-elf-objdump -D -b binary -m i386 -M intel build/img/kernel.img | less
 
+create-symbols: $(BUILD_DIRS)
+	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $(SYMBOLS_DIR)/init.elf $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) --oformat elf32-i386
+	$(LD) $(LDFLAGS) -T $(LINKER_B32_FILE) -o $(SYMBOLS_DIR)/kernel.elf $(KERNEL32_ENTRY) $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) --oformat elf32-i386
+
 debug:
-	make update-bins
+	make
+	make create-symbols
 	qemu-system-i386 -serial stdio -drive format=raw,file=$(IMG) -s -S &
 	@echo --QEMU ready for debugging!--
 
