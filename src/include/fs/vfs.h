@@ -121,4 +121,6 @@ static inline void inode_dispose(struct inode *ino) {
     kfree(ino);
 }
 
+int kernel_exec(const char* pathname, const char* argv[], const char* envp[]);
+
 #endif
