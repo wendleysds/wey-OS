@@ -89,27 +89,27 @@ void init_idt(){
 
 static void _print_frame(struct InterruptFrame* frame){
 	terminal_write(
-		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n", 
+		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n",
 		frame->eax, frame->ebx, frame->ecx, frame->edx
 	);
 
 	terminal_write( 
-		"edi 0x%x esi 0x%x esp 0x%x ebp 0x%x\n", 
-		frame->edi, frame->esp, frame->esi, frame->ebp
+		"esi 0x%x edi 0x%x esp 0x%x ebp 0x%x\n",
+		frame->esi, frame->edi, frame->esp, frame->ebp
 	);
 
 	terminal_write(
-		"ip 0x%x cs 0x%x ss 0x%x\n", 
+		"ip 0x%x cs 0x%x ss 0x%x\n",
 		frame->eip, frame->cs, frame->ss
 	);
 
 	terminal_write(
-		"eflags 0x%x kesp 0x%x\n", 
+		"eflags 0x%x kesp 0x%x\n",
 		frame->eflags, frame->kesp
 	);
 
 	terminal_write(
-		"int 0x%x err 0x%x\n", 
+		"int 0x%x err 0x%x\n",
 		frame->int_no, frame->err_code
 	);
 }
