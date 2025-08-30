@@ -1,7 +1,6 @@
 #include <fs/binfmts.h>
 #include <fs/vfs.h>
 #include <mmu.h>
-#include <uaccess.h>
 #include <core/sched.h>
 #include <lib/string.h>
 #include <def/config.h>
@@ -11,42 +10,235 @@ extern struct binfmt elf_format;
 extern struct binfmt script_format;
 
 static struct binfmt* fmts[] = {
-    &elf_format, // ELF binary format
-    &script_format, // Script binary format
-    0x0
+	&elf_format, // ELF binary format
+	&script_format, // Script binary format
+	0x0
 };
 
-static struct binprm* alloc_binprm(int fd, const char* filename) {
-    return ERR_PTR(NO_MEMORY);
+static struct binprm* alloc_binprm(char* filename, int flags) {
+	struct binprm* bprm;
+	struct file* file;
+
+	file = vfs_open(filename, flags);
+	if (IS_ERR(file)) {
+		return ERR_CAST(file);
+	}
+
+	bprm = (struct binprm*)kzalloc(sizeof(struct binprm));
+	if (!bprm) {
+		vfs_close(file);
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	struct PagingDirectory* dir = paging_new_directory(
+		PAGING_TOTAL_ENTRIES_PER_TABLE,
+		(FPAGING_P | FPAGING_US),
+		(FPAGING_P | FPAGING_US)
+	);
+
+	if(IS_ERR_OR_NULL(dir)){
+		kfree(bprm);
+		vfs_close(file);
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	struct mm_struct* mm = (struct mm_struct*)kzalloc(sizeof(struct mm_struct));
+	if (!mm) {
+		kfree(bprm);
+		vfs_close(file);
+		mmu_destroy_page(dir);
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	bprm->filename = filename;
+	bprm->interp = filename;
+	bprm->file = file;
+
+	mm->pageDirectory = dir;
+	bprm->mm = mm;
+
+	return bprm;
 }
 
-static void destroy_binprm(struct binprm* bprm, uint8_t free_mm){
+static void bprm_free(struct binprm* bprm) {
+	if (!bprm) {
+		return;
+	}
+
+	if (bprm->file) {
+		vfs_close(bprm->file);
+	}
+
+	if (bprm->mm) {
+		vma_destroy(bprm->mm);
+	}
+
+	if (bprm->interp != bprm->filename){
+		kfree((void*)bprm->interp);
+	}
+
+	kfree(bprm);
 }
 
-static int exec_binprm(struct binprm* bprm) {
-    if (!bprm || !bprm->filename) {
-        return INVALID_ARG; // Invalid binary parameters
-    }
+static int bprm_load(struct binprm* bprm) {
+	if (!bprm || !bprm->file) {
+		return INVALID_ARG;
+	}
 
-    int res = SUCCESS;
-    struct binfmt* fmt;
-    for (int i = 0; (fmt = fmts[i]); i++){
-        if((res = fmt->load_binary(bprm)) == SUCCESS){
-            break;
-        }
+	int res = FAILED;
+	struct binfmt* fmt;
+	for (int i = 0; (fmt = fmts[i]); i++){
+		if((res = fmt->load_binary(bprm)) == SUCCESS){
+			break;
+		}
 
-        if(res == NO_MEMORY){
-            return res;
-        }
-    }
+		if(res == NO_MEMORY){
+			return res;
+		}
+	}
 
-    if(res != SUCCESS){
-        return INVALID_FILE;
-    }
+	if(IS_STAT_ERR(res)){
+		return INVALID_FILE;
+	}
 
-    return SUCCESS;
+	return SUCCESS;
 }
 
-int exec(const char* pathname, const char* argv[], const char* envp[]) {
-    return NOT_IMPLEMENTED;
+static inline int _count_args_kernel(const char* const* argv) {
+	int count = 0;
+	while (argv[count]) {
+		count++;
+		if (count >= PROC_ARG_MAX) {
+			return OVERFLOW;
+		}
+	}
+	return count;
+}
+
+static int _copy_args_kernel(int count, const char* const* argv, struct binprm* bprm){
+	uint8_t* top = (uint8_t*)bprm->curMemTop;
+	uint8_t* stack_base = (uint8_t*)((uintptr_t)top - PROC_STACK_SIZE);
+
+	uint8_t* argPtrs[count];
+	for (int i = count-1; i >= 0; i--) {
+		int len = strlen(argv[i]) + 1;
+		if (top - len < stack_base) {
+			return OVERFLOW;
+		}
+		top -= len;
+		memcpy(top, argv[i], len);
+		argPtrs[i] = top;
+	}
+
+	top = (uint8_t*)((uintptr_t)top & ~0xF);
+
+	if (top - sizeof(uint8_t*) < stack_base) {
+		return OVERFLOW;
+	}
+	top -= sizeof(uint8_t*);
+	*(uint8_t**)top = NULL;
+
+	for (int i = count-1; i >= 0; i--) {
+		if (top - sizeof(uint8_t*) < stack_base) {
+			return OVERFLOW;
+		}
+		top -= sizeof(uint8_t*);
+		*(uint8_t**)top = argPtrs[i];
+	}
+
+	if (top - sizeof(int) < stack_base) {
+		return OVERFLOW;
+	}
+
+	top -= sizeof(int);
+	*(int*)top = count;
+
+	bprm->curMemTop = (uintptr_t)top; // update
+
+	return SUCCESS;
+}
+
+int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
+	if (!pathname || strlen(pathname) > PATH_MAX || !argv || !envp){
+		return INVALID_ARG;
+	}
+
+	struct binprm* bprm = alloc_binprm((char*)pathname, 0);
+	int res = SUCCESS;
+
+	res = _count_args_kernel(argv);
+	if (IS_STAT_ERR(res)) {
+		goto out_fbrpm;
+	}
+
+	bprm->argc = res;
+
+	res = _count_args_kernel(envp);
+	if (IS_STAT_ERR(res)) {
+		goto out_fbrpm;
+	}
+
+	bprm->envc = res;
+
+	void* newStack = kzalloc(PROC_STACK_SIZE);
+	bprm->curMemTop = ((uintptr_t)newStack + PROC_STACK_SIZE);
+
+	res = _copy_args_kernel(bprm->argc, argv, bprm);
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	res = _copy_args_kernel(bprm->envc, envp, bprm);
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	res = vma_add(bprm->mm, 
+		(void*)PROC_VIRTUAL_STACK_END, 
+		newStack, 
+		PROC_STACK_SIZE, 
+		FPAGING_P | FPAGING_RW | FPAGING_US,
+		1
+	);
+
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	res = bprm_load(bprm);
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	struct Task* task = pcb_current();
+	struct Process* process = task->process;
+
+	if(process->mm){
+		vma_destroy(process->mm);
+	}
+
+	process->mm = bprm->mm;
+	bprm->mm = NULL;
+
+	task->userStack = newStack;
+	memset(task->kernelStack, 0, PROC_KERNEL_STACK_SIZE);
+
+	// TODO: Implement -> Close all file descriptors
+
+	memset(&task->regs, 0x0, sizeof(struct Registers));
+
+	task->regs.eip = (uint32_t)bprm->entryPoint;
+
+	task->regs.esp = PROC_VIRTUAL_STACK_START;
+	task->regs.ebp = task->regs.esp;
+    task->regs.ss = USER_DATA_SEGMENT;
+    task->regs.cs = USER_CODE_SEGMENT;
+
+	goto out_fbrpm;
+
+out_fstack:
+	kfree(newStack);
+out_fbrpm:
+	bprm_free(bprm);
+	return res;
 }
