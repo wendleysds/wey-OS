@@ -26,7 +26,7 @@
 #ifndef __SYSCALL_DEFINEx
 #define __SYSCALL_DEFINEx(x, name, ...)                                  \
     asmlinkage long sys##name(__MAP(x, __SC_DECL, __VA_ARGS__))          \
-        __attribute__((alias(stringfy(__se_sys_##name))));             \
+        __attribute__((alias(stringfy(__se_sys##name))));             \
     static inline long __do_sys##name(__MAP(x, __SC_DECL, __VA_ARGS__)); \
     asmlinkage long __se_sys##name(__MAP(x, __SC_LONG, __VA_ARGS__));    \
     asmlinkage long __se_sys##name(__MAP(x, __SC_LONG, __VA_ARGS__))     \
@@ -51,6 +51,9 @@
 #define SYSCALL_DEFINE5(name, ...) SYSCALL_DEFINEx(5, _##name, __VA_ARGS__)
 #define SYSCALL_DEFINE6(name, ...) SYSCALL_DEFINEx(6, _##name, __VA_ARGS__)
 
+typedef long (*sys_fn_t)(long long, long long, long long, long long, long long, long long);
+
 void syscalls_init();
+int syscalls_register(long sys_no, sys_fn_t syscall_fn);
 
 #endif

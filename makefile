@@ -10,7 +10,7 @@ CFLAGS += -g
 # Bare-metal Flags
 CFLAGS += -ffreestanding -nostdlib -nostartfiles
 # Warnig Suppresion Flags
-CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-cpp
+CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
 # Alignment Flags
 CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
 # Optimzation Flags

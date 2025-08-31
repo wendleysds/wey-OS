@@ -68,8 +68,8 @@ static void _set_idt_gate(uint8_t interrupt_num, uint32_t base, uint16_t selecto
 	desc->offset_2 = (base >> 16) & 0xFFFF;
 }
 
-void _set_idt(uint8_t interrupt_num, void* address){
-	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, 0x8E);
+void _set_idt(uint8_t interrupt_num, void* address, uint8_t flags){
+	_set_idt_gate(interrupt_num, (uint32_t)address, KERNEL_CODE_SELECTOR, flags);
 }
 
 void init_idt(){
@@ -78,10 +78,8 @@ void init_idt(){
 	idtr_ptr.base = (uintptr_t)&idt;
 
 	for(int i = 0; i < TOTAL_INTERRUPTS; i++){
-		_set_idt(i, interrupt_pointer_table[i]);
+		_set_idt(i, interrupt_pointer_table[i], IDT_PRESENT | IDT_DPL0 | IDT_TYPE_INT_GATE32);
 	}
-
-	_set_idt_gate(0x80, (uint32_t)interrupt_pointer_table[0x80], KERNEL_CODE_SELECTOR, 0xEE); // syscall gate
 
 	load_idt(&idtr_ptr);
 	enable_interrupts();
@@ -126,11 +124,6 @@ void __cdecl interrupt_handler(struct InterruptFrame* frame){
 	kernel_page();
 
 	int interrupt = frame->int_no;
-
-	if(interrupt == 0x80){
-		terminal_write("Syscall interrupt 0x80 called!\n");
-		_print_frame(frame); // for testing
-	}
 
 	if(interrupt_callbacks[interrupt] != 0){
 		interrupt_callbacks[interrupt](frame);
