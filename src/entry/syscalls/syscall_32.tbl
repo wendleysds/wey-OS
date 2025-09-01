@@ -1,0 +1,2 @@
+# <number> <abi> <name> <entry point>
+1 i386 write_terminal sys_write_terminal

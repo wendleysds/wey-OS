@@ -9,3 +9,5 @@ __pycache__
 # Files/Configs
 compile_commands.json
 .clangd
+
+syscalltbl.h
