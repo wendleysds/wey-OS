@@ -51,9 +51,10 @@
 #define SYSCALL_DEFINE5(name, ...) SYSCALL_DEFINEx(5, _##name, __VA_ARGS__)
 #define SYSCALL_DEFINE6(name, ...) SYSCALL_DEFINEx(6, _##name, __VA_ARGS__)
 
-typedef long (*sys_fn_t)(long long, long long, long long, long long, long long, long long);
+typedef asmlinkage long (*sys_fn_t)(long long, long long, long long, long long, long long, long long);
 
 void syscalls_init();
-int syscalls_register(long sys_no, sys_fn_t syscall_fn);
+
+sys_fn_t _syscall(long no);
 
 #endif

@@ -65,6 +65,12 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 
 SECTOR_SIZE = 512
 
+make:
+	$(TOOLS_DIR)/syscall/gen_syscalls.sh src/entry/syscalls/syscall_32.tbl src/entry/syscalls/syscalltbl.h
+	make img
+
+img: $(IMG)
+
 # Create kernel.img
 $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 	@echo "Creating os image in $@"
