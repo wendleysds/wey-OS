@@ -4,21 +4,36 @@ section .text.boot
 global _entry32
 
 extern main
+extern kmain
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
 
+STACK_VIRT_BASE equ 0xC1000000
+STACK_SIZE_KB equ 512
+
 _entry32:
 	mov ax, DATA_SEG
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  mov ss, ax
-  mov ebp, 0x00200000
-  mov esp, ebp
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+	mov ebp, 0x00200000
+	mov esp, ebp
 
-	jmp CODE_SEG:main
+	call main
+
+	; clear stack
+	mov edi, esp
+	mov ecx, 4096 / STACK_SIZE_KB
+	xor eax, eax
+	rep stosd
+
+	mov ebp, STACK_VIRT_BASE
+	mov esp, ebp
+
+	jmp CODE_SEG:kmain
 
 	cli
 	hlt

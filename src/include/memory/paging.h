@@ -7,12 +7,15 @@
 #define PAGING_PAGE_SIZE 4096
 
 // Flags
-
 #define FPAGING_PCD 0x16
 #define FPAGING_PWT 0x8
 #define FPAGING_US  0x4
 #define FPAGING_RW  0x2
 #define FPAGING_P   0x1
+
+// Maks
+#define PAGE_MASK 0xFFFFF000
+#define FLAGS_MASK 0x00000FFF
 
 typedef uint32_t PagingTable;
 

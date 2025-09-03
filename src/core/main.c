@@ -199,6 +199,17 @@ static void _map_framebuffer(struct PagingDirectory* directory){
 	video->framebuffer_virtual = KERNEL_FB_VIRT_BASE;
 }
 
+__section(".text.boot")
+static void _map_stack(struct PagingDirectory* directory){
+	_map_range(
+		directory, 
+		(KERNEL_STACK_SIZE + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE, 
+		(void*)KERNEL_STACK_VIRT_BASE,
+		(void*)KERNEL_STACK_PHYS_BASE,
+		(FPAGING_P | FPAGING_RW)
+	);
+}
+
 __section(".text.boot") 
 void main(){
 	_MALLOC_INIT(_TEMP_PAGE_DIRECTORY_ADDRESS);
@@ -206,16 +217,14 @@ void main(){
 	struct PagingDirectory* dir = _pag_dir_new_empty();
 
 	_map_kernel(dir);
+	_map_stack(dir);
 	_map_heap(dir);
 	_map_framebuffer(dir);
+
+	dir->entry[1023] = (uintptr_t)dir->entry | FPAGING_P | FPAGING_RW;
 	
 	_ldir(dir->entry);
 
 	_epg();
-	
-	void (*jmp_kmain)(void) = (void(*)(void))((uintptr_t)&kmain);
-	jmp_kmain();
-
-	_hlt
 }
 

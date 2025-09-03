@@ -16,10 +16,30 @@
 
 struct PagingDirectory* _currentDirectory = 0x0;
 
-int mmu_init(struct PagingDirectory** kernelDirectory){
-	struct PagingDirectory* tmpdir = (struct PagingDirectory*)_TEMP_PAGE_DIRECTORY_ADDRESS;
-	paging_switch(tmpdir);
+#define VIRT_PD ((uint32_t*)0xFFFFF000)
+#define VIRT_PT(i) \
+	((uint32_t*)(0xFFC00000 + (i) * 0x1000))
 
+static uintptr_t virt_to_phys(uintptr_t virt) {
+	uint32_t dir_idx = virt >> 22;
+	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
+
+	uint32_t pde = VIRT_PD[dir_idx];
+	if (!(pde & 0x1)) {
+		return 0;
+	}
+
+	uint32_t* pt = VIRT_PT(dir_idx);
+	uint32_t pte = pt[tbl_idx];
+	if (!(pte & 0x1)) {
+		return 0;
+	}
+
+	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
+	return phys;
+}
+
+int mmu_init(struct PagingDirectory** kernelDirectory){
 	struct PagingDirectory* dir = mmu_create_page();
 
 	extern uintptr_t __kernel_phys_start;
@@ -31,11 +51,27 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 	uint8_t flags = (FPAGING_P | FPAGING_RW);
 
 	mmu_map_pages(
-			dir,
-			(void*)&__kernel_high_start, 
-			(void*)&__kernel_phys_start, 
-			kernel_size,
-			flags
+		dir,
+		(void*)&__kernel_high_start, 
+		(void*)&__kernel_phys_start, 
+		kernel_size,
+		flags
+	);
+
+	mmu_map_pages(
+		dir,
+		(void*)KERNEL_STACK_VIRT_BASE,
+		(void*)KERNEL_STACK_PHYS_BASE,
+		KERNEL_STACK_SIZE,
+		flags
+	);
+
+	mmu_map_pages(
+		dir,
+		(void*)HEAP_VIRT_BASE,
+		(void*)HEAP_PHYS_BASE,
+		HEAP_SIZE_BYTES,
+		flags
 	);
 
 	mmu_map_pages(
@@ -50,18 +86,12 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 	struct VideoStructPtr* vPtr = _get_video();
 
 	mmu_map_pages(
-			dir,
-			(void*)KERNEL_FB_VIRT_BASE,
-			(void*)vPtr->framebuffer_physical,
-			(vPtr->height * vPtr->width * (vPtr->bpp / 2)),
-			flags
+		dir,
+		(void*)KERNEL_FB_VIRT_BASE,
+		(void*)vPtr->framebuffer_physical,
+		(vPtr->height * vPtr->width * (vPtr->bpp / 2)),
+		flags
 	);
-
-	paging_switch(dir);
-
-	while(1){
-		__asm__ volatile ("hlt");
-	}
 
 	return NOT_IMPLEMENTED;
 }
