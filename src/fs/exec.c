@@ -30,11 +30,7 @@ static struct binprm* alloc_binprm(char* filename, int flags) {
 		return ERR_PTR(NO_MEMORY);
 	}
 
-	struct PagingDirectory* dir = paging_new_directory(
-		PAGING_TOTAL_ENTRIES_PER_TABLE,
-		(FPAGING_P | FPAGING_US),
-		(FPAGING_P | FPAGING_US)
-	);
+	struct PagingDirectory* dir = mmu_create_page();
 
 	if(IS_ERR_OR_NULL(dir)){
 		kfree(bprm);

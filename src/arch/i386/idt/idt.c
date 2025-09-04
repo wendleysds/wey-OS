@@ -121,7 +121,7 @@ void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback){
 }
 
 void __cdecl interrupt_handler(struct InterruptFrame* frame){
-	kernel_page();
+	kernel_registers();
 
 	int interrupt = frame->int_no;
 
@@ -142,6 +142,6 @@ void __cdecl interrupt_handler(struct InterruptFrame* frame){
 	}
 
 	pic_send_eoi(interrupt);
-  pcb_page_current();
+	user_registers();
 }
 

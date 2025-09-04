@@ -24,7 +24,6 @@ struct PagingDirectory {
 	uint32_t tableCount;
 };
 
-struct PagingDirectory* paging_new_directory(uint32_t tablesAmount, uint8_t dirFlags, uint8_t tblFlags);
 struct PagingDirectory* paging_new_directory_empty();
 void paging_free_directory(struct PagingDirectory* directory);
 

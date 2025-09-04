@@ -87,19 +87,6 @@ int pcb_switch(struct Task* task){
     return SUCCESS;
 }
 
-int pcb_page_current(){
-	if(!scheduling){
-		return NOT_READY;
-	}
-
-    if(!_currentTask){
-        return NULL_PTR;
-    }
-
-    user_registers();
-    return pcb_switch(_currentTask);
-}
-
 struct Task* pcb_current(){
     return _currentTask;
 }

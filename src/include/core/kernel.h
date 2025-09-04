@@ -7,6 +7,5 @@
 
 void panic(const char* fmt, ...);
 void warning(const char* fmt, ...);
-void kernel_page();
 
 #endif

@@ -33,7 +33,7 @@ void syscalls_init(){
 }
 
 long isr80h_handler(struct InterruptFrame* frame){
-	kernel_page();
+	kernel_registers();
 
 	int res = _dispatch_syscall(
 		frame->eax,
@@ -45,7 +45,7 @@ long isr80h_handler(struct InterruptFrame* frame){
 		frame->ebp
 	);
 
-	pcb_page_current();
+	user_registers();
 	return res;
 }
 

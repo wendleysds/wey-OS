@@ -115,7 +115,7 @@ static void _page_fault_handler(struct InterruptFrame* frame){
 	}
 }
 
-int mmu_init(struct PagingDirectory** kernelDirectory){
+int mmu_init(){
 	struct PagingDirectory* dir = mmu_create_page();
 
 	extern uintptr_t __kernel_phys_start;
@@ -178,8 +178,6 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 	}
 
 	dir->entry[1023] = (PagingTable)((uintptr_t)virt_to_phys(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
-
-	*kernelDirectory = dir;
 	
 	idt_register_callback(14, &_page_fault_handler);
 

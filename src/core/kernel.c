@@ -48,7 +48,6 @@
 
 extern void load_drivers();
 
-static struct PagingDirectory* kernel_directory = 0x0;
 static struct TSS tss;
 static struct GDT gdt[TOTAL_GDT_SEGMENTS];
 
@@ -151,7 +150,7 @@ void kmain(){
 	_INIT_PANIC(
 		"Initializing Memory Manager Unit",
 		"Failed to initializing Memory Manager Unit!",
-		mmu_init(&kernel_directory)
+		mmu_init()
 	);
 
 	enable_interrupts();
@@ -214,13 +213,4 @@ void warning(const char* fmt, ...){
 	va_start(args, fmt);
 	terminal_vwrite(TERMINAL_DEFAULT_COLOR, fmt, args);
 	va_end(args);
-}
-
-void kernel_page(){
-	if(!kernel_directory){
-		return;
-	}
-
-	kernel_registers();
-	mmu_page_switch(kernel_directory);
 }

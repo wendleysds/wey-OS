@@ -22,6 +22,5 @@ struct Task* scheduler_pick_next();
 int __must_check pcb_save_current(struct InterruptFrame* frame);
 struct Task* pcb_current();
 int pcb_switch(struct Task* task);
-int pcb_page_current();
 
 #endif

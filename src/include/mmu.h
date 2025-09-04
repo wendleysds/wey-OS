@@ -37,7 +37,7 @@ struct mm_struct{
 
 extern struct PagingDirectory* _currentDirectory;
 
-int mmu_init(struct PagingDirectory** kernelDirectory);
+int mmu_init();
 
 struct PagingDirectory* mmu_create_page();
 int mmu_page_switch(struct PagingDirectory* directory);
