@@ -232,8 +232,6 @@ void main(){
 
 	_epg();
 
-	extern void kmain();
-
 	__asm__ volatile (
 		"mov %0, %%esp\n\t"
 		"mov %%esp, %%ebp\n\t"
