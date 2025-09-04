@@ -104,9 +104,7 @@ void kmain(){
 		SUCCESS
 	);
 
-	while(1){
-		__asm__ volatile ("hlt");
-	}
+	enable_interrupts();
 
 	_INIT(
 		"Initializing Drivers",
