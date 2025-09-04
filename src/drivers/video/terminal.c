@@ -7,6 +7,10 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+#include <def/err.h>
+#include <uaccess.h>
+#include <syscall.h>
+
 /*
  * Main video stdout module
  */
@@ -235,3 +239,27 @@ void terminal_cwrite(uint32_t color, const char *restrict format, ...) {
 	va_end(args);
 }
 
+SYSCALL_DEFINE2(write_terminal, const char*, buffer, uint32_t, size){
+	if(!buffer || size < 0){
+		return INVALID_ARG;
+	}
+
+	int res = 0;
+	int cp = 0;
+	char kbuff[256];
+
+	do {
+		if((res = copy_string_from_user(kbuff, buffer + cp, sizeof(kbuff))) != SUCCESS){
+			return res;
+		}
+
+		for (int i = 0; i < size - cp; i++)
+		{
+			terminal_putchar(kbuff[i], TERMINAL_DEFAULT_COLOR);
+		}
+
+		cp += size;
+	}while(cp < size);
+
+	return size - cp;
+}

@@ -40,6 +40,81 @@ static void* virt_to_phys(void* virtualAddr) {
 	return (void*)phys;
 }
 
+static inline int _read_cr2(){
+	uint32_t cr2;
+	__asm__ volatile("mov %%cr2, %0" : "=r" (cr2));
+	return cr2;
+}
+
+typedef struct {
+	void* addr;
+	uint32_t ec;
+	int8_t present, write, user, rsvd, exec;
+} pf_info_t;
+
+static inline pf_info_t pf_decode(uint32_t ec, void* cr2){
+	pf_info_t pf;
+	memset(&pf, 0x0, sizeof(pf));
+
+	pf.addr = cr2;
+	pf.ec = ec;
+	pf.present = ec >> 0 & 1;
+	pf.write   = ec >> 1 & 1;
+	pf.user    = ec >> 2 & 1;
+	pf.rsvd    = ec >> 3 & 1;
+	pf.exec    = ec >> 4 & 1;
+
+	return pf;
+}
+
+static inline void _show_pf_info(pf_info_t pf){
+	terminal_write(
+		"\nPage fault at 0x%x (ec=0x%x) [present=%d, write=%d, user=%d, rsvd=%d, exec=%d]\n", 
+		pf.addr, pf.ec, pf.present, pf.write, pf.user, pf.rsvd, pf.exec
+	);
+}
+
+static void _page_fault_handler(struct InterruptFrame* frame){
+	void* faultingAddress = (void*)frame->eip;
+	pf_info_t pf = pf_decode(frame->err_code, faultingAddress);
+
+	struct mm_struct* mm = 0x0;
+	struct Task* task = pcb_current();
+
+	if(task && task->process){
+		mm = task->process->mm;
+	}else{
+		panic("Page fault in kernel mode!");
+	}
+	
+	_show_pf_info(pf);
+
+	struct mem_region* v = vma_lookup(mm, faultingAddress);
+
+	if(!v){
+		// Invalid memory access
+		panic(
+			"Invalid memory access at 0x%x (ec=0x%x) [present=%d, write=%d, user=%d, rsvd=%d, exec=%d] in task %d (%s)\n", 
+			faultingAddress, pf.ec, pf.present, pf.write, pf.user, pf.rsvd, pf.exec,
+			task->tid, task->process ? task->process->name : "unknown"
+		);
+	}
+
+	if(!pf.present){
+		panic(
+			"Protection fault at 0x%x (ec=0x%x) [present=%d, write=%d, user=%d, rsvd=%d, exec=%d] in task %d (%s)\n", 
+			faultingAddress, pf.ec, pf.present, pf.write, pf.user, pf.rsvd, pf.exec,
+			task->tid, task->process ? task->process->name : "unknown"
+		);
+	}
+
+	// kill process
+	
+	while(1){
+		__asm__ volatile ("hlt");
+	}
+}
+
 int mmu_init(struct PagingDirectory** kernelDirectory){
 	struct PagingDirectory* dir = mmu_create_page();
 
@@ -105,6 +180,9 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 	dir->entry[1023] = (PagingTable)((uintptr_t)virt_to_phys(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
 
 	*kernelDirectory = dir;
+	
+	idt_register_callback(14, &_page_fault_handler);
+
 	return mmu_page_switch(dir);
 }
 

@@ -3,7 +3,7 @@
 #include <fs/vfs.h>
 #include <mmu.h>
 #include <core/sched.h>
-#include <def/status.h>
+#include <def/err.h>
 
 static int load_elf_binarie(struct binprm *bprm);
 
@@ -13,7 +13,7 @@ struct binfmt elf_format = {
 
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
     if (!ehdr) {
-        return INVALID_ARG; // Invalid ELF header
+        return NULL_PTR;
     }
 
     if(memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
@@ -36,9 +36,76 @@ static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
         return NOT_SUPPORTED; // Unsupported ELF version
     }
 
-    return SUCCESS;
+    return OK;
 }
 
 static int load_elf_binarie(struct binprm *bprm){
-    return NOT_IMPLEMENTED;
+	if(!bprm->file || !bprm->filename){
+		return NULL_PTR;
+	}
+
+	int res = SUCCESS;
+
+	vfs_lseek(bprm->file, 0, SEEK_SET);
+	res = vfs_read(bprm->file, bprm->buff, sizeof(bprm->buff));
+
+	if(IS_STAT_ERR(res)){
+        return res;
+    }
+
+	struct Elf32_Ehdr* ehdr = (struct Elf32_Ehdr*)bprm->buff;
+	struct Elf32_Phdr* phdrs = (struct Elf32_Phdr*)((uint8_t*)ehdr + ehdr->e_phoff);
+
+	if((res = _validade_elf_ehdr(ehdr)) != OK){
+		return INVALID_FORMAT;
+	}
+
+	uint8_t flags = FPAGING_P | FPAGING_US;
+
+	for (int i = 0; i < ehdr->e_phnum; i++) {
+		struct Elf32_Phdr* phdr = &phdrs[i];
+		if (phdr->p_type != PT_LOAD){
+			continue;
+		}
+
+		void* segment = kmalloc(phdr->p_memsz);
+		if(!segment){
+			return NO_MEMORY;
+		}
+
+		vfs_lseek(bprm->file, phdr->p_offset, SEEK_SET);
+		int readBytes = vfs_read(bprm->file, segment, phdr->p_filesz);
+
+		if(IS_STAT_ERR(readBytes) || readBytes != phdr->p_filesz){
+			kfree(segment);
+			return READ_FAIL;
+		}
+
+		// Zero extra part (BSS)
+		memset(segment + phdr->p_filesz, 0x0, phdr->p_memsz - phdr->p_filesz);
+
+		res = vma_add(bprm->mm, 
+			(void*)phdr->p_vaddr, 
+			segment, 
+			phdr->p_memsz, 
+			flags | (phdr->p_flags & PF_W ? FPAGING_RW : 0),
+			1
+		);
+
+		mmu_map_pages(
+			bprm->mm->pageDirectory,
+			(void*)phdr->p_vaddr,
+			segment,
+			phdr->p_memsz,
+			flags | (phdr->p_flags & PF_W ? FPAGING_RW : 0)
+		);
+
+		if(res != SUCCESS){
+			return res;
+		}
+	}
+
+	bprm->entryPoint = (void*)ehdr->e_entry;
+
+	return SUCCESS;
 }

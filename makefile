@@ -10,7 +10,7 @@ CFLAGS += -g
 # Bare-metal Flags
 CFLAGS += -ffreestanding -nostdlib -nostartfiles
 # Warnig Suppresion Flags
-CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-cpp
+CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
 # Alignment Flags
 CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
 # Optimzation Flags
@@ -66,6 +66,12 @@ OBJ_ASM32_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_B32_ASM
 
 SECTOR_SIZE = 512
 
+make:
+	$(TOOLS_DIR)/syscall/gen_syscalls.sh src/entry/syscalls/syscall_32.tbl src/entry/syscalls/syscalltbl.h
+	make img
+
+img: $(IMG)
+
 # Create kernel.img
 $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 	@echo "Creating os image in $@"
@@ -73,6 +79,8 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 	dd if=/dev/zero of=$@ bs=512 count=65536
 	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
 	$(TOOLS_DIR)/fs/fat/main.py init
+	cd tmp && make
+	$(TOOLS_DIR)/fs/fat/main.py cp -ex ./tmp/bash /bin
 
 # Create directories
 $(BUILD_DIRS):
