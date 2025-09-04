@@ -226,7 +226,7 @@ void main(){
 	_map_heap(dir);
 	_map_framebuffer(dir);
 
-	dir->entry[1023] = (uintptr_t)dir->entry | FPAGING_P | FPAGING_RW;
+	dir->entry[1023] = (uintptr_t)dir->entry | FPAGING_P | FPAGING_RW; // self-referencing PDE
 	
 	_ldir(dir->entry);
 

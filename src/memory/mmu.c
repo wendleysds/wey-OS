@@ -102,6 +102,8 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 		}
 	}
 
+	dir->entry[1023] = (PagingTable)((uintptr_t)virt_to_phys(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
+
 	*kernelDirectory = dir;
 	return mmu_page_switch(dir);
 }
