@@ -64,35 +64,6 @@ struct PagingDirectory* paging_new_directory_empty(){
     return directory;
 }
 
-void paging_switch(struct PagingDirectory *directory){
-	if(!directory){
-		panic("paging_switch(*directory): Directory is null!");
-	}
-
-	if (_currentDirectory == directory) {
-		return;
-	}
-
-	if (!directory->entry) {
-		panic("paging_switch(*directory): Directory entry is null!");
-	}
-
-	if ((uintptr_t)(directory->entry) & (PAGING_PAGE_SIZE - 1)) {
-		panic("paging_switch(*directory): Directory entry is not page-aligned!");
-	}
-
-	if (directory->tableCount == 0) {
-		panic("paging_switch(*directory): Directory has no tables!");
-	}
-
-	if (directory->tableCount > PAGING_TOTAL_ENTRIES_PER_TABLE) {
-		panic("paging_switch(*directory): Directory table count exceeds %d!", PAGING_TOTAL_ENTRIES_PER_TABLE);
-	}
-
-	paging_load_directory(directory->entry);
-	_currentDirectory = directory;
-}
-
 void paging_free_directory(struct PagingDirectory *directory){
 	for(size_t i = 0; i < directory->tableCount; i++){
 		PagingTable tableEntry = directory->entry[i];

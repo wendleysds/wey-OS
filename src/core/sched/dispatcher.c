@@ -82,7 +82,7 @@ int pcb_switch(struct Task* task){
     }
 
     _currentTask = task;
-    paging_switch(task->process->mm->pageDirectory);
+    mmu_page_switch(task->process->mm->pageDirectory);
 
     return SUCCESS;
 }
