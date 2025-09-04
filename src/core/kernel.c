@@ -87,6 +87,8 @@ void kmain(){
 		"Initializing Interrupt Descriptor Table (IDT)", 
 		init_idt()
 	);
+
+	disable_interrupts();
 	
 	_INIT_PANIC(
 		"Initializing Kernel Heap",
@@ -97,7 +99,7 @@ void kmain(){
 
 	_INIT_PANIC(
 		"Initializing Memory Manager Unit",
-		"Failed to initializing paging!",
+		"Failed to initializing Memory Manager Unit!",
 		mmu_init(&kernel_directory),
 		SUCCESS
 	);
@@ -158,5 +160,5 @@ void kernel_page(){
 	}
 
 	kernel_registers();
-	paging_switch(kernel_directory);
+	mmu_page_switch(kernel_directory);
 }

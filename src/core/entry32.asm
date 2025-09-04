@@ -4,7 +4,6 @@ section .text.boot
 global _entry32
 
 extern main
-extern kmain
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
@@ -22,18 +21,7 @@ _entry32:
 	mov ebp, 0x00200000
 	mov esp, ebp
 
-	call main
-
-	; clear stack
-	mov edi, esp
-	mov ecx, 4096 / STACK_SIZE_KB
-	xor eax, eax
-	rep stosd
-
-	mov ebp, STACK_VIRT_BASE
-	mov esp, ebp
-
-	jmp CODE_SEG:kmain
+	jmp CODE_SEG:main
 
 	cli
 	hlt

@@ -63,23 +63,23 @@ static inline void _ldir(uint32_t* val) {
 __section(".text.boot")
 static inline void _epg(void) {
 	__asm__ __volatile__ (
-			"mov %%cr0, %%eax\n\t"
-			"or  $0x80000000, %%eax\n\t"
-			"mov %%eax, %%cr0\n\t"
-			"jmp flush\n\t"
-			"flush:"
-      :
-      :
-      : "eax", "memory"
+		"mov %%cr0, %%eax\n\t"
+		"or  $0x80000000, %%eax\n\t"
+		"mov %%eax, %%cr0\n\t"
+		"jmp flush\n\t"
+		"flush:"
+		:
+		:
+		: "eax", "memory"
   );
 }
 
 __section(".text.boot")
 static inline void _jmp(void* addr) {
 	__asm__ __volatile__ (
-			"jmp %0\n\t"
-      :
-      : "r"(addr)
+		"jmp %0\n\t"
+		:
+		: "r"(addr)
   );
 }
 
@@ -186,14 +186,16 @@ static void _map_heap(struct PagingDirectory* directory){
 __section(".text.boot")
 static void _map_framebuffer(struct PagingDirectory* directory){
 	struct VideoStructPtr* video = (struct VideoStructPtr*)VIDEO_INFO_LOCATION;
-	size_t videoMemSize = video->height * video->width * (video->bpp / 8);
+	size_t framebuffer_size = video->height * video->width * (video->bpp / 8);
+
+	size_t fb_pages = (framebuffer_size + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
 
 	_map_range(
-			directory, 
-			(videoMemSize + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE, 
-			(void*)KERNEL_FB_VIRT_BASE,
-			(void*)video->framebuffer_physical,
-			(FPAGING_P | FPAGING_RW)
+		directory, 
+		fb_pages,
+		(void*)KERNEL_FB_VIRT_BASE,
+		(void*)video->framebuffer_physical,
+		(FPAGING_P | FPAGING_RW)
 	);
 
 	video->framebuffer_virtual = KERNEL_FB_VIRT_BASE;
@@ -201,11 +203,14 @@ static void _map_framebuffer(struct PagingDirectory* directory){
 
 __section(".text.boot")
 static void _map_stack(struct PagingDirectory* directory){
+
+	size_t stack_pages = (KERNEL_STACK_SIZE + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
+
 	_map_range(
 		directory, 
-		(KERNEL_STACK_SIZE + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE, 
-		(void*)KERNEL_STACK_VIRT_BASE,
-		(void*)KERNEL_STACK_PHYS_BASE,
+		stack_pages, 
+		(void*)KERNEL_STACK_VIRT_BOTTOM,
+		(void*)KERNEL_STACK_PHYS_BOTTOM,
 		(FPAGING_P | FPAGING_RW)
 	);
 }
@@ -226,5 +231,15 @@ void main(){
 	_ldir(dir->entry);
 
 	_epg();
+
+	extern void kmain();
+
+	__asm__ volatile (
+		"mov %0, %%esp\n\t"
+		"mov %%esp, %%ebp\n\t"
+		"jmp %1\n\t"
+		:
+		: "r"(KERNEL_STACK_VIRT_TOP), "r"(&kmain)
+	);
 }
 

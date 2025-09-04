@@ -20,7 +20,8 @@ struct PagingDirectory* _currentDirectory = 0x0;
 #define VIRT_PT(i) \
 	((uint32_t*)(0xFFC00000 + (i) * 0x1000))
 
-static uintptr_t virt_to_phys(uintptr_t virt) {
+static void* virt_to_phys(void* virtualAddr) {
+	uintptr_t virt = (uintptr_t)virtualAddr;
 	uint32_t dir_idx = virt >> 22;
 	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
 
@@ -36,7 +37,7 @@ static uintptr_t virt_to_phys(uintptr_t virt) {
 	}
 
 	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
-	return phys;
+	return (void*)phys;
 }
 
 int mmu_init(struct PagingDirectory** kernelDirectory){
@@ -60,8 +61,8 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 
 	mmu_map_pages(
 		dir,
-		(void*)KERNEL_STACK_VIRT_BASE,
-		(void*)KERNEL_STACK_PHYS_BASE,
+		(void*)KERNEL_STACK_VIRT_BOTTOM,
+		(void*)KERNEL_STACK_PHYS_BOTTOM,
 		KERNEL_STACK_SIZE,
 		flags
 	);
@@ -89,11 +90,20 @@ int mmu_init(struct PagingDirectory** kernelDirectory){
 		dir,
 		(void*)KERNEL_FB_VIRT_BASE,
 		(void*)vPtr->framebuffer_physical,
-		(vPtr->height * vPtr->width * (vPtr->bpp / 2)),
+		(vPtr->height * vPtr->width * (vPtr->bpp / 8)),
 		flags
 	);
 
-	return NOT_IMPLEMENTED;
+	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
+		if (dir->entry[i]) {
+			uintptr_t va = dir->entry[i] & PAGE_MASK;
+			uintptr_t pa = (uintptr_t)virt_to_phys((void*)va);
+			dir->entry[i] = pa | (dir->entry[i] & FLAGS_MASK);
+		}
+	}
+
+	*kernelDirectory = dir;
+	return mmu_page_switch(dir);
 }
 
 struct PagingDirectory* mmu_create_page(){
@@ -105,7 +115,30 @@ int mmu_page_switch(struct PagingDirectory* directory){
 		return NULL_PTR;
 	}
 
-	paging_switch(directory);
+	if (_currentDirectory == directory) {
+		return SUCCESS;
+	}
+
+	if (!directory->entry) {
+		return NULL_PTR;
+	}
+
+	if ((uintptr_t)(directory->entry) & (PAGING_PAGE_SIZE - 1)) {
+		return BAD_ALIGNMENT;
+	}
+
+	if (directory->tableCount == 0) {
+		return INVALID_ARG;
+	}
+
+	if (directory->tableCount > PAGING_TOTAL_ENTRIES_PER_TABLE) {
+		return OUT_OF_BOUNDS;
+	}
+
+	uint32_t* physAddr = (uint32_t*)virt_to_phys(directory->entry);
+
+	paging_load_directory(physAddr);
+	_currentDirectory = directory;
 
 	return SUCCESS;
 }
