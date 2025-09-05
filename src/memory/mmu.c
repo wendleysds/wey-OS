@@ -14,6 +14,7 @@
 	(((uintptr_t)(virt) & (PAGING_PAGE_SIZE - 1)) || \
 	((uintptr_t)(phys) & (PAGING_PAGE_SIZE - 1)))
 
+static struct PagingDirectory* _kernelDirectory = 0x0;
 struct PagingDirectory* _currentDirectory = 0x0;
 
 static inline int _read_cr2(){
@@ -92,6 +93,9 @@ static void _page_fault_handler(struct InterruptFrame* frame){
 }
 
 int mmu_init(){
+	_currentDirectory = 0x0;
+	_kernelDirectory = 0x0;
+
 	struct PagingDirectory* dir = mmu_create_page();
 
 	extern uintptr_t __kernel_phys_start;
@@ -169,6 +173,7 @@ int mmu_init(){
 	
 	idt_register_callback(14, &_page_fault_handler);
 
+	_kernelDirectory = dir;
 	return mmu_page_switch(dir);
 }
 
@@ -212,6 +217,10 @@ int mmu_page_switch(struct PagingDirectory* directory){
 int mmu_destroy_page(struct PagingDirectory* directory){
 	if(!directory){
 		return NULL_PTR;
+	}
+
+	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1024; i++){
+		directory->entry[i] = 0;
 	}
 
 	paging_free_directory(directory);
@@ -280,4 +289,10 @@ uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size){
 
 void* phys_to_virt(void* physicalAddr){
 	return (void*)((uintptr_t)physicalAddr + KERNEL_VIRT_BASE - KERNEL_PHYS_BASE);
+}
+
+void mmu_copy_kernel_to_directory(struct PagingDirectory* directory){
+	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1024; i++){
+		directory->entry[i] = _kernelDirectory->entry[i];
+	}
 }

@@ -51,6 +51,8 @@ void* mmu_translate(void* virt);
 uint8_t mmu_user_pointer_valid(void* ptr);
 uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size);
 
+void mmu_copy_kernel_to_directory(struct PagingDirectory* directory);
+
 struct mem_region* vma_lookup(struct mm_struct* mm, void* virtualAddr);
 int vma_add(struct mm_struct* mm, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags, uint8_t isPrivate);
 int vma_remove(struct mm_struct* mm, void* virtualAddr, uint32_t size);
