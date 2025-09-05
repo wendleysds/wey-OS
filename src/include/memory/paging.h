@@ -13,7 +13,7 @@
 #define FPAGING_RW  0x2
 #define FPAGING_P   0x1
 
-// Maks
+// Mask
 #define PAGE_MASK 0xFFFFF000
 #define FLAGS_MASK 0x00000FFF
 
@@ -24,7 +24,7 @@ struct PagingDirectory {
 	uint32_t tableCount;
 };
 
-struct PagingDirectory* paging_new_directory_empty();
+struct PagingDirectory* paging_new_directory();
 void paging_free_directory(struct PagingDirectory* directory);
 
 void paging_load_directory(uint32_t* addr);
@@ -37,7 +37,6 @@ int paging_unmap(struct PagingDirectory* directory, void* virtual);
 int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual);
 
 void* paging_translate(struct PagingDirectory* directory, void* virt);
-uint8_t paging_is_user_pointer_valid(void* ptr);
 
 static inline void* paging_align_to_lower(void* addr){
     return (void*)((uintptr_t)addr & ~(PAGING_PAGE_SIZE - 1));

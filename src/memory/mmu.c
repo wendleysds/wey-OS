@@ -16,30 +16,6 @@
 
 struct PagingDirectory* _currentDirectory = 0x0;
 
-#define VIRT_PD ((uint32_t*)0xFFFFF000)
-#define VIRT_PT(i) \
-	((uint32_t*)(0xFFC00000 + (i) * 0x1000))
-
-static void* virt_to_phys(void* virtualAddr) {
-	uintptr_t virt = (uintptr_t)virtualAddr;
-	uint32_t dir_idx = virt >> 22;
-	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
-
-	uint32_t pde = VIRT_PD[dir_idx];
-	if (!(pde & 0x1)) {
-		return 0;
-	}
-
-	uint32_t* pt = VIRT_PT(dir_idx);
-	uint32_t pte = pt[tbl_idx];
-	if (!(pte & 0x1)) {
-		return 0;
-	}
-
-	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
-	return (void*)phys;
-}
-
 static inline int _read_cr2(){
 	uint32_t cr2;
 	__asm__ volatile("mov %%cr2, %0" : "=r" (cr2));
@@ -172,12 +148,12 @@ int mmu_init(){
 	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
 		if (dir->entry[i]) {
 			uintptr_t va = dir->entry[i] & PAGE_MASK;
-			uintptr_t pa = (uintptr_t)virt_to_phys((void*)va);
+			uintptr_t pa = (uintptr_t)mmu_translate((void*)va);
 			dir->entry[i] = pa | (dir->entry[i] & FLAGS_MASK);
 		}
 	}
 
-	dir->entry[1023] = (PagingTable)((uintptr_t)virt_to_phys(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
+	dir->entry[1023] = (PagingTable)((uintptr_t)mmu_translate(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
 	
 	idt_register_callback(14, &_page_fault_handler);
 
@@ -185,7 +161,7 @@ int mmu_init(){
 }
 
 struct PagingDirectory* mmu_create_page(){
-	return paging_new_directory_empty();
+	return paging_new_directory();
 }
 
 int mmu_page_switch(struct PagingDirectory* directory){
@@ -213,7 +189,7 @@ int mmu_page_switch(struct PagingDirectory* directory){
 		return OUT_OF_BOUNDS;
 	}
 
-	uint32_t* physAddr = (uint32_t*)virt_to_phys(directory->entry);
+	uint32_t* physAddr = (uint32_t*)mmu_translate(directory->entry);
 
 	paging_load_directory(physAddr);
 	_currentDirectory = directory;
@@ -245,8 +221,24 @@ int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint3
 	return paging_unmap_range(directory, count, paging_align_to_lower(virtualStart));
 }
 
-void* mmu_translate(struct PagingDirectory* directory, void* virt){
-	return paging_translate(directory, virt);
+void* mmu_translate(void* virtualAddr){
+	uintptr_t virt = (uintptr_t)virtualAddr;
+	uint32_t dir_idx = virt >> 22;
+	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
+
+	uint32_t pde = VIRT_PDIR[dir_idx];
+	if (!(pde & 0x1)) {
+		return 0;
+	}
+
+	uint32_t* pt = VIRT_PTBL(dir_idx);
+	uint32_t pte = pt[tbl_idx];
+	if (!(pte & 0x1)) {
+		return 0;
+	}
+
+	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
+	return (void*)phys;
 }
 
 uint8_t mmu_user_pointer_valid(void* ptr){
@@ -254,7 +246,7 @@ uint8_t mmu_user_pointer_valid(void* ptr){
 		return 0;
 	}
 	
-	return paging_is_user_pointer_valid(ptr);
+	return 0;
 }
 
 uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size){
@@ -272,119 +264,4 @@ uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size){
     }
 
     return 1;
-}
-
-struct mem_region* vma_lookup(struct mm_struct* mm, void* virtualAddr){
-	if(!mm || !virtualAddr){
-		return 0x0;
-	}
-
-	struct mem_region* region = mm->regions;
-	while(region){
-		if(virtualAddr >= region->virtualBaseAddress && virtualAddr < region->virtualEndAddress){
-			return region;
-		}
-
-		region = region->next;
-	}
-
-	return 0x0;
-}
-
-int vma_add(struct mm_struct* mm, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags, uint8_t isPrivate){
-	if (!mm || !mm->pageDirectory) {
-		return NULL_PTR;
-	}
-
-	struct mem_region* region = (struct mem_region*)kzalloc(sizeof(struct mem_region));
-	if (!region) {
-		return NO_MEMORY;
-	}
-
-	region->physBaseAddress = physicalAddr;
-
-	region->virtualBaseAddress = virtualAddr;
-	region->virtualEndAddress = paging_align_address((void*)((uintptr_t)virtualAddr + size));
-
-	region->flags = flags;
-	region->size = size;
-	region->isPrivite = isPrivate;
-
-	region->next = mm->regions;
-	mm->regions = region;
-
-	return SUCCESS;
-}
-
-int vma_remove(struct mm_struct* mm, void* virtualAddr, uint32_t size){
-	if (!mm || !mm->pageDirectory) {
-		return NULL_PTR;
-	}
-
-	struct mem_region* prev = NULL;
-	struct mem_region* current = mm->regions;
-
-	while (current) {
-		if (current->virtualBaseAddress == virtualAddr && current->size == size) {
-			if (prev) {
-				prev->next = current->next;
-			} else {
-				mm->regions = current->next;
-			}
-
-			if(current->physBaseAddress){
-				kfree(current->physBaseAddress);
-			}
-
-			kfree(current);
-			break;
-		}
-		prev = current;
-		current = current->next;
-	}
-
-	return SUCCESS;
-}
-
-int vma_clean(struct mm_struct* mm){
-	if (!mm) {
-		return NULL_PTR;
-	}
-
-	struct mem_region* current = mm->regions;
-	while (current) {
-		struct mem_region* next = current->next;
-
-		if(current->isPrivite){
-			if(current->virtualBaseAddress && current->size > 0){
-				mmu_unmap_pages(mm->pageDirectory, current->virtualBaseAddress, current->size);
-			}
-
-			if(current->physBaseAddress){
-				kfree(current->physBaseAddress);
-			}
-
-			kfree(current);
-		}
-		
-		current = next;
-	}
-
-	return SUCCESS;
-}
-
-int vma_destroy(struct mm_struct* mm){
-	if (!mm) {
-		return NULL_PTR;
-	}
-
-	vma_clean(mm);
-
-	if (mm->pageDirectory) {
-		mmu_destroy_page(mm->pageDirectory);
-	}
-
-	kfree(mm);
-
-	return SUCCESS;
 }

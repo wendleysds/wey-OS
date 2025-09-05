@@ -16,6 +16,9 @@
 #define MAP_PRIVATE   0x2
 #define MAP_ANONYMOUS 0x4
 
+#define VIRT_PDIR ((uint32_t*)0xFFFFF000)
+#define VIRT_PTBL(i) ((uint32_t*)(0xFFC00000 + (i) * PAGING_PAGE_SIZE))
+
 struct mem_region {
 	void* physBaseAddress;
     void* virtualBaseAddress;
@@ -44,7 +47,7 @@ int mmu_page_switch(struct PagingDirectory* directory);
 int mmu_destroy_page(struct PagingDirectory* directory);
 int mmu_map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags);
 int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint32_t size);
-void* mmu_translate(struct PagingDirectory* directory, void* virt);
+void* mmu_translate(void* virt);
 uint8_t mmu_user_pointer_valid(void* ptr);
 uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size);
 

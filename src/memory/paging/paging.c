@@ -8,22 +8,21 @@
  * Paging Controller and Loader
  */
 
-// Flags when the paging_map create a directory
-#define DEFAULT_DIR_FLAGS (FPAGING_P | FPAGING_US | FPAGING_RW)
-
 #define _ADDRS_NOT_ALING(virt, phys) \
 	(((uintptr_t)(virt) & (PAGING_PAGE_SIZE - 1)) || \
 	((uintptr_t)(phys) & (PAGING_PAGE_SIZE - 1)))
 
-extern void paging_load_directory(uint32_t* addr);
+static inline void _invlpg(void* virtAddr){
+	__asm__ volatile("invlpg (%0)" : : "r"(virtAddr) : "memory");
+}
 
-static void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
+static inline void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
 	uintptr_t virt = (uintptr_t)virtualAddr;
 	*outDirIndex = virt >> 22;
 	*outTabIndex = (virt >> 12) & 0x3FF;
 }
 
-static uint32_t _get_page(struct PagingDirectory* directory, void* virt){
+static inline uint32_t _get_page(struct PagingDirectory* directory, void* virt){
     uint32_t dirIndex, tblIndex;
     _get_indexes(virt, &dirIndex, &tblIndex);
     
@@ -32,10 +31,6 @@ static uint32_t _get_page(struct PagingDirectory* directory, void* virt){
 
     uint32_t* table = (uint32_t*)(entry & PAGE_MASK);
     return table[tblIndex];
-}
-
-static inline void _invlpg(void* virtAddr){
-	__asm__ volatile("invlpg (%0)" : : "r"(virtAddr) : "memory");
 }
 
 void* paging_translate(struct PagingDirectory* directory, void* virt){
@@ -48,7 +43,7 @@ void* paging_translate(struct PagingDirectory* directory, void* virt){
 	return (void*)(pagePhysic + difference);
 }
 
-struct PagingDirectory* paging_new_directory_empty(){
+struct PagingDirectory* paging_new_directory(){
     struct PagingDirectory* directory = (struct PagingDirectory*)kcalloc(sizeof(struct PagingDirectory), 1);
     if (!directory){
 		return NULL;
@@ -94,7 +89,7 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 		}
 
 		directory->tableCount++;
-		directory->entry[dirIndex] = (PagingTable)table | DEFAULT_DIR_FLAGS;
+		directory->entry[dirIndex] = (PagingTable)table | flags;
 	}else{
 		table = (PagingTable*)(directory->entry[dirIndex] & PAGE_MASK);
 	}
@@ -104,19 +99,6 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 	}
 
 	table[tblIndex] = (uint32_t) physicalAddr | flags;
-
-	return SUCCESS;
-}
-
-int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags){
-	for(int i = 0; i < count; i++){
-		int status = paging_map(directory, virtualAddr, physicalAddr, flags);
-		if(status != SUCCESS)
-			return status;
-
-		virtualAddr = (void*)((uintptr_t)virtualAddr + PAGING_PAGE_SIZE);
-		physicalAddr = (void*)((uintptr_t)physicalAddr + PAGING_PAGE_SIZE);
-	}
 
 	return SUCCESS;
 }
@@ -147,6 +129,19 @@ int paging_unmap(struct PagingDirectory* directory, void* virtual){
 	return SUCCESS;
 }
 
+int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags){
+	for(int i = 0; i < count; i++){
+		int status = paging_map(directory, virtualAddr, physicalAddr, flags);
+		if(status != SUCCESS)
+			return status;
+
+		virtualAddr = (void*)((uintptr_t)virtualAddr + PAGING_PAGE_SIZE);
+		physicalAddr = (void*)((uintptr_t)physicalAddr + PAGING_PAGE_SIZE);
+	}
+
+	return SUCCESS;
+}
+
 int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual){
 	for (int i = 0; i < count; i++) {
 		int status = paging_unmap(directory, virtual);
@@ -156,19 +151,4 @@ int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtu
 		virtual = (void*)((uintptr_t)virtual + PAGING_PAGE_SIZE);
 	}
 	return SUCCESS;
-}
-
-uint8_t paging_is_user_pointer_valid(void* ptr){
-    uint32_t dirIndex = ((uintptr_t)ptr >> 22) & 0x3FF;
-    uint32_t tblIndex = ((uintptr_t)ptr >> 12) & 0x3FF;
-
-    uint32_t dir_entry = _currentDirectory->entry[dirIndex];
-    if (!(dir_entry & FPAGING_P) || !(dir_entry & FPAGING_US)){
-		return 0;
-	}
-
-    PagingTable* table = (PagingTable*)(dir_entry & PAGE_MASK);
-
-    uint32_t page_entry = table[tblIndex];
-    return (page_entry & FPAGING_P) && (page_entry & FPAGING_US);
 }
