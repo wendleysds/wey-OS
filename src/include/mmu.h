@@ -57,4 +57,6 @@ int vma_remove(struct mm_struct* mm, void* virtualAddr, uint32_t size);
 int vma_clean(struct mm_struct* mm);
 int vma_destroy(struct mm_struct* mm);
 
+void* phys_to_virt(void* physicalAddr);
+
 #endif

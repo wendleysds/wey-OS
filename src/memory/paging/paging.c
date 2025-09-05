@@ -89,9 +89,10 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 		}
 
 		directory->tableCount++;
-		directory->entry[dirIndex] = (PagingTable)table | flags;
+		directory->entry[dirIndex] = (PagingTable)mmu_translate(table) | flags;
 	}else{
-		table = (PagingTable*)(directory->entry[dirIndex] & PAGE_MASK);
+		uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
+		table = (PagingTable*)(tableVirt & PAGE_MASK);
 	}
 
 	if (table[tblIndex] & FPAGING_P) {
@@ -111,7 +112,8 @@ int paging_unmap(struct PagingDirectory* directory, void* virtual){
 		return ALREADY_UMAPD;
 	}
 
-	PagingTable *table = (PagingTable*)(directory->entry[dirIndex] & PAGE_MASK);
+	uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
+	PagingTable *table = (PagingTable*)(tableVirt & PAGE_MASK);
 	table[tblIndex] = 0;
 
 	_invlpg(virtual);

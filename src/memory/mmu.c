@@ -102,7 +102,7 @@ int mmu_init(){
 
 	uint8_t flags = (FPAGING_P | FPAGING_RW);
 
-	mmu_map_pages(
+	int res = mmu_map_pages(
 		dir,
 		(void*)&__kernel_high_start, 
 		(void*)&__kernel_phys_start, 
@@ -110,7 +110,11 @@ int mmu_init(){
 		flags
 	);
 
-	mmu_map_pages(
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	res = mmu_map_pages(
 		dir,
 		(void*)KERNEL_STACK_VIRT_BOTTOM,
 		(void*)KERNEL_STACK_PHYS_BOTTOM,
@@ -118,7 +122,11 @@ int mmu_init(){
 		flags
 	);
 
-	mmu_map_pages(
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	res = mmu_map_pages(
 		dir,
 		(void*)HEAP_VIRT_BASE,
 		(void*)HEAP_PHYS_BASE,
@@ -126,7 +134,11 @@ int mmu_init(){
 		flags
 	);
 
-	mmu_map_pages(
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
+	res = mmu_map_pages(
 		dir, 
 		(void*)HEAP_TABLE_VIRT_BASE, 
 		(void*)HEAP_TABLE_PHYS_BASE, 
@@ -134,10 +146,14 @@ int mmu_init(){
 		flags
 	);
 
+	if(IS_STAT_ERR(res)){
+		return res;
+	}
+
 	extern struct VideoStructPtr* _get_video();
 	struct VideoStructPtr* vPtr = _get_video();
 
-	mmu_map_pages(
+	res = mmu_map_pages(
 		dir,
 		(void*)KERNEL_FB_VIRT_BASE,
 		(void*)vPtr->framebuffer_physical,
@@ -145,12 +161,8 @@ int mmu_init(){
 		flags
 	);
 
-	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
-		if (dir->entry[i]) {
-			uintptr_t va = dir->entry[i] & PAGE_MASK;
-			uintptr_t pa = (uintptr_t)mmu_translate((void*)va);
-			dir->entry[i] = pa | (dir->entry[i] & FLAGS_MASK);
-		}
+	if(IS_STAT_ERR(res)){
+		return res;
 	}
 
 	dir->entry[1023] = (PagingTable)((uintptr_t)mmu_translate(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
@@ -227,13 +239,13 @@ void* mmu_translate(void* virtualAddr){
 	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
 
 	uint32_t pde = VIRT_PDIR[dir_idx];
-	if (!(pde & 0x1)) {
+	if (!(pde & FPAGING_P)) {
 		return 0;
 	}
 
 	uint32_t* pt = VIRT_PTBL(dir_idx);
 	uint32_t pte = pt[tbl_idx];
-	if (!(pte & 0x1)) {
+	if (!(pte & FPAGING_P)) {
 		return 0;
 	}
 
@@ -264,4 +276,8 @@ uint8_t mmu_user_pointer_valid_range(const void* userPtr, size_t size){
     }
 
     return 1;
+}
+
+void* phys_to_virt(void* physicalAddr){
+	return (void*)((uintptr_t)physicalAddr + KERNEL_VIRT_BASE - KERNEL_PHYS_BASE);
 }
