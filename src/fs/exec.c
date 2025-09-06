@@ -162,6 +162,10 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 	}
 
 	struct binprm* bprm = alloc_binprm((char*)pathname, 0);
+	if(IS_ERR(bprm)){
+		return PTR_ERR(bprm);
+	}
+	
 	int res = SUCCESS;
 
 	mmu_page_switch(bprm->mm->pageDirectory);

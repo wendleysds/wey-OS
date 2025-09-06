@@ -79,8 +79,6 @@ $(IMG): $(BUILD_DIRS) $(BOOTLOADER_BIN) $(INIT_BIN) $(KERNEL_BIN)
 	dd if=/dev/zero of=$@ bs=512 count=65536
 	dd if=$(BOOTLOADER_BIN) of=$@ conv=notrunc
 	$(TOOLS_DIR)/fs/fat/main.py init
-	cd tmp && make
-	$(TOOLS_DIR)/fs/fat/main.py cp -ex ./tmp/bash /bin
 
 # Create directories
 $(BUILD_DIRS):
