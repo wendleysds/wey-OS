@@ -102,7 +102,7 @@ static int8_t kernel_userland_init(){
 static void _load_tss(){
 	memset(&tss, 0x0, sizeof(tss));
 	tss.ss0 = KERNEL_DATA_SELECTOR;
-	tss.esp0 = 0x600000;
+	tss.esp0 = KERNEL_STACK_VIRT_TOP;
 	tss.iopb = sizeof(tss);
 
 	tss_load(0x28); // TSS segment is the 6th entry in the GDT (index 5), so selector is 0x28
@@ -176,17 +176,13 @@ void kmain(){
 		syscalls_init()
 	);
 
-	while(1){
-		__asm__ volatile ("hlt");
-	}	
-
 	_INIT_PANIC(
 		"Starting userland",
 		"userland init failed!",
 		kernel_userland_init()
 	);
 
-	//terminal_clear();
+	terminal_clear();
 
 	pcb_set(0x0);
 	scheduler_start();
