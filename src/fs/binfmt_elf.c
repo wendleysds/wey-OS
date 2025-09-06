@@ -93,7 +93,6 @@ static int load_elf_binarie(struct binprm *bprm){
 		);
 
 		mmu_map_pages(
-			bprm->mm->pageDirectory,
 			(void*)phdr->p_vaddr,
 			segment,
 			phdr->p_memsz,

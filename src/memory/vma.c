@@ -84,7 +84,7 @@ int vma_clean(struct mm_struct* mm){
 
 		if(current->isPrivite){
 			if(current->virtualBaseAddress && current->size > 0){
-				mmu_unmap_pages(mm->pageDirectory, current->virtualBaseAddress, current->size);
+				mmu_unmap_pages(current->virtualBaseAddress, current->size);
 			}
 
 			if(current->physBaseAddress){
