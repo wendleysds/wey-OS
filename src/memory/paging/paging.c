@@ -59,7 +59,21 @@ struct PagingDirectory* paging_new_directory(){
 }
 
 void paging_free_directory(struct PagingDirectory *directory){
-	panic("paging_free_directory(): NOT IMPLEMENTED!");
+	if(directory == _currentDirectory){
+		panic("paging_free_directory(): Trying to free current directory!");
+	}
+
+	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
+		if (directory->entry[i] & FPAGING_P) {
+			PagingTable* pte = (PagingTable*)VIRT_PTBL(i);
+			kfree(pte);
+
+			directory->entry[i] = 0;
+		}
+	}
+
+	kfree(directory->entry);
+	kfree(directory);
 }
 
 int paging_map(void* virtualAddr, void* physicalAddr, uint8_t flags){

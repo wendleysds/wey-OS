@@ -272,6 +272,12 @@ int mmu_destroy_page(struct PagingDirectory* directory){
 		return NULL_PTR;
 	}
 
+	if(directory == _kernelDirectory){
+		return INVALID_ARG;
+	}else{
+		mmu_page_switch(_kernelDirectory);
+	}
+
 	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1024; i++){
 		directory->entry[i] = 0;
 	}
