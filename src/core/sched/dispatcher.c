@@ -2,11 +2,12 @@
 #include <core/sched/task.h>
 #include <core/rings.h>
 #include <def/status.h>
+#include <def/compile.h>
 #include <memory/paging.h>
 
 static struct Task* _currentTask = 0x0;
 
-extern void pcb_return(struct Registers* regs);
+extern __no_return void pcb_return(struct Registers* regs);
 extern void sheduler_enqueue_auto(struct Task* task);
 
 static void pcb_save(struct Task* task, struct InterruptFrame* frame){

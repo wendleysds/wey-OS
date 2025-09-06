@@ -12,7 +12,6 @@ global pcb_return
 
 
 ; void _restore_register(struct Registers *regs)
-; Expects: [esp+4] = pointer to Registers struct
 _restore_registers:
     mov ebp, [esp+4]
 
@@ -27,7 +26,6 @@ _restore_registers:
     ret
 
 ; void pcb_return(struct Registers *regs)
-; Expects: [esp+4] = pointer to Registers struct
 pcb_return:
     mov esi, [esp+4]
 
@@ -37,36 +35,17 @@ pcb_return:
     cmp eax, 0x3
     je .user_return
 
-.kernel_return:
-    mov eax, [esi+44]     ; EFLAGS
-    or eax, 0x200         ; IF = 1
-    push eax
-    push dword [esi+40]   ; CS
-    push dword [esi+28]   ; EIP
-
-    ; Re-updated the segments
-    mov ax, 0x10          ; Kernel data selector
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-
-    push dword [esi+4]
-    call _restore_registers
-    add esp, 4
-
-    iretd
-
 .user_return:
     push dword [esi+36]   ; Stack Selector
     push dword [esi+32]   ; Stack Pointer
 
-    mov eax, [esi+44]     ; Flags
-    or eax, 0x200         ; Enable Flag Set
+.kernel_return:
+    mov eax, [esi+44]     ; EFLAGS
+    or eax, 0x200         ; IF = 1
     push eax
 
-    push dword [esi+40]   ; Code Segment
-    push dword [esi+28]   ; Instruct Pointer
+    push dword [esi+40]   ; CS
+    push dword [esi+28]   ; EIP
 
     ; Segments
     mov ax, [esi+36]
@@ -75,7 +54,7 @@ pcb_return:
     mov fs, ax
     mov gs, ax
 
-    push dword [esi+4]
+    push dword esi
     call _restore_registers
     add esp, 4
 
