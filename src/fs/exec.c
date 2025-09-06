@@ -164,6 +164,8 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 	struct binprm* bprm = alloc_binprm((char*)pathname, 0);
 	int res = SUCCESS;
 
+	mmu_page_switch(bprm->mm->pageDirectory);
+
 	res = _count_args_kernel(argv);
 	if (IS_STAT_ERR(res)) {
 		goto out_fbrpm;
@@ -214,6 +216,13 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 	if(process->mm){
 		vma_destroy(process->mm);
 	}
+
+	mmu_map_pages(
+		(void*)PROC_VIRTUAL_STACK_END, 
+		mmu_translate(newStack), 
+		PROC_STACK_SIZE, 
+		FPAGING_P | FPAGING_RW | FPAGING_US
+	);
 
 	process->mm = bprm->mm;
 	bprm->mm = NULL;

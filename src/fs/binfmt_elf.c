@@ -94,7 +94,7 @@ static int load_elf_binarie(struct binprm *bprm){
 
 		mmu_map_pages(
 			(void*)phdr->p_vaddr,
-			segment,
+			mmu_translate(segment),
 			phdr->p_memsz,
 			flags | (phdr->p_flags & PF_W ? FPAGING_RW : 0)
 		);
