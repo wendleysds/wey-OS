@@ -125,15 +125,20 @@ static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
 }
 
 void schedule(){
-    struct Task* next = scheduler_pick_next();
-    if(!next){
-        next = &_idleTask;
-    }
+	struct Task* next = scheduler_pick_next();
+	if(!next){
+		// if has a task running, continue with it
+		if(pcb_current()){
+			return;
+		}
 
-    next->state = TASK_RUNNING;
-    if(dispatcher_load(next) != SUCCESS){
-        panic("dispatcher_load(): Invalid task!");
-    }
+		next = &_idleTask;
+	}
+
+	next->state = TASK_RUNNING;
+	if(dispatcher_load(next) != SUCCESS){
+		panic("dispatcher_load(): Invalid task!");
+	}
 }
 
 void scheduler_start(){
@@ -147,6 +152,9 @@ void scheduler_start(){
 }
 
 void scheduler_init(){
+	extern void pcb_set(struct Task* t);
+	pcb_set(NULL);
+
     init_task_idle();
 
 	memset(&_readyQueue, 0x0, sizeof(struct TaskQueue));
