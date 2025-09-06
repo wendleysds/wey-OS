@@ -92,6 +92,59 @@ static void _page_fault_handler(struct InterruptFrame* frame){
 	}
 }
 
+static int _map_kernel(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint8_t flags){
+	if(_ADDRS_NOT_ALING(virtualAddr, physicalAddr)){
+		return BAD_ALIGNMENT;
+	}
+
+	uint32_t dirIndex, tblIndex;
+
+	uintptr_t virt = (uintptr_t)virtualAddr;
+	dirIndex = virt >> 22;
+	tblIndex = (virt >> 12) & 0x3FF;
+
+	PagingTable* table = 0x0;
+	if(!(directory->entry[dirIndex] & FPAGING_P)){
+		table = (PagingTable*)kcalloc(sizeof(PagingTable), PAGING_TOTAL_ENTRIES_PER_TABLE);
+		if (!table){
+			return NO_MEMORY;
+		}
+
+		directory->tableCount++;
+		directory->entry[dirIndex] = (PagingTable)mmu_translate(table) | flags;
+	}else{
+		uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
+		table = (PagingTable*)(tableVirt & PAGE_MASK);
+	}
+
+	if (table[tblIndex] & FPAGING_P) {
+		return ALREADY_MAPD;
+	}
+
+	table[tblIndex] = (uint32_t) physicalAddr | flags;
+
+	return SUCCESS;
+}
+
+static int _map_kernel_range(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags){
+	uint32_t alignedSize = (size + PAGING_PAGE_SIZE - 1) & ~(PAGING_PAGE_SIZE - 1);
+	uint32_t count = alignedSize / PAGING_PAGE_SIZE;
+
+	virtualAddr = paging_align_to_lower(virtualAddr);
+	physicalAddr = paging_align_to_lower(physicalAddr);
+
+	for(int i = 0; i < count; i++){
+		int status = _map_kernel(directory, virtualAddr, physicalAddr, flags);
+		if(status != SUCCESS)
+			return status;
+
+		virtualAddr = (void*)((uintptr_t)virtualAddr + PAGING_PAGE_SIZE);
+		physicalAddr = (void*)((uintptr_t)physicalAddr + PAGING_PAGE_SIZE);
+	}
+
+	return SUCCESS;
+}
+
 int mmu_init(){
 	_currentDirectory = 0x0;
 	_kernelDirectory = 0x0;
@@ -106,7 +159,7 @@ int mmu_init(){
 
 	uint8_t flags = (FPAGING_P | FPAGING_RW);
 
-	int res = mmu_map_pages(
+	int res = _map_kernel_range(
 		dir,
 		(void*)&__kernel_high_start, 
 		(void*)&__kernel_phys_start, 
@@ -118,7 +171,7 @@ int mmu_init(){
 		return res;
 	}
 
-	res = mmu_map_pages(
+	res = _map_kernel_range(
 		dir,
 		(void*)KERNEL_STACK_VIRT_BOTTOM,
 		(void*)KERNEL_STACK_PHYS_BOTTOM,
@@ -130,7 +183,7 @@ int mmu_init(){
 		return res;
 	}
 
-	res = mmu_map_pages(
+	res = _map_kernel_range(
 		dir,
 		(void*)HEAP_VIRT_BASE,
 		(void*)HEAP_PHYS_BASE,
@@ -142,7 +195,7 @@ int mmu_init(){
 		return res;
 	}
 
-	res = mmu_map_pages(
+	res = _map_kernel_range(
 		dir, 
 		(void*)HEAP_TABLE_VIRT_BASE, 
 		(void*)HEAP_TABLE_PHYS_BASE, 
@@ -157,7 +210,7 @@ int mmu_init(){
 	extern struct VideoStructPtr* _get_video();
 	struct VideoStructPtr* vPtr = _get_video();
 
-	res = mmu_map_pages(
+	res = _map_kernel_range(
 		dir,
 		(void*)KERNEL_FB_VIRT_BASE,
 		(void*)vPtr->framebuffer_physical,
@@ -228,38 +281,22 @@ int mmu_destroy_page(struct PagingDirectory* directory){
 	return SUCCESS;
 }
 
-int mmu_map_pages(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags){
+int mmu_map_pages(void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags){
 	uint32_t alignedSize = (size + PAGING_PAGE_SIZE - 1) & ~(PAGING_PAGE_SIZE - 1);
 	uint32_t count = alignedSize / PAGING_PAGE_SIZE;
 
-	return paging_map_range(directory, count, paging_align_to_lower(virtualAddr),  paging_align_to_lower(physicalAddr), flags);
+	return paging_map_range(count, paging_align_to_lower(virtualAddr),  paging_align_to_lower(physicalAddr), flags);
 }
 
-int mmu_unmap_pages(struct PagingDirectory* directory, void* virtualStart, uint32_t size){
+int mmu_unmap_pages(void* virtualStart, uint32_t size){
 	uint32_t alignedSize = (size + PAGING_PAGE_SIZE - 1) & ~(PAGING_PAGE_SIZE - 1);
 	uint32_t count = alignedSize / PAGING_PAGE_SIZE;
 
-	return paging_unmap_range(directory, count, paging_align_to_lower(virtualStart));
+	return paging_unmap_range(count, paging_align_to_lower(virtualStart));
 }
 
 void* mmu_translate(void* virtualAddr){
-	uintptr_t virt = (uintptr_t)virtualAddr;
-	uint32_t dir_idx = virt >> 22;
-	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
-
-	uint32_t pde = VIRT_PDIR[dir_idx];
-	if (!(pde & FPAGING_P)) {
-		return 0;
-	}
-
-	uint32_t* pt = VIRT_PTBL(dir_idx);
-	uint32_t pte = pt[tbl_idx];
-	if (!(pte & FPAGING_P)) {
-		return 0;
-	}
-
-	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
-	return (void*)phys;
+	return paging_translate(virtualAddr);
 }
 
 uint8_t mmu_user_pointer_valid(void* ptr){

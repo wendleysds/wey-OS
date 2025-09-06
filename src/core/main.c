@@ -75,15 +75,6 @@ static inline void _epg(void) {
 }
 
 __section(".text.boot")
-static inline void _jmp(void* addr) {
-	__asm__ __volatile__ (
-		"jmp %0\n\t"
-		:
-		: "r"(addr)
-  );
-}
-
-__section(".text.boot")
 static void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32_t* outTabIndex){
 	uintptr_t virt = (uintptr_t)virtualAddr;
 	*outDirIndex = virt >> 22;
@@ -136,24 +127,26 @@ static void _map_kernel(struct PagingDirectory* directory){
 	size_t kernel_size = (size_t)&__kernel_phys_end - (size_t)&__kernel_phys_start;
 	size_t kernel_pages = (kernel_size + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
 
+	size_t ident_pages = (MiB(2) + PAGING_PAGE_SIZE - 1) / PAGING_PAGE_SIZE;
+
 	uint8_t flags = (FPAGING_P | FPAGING_RW);
 
 	// Identity
 	_map_range(
-			directory,
-			PAGING_PAGE_SIZE / 4, // 0x00000000 -> 0x00400000
-			(void*)0x0,
-			(void*)0x0,
-			flags
+		directory,
+		ident_pages,
+		(void*)0x0,
+		(void*)0x0,
+		flags
 	);
 
 	// High
 	_map_range(
-			directory, 
-			PAGING_PAGE_SIZE + (kernel_pages - kernel_pages),
-			(void*)&__kernel_high_start,
-      (void*)&__kernel_phys_start,
-			flags
+		directory, 
+		PAGING_PAGE_SIZE + (kernel_pages - kernel_pages),
+		(void*)&__kernel_high_start,
+		(void*)&__kernel_phys_start,
+		flags
 	);
 }
 

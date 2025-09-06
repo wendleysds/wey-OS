@@ -22,25 +22,24 @@ static inline void _get_indexes(void* virtualAddr, uint32_t* outDirIndex, uint32
 	*outTabIndex = (virt >> 12) & 0x3FF;
 }
 
-static inline uint32_t _get_page(struct PagingDirectory* directory, void* virt){
-    uint32_t dirIndex, tblIndex;
-    _get_indexes(virt, &dirIndex, &tblIndex);
-    
-	uint32_t entry = directory->entry[dirIndex];
-	if (!(entry & FPAGING_P)) return 0;
+void* paging_translate(void* virtualAddr){
+	uintptr_t virt = (uintptr_t)virtualAddr;
+	uint32_t dir_idx = virt >> 22;
+	uint32_t tbl_idx = (virt >> 12) & 0x3FF;
 
-    uint32_t* table = (uint32_t*)(entry & PAGE_MASK);
-    return table[tblIndex];
-}
+	uint32_t pde = VIRT_PDIR[dir_idx];
+	if (!(pde & FPAGING_P)) {
+		return 0;
+	}
 
-void* paging_translate(struct PagingDirectory* directory, void* virt){
-	uintptr_t lowVirt = (uintptr_t)((uintptr_t)virt & ~(PAGING_PAGE_SIZE - 1));
-	uintptr_t difference = (uintptr_t) virt - lowVirt;
+	uint32_t* pt = VIRT_PTBL(dir_idx);
+	uint32_t pte = pt[tbl_idx];
+	if (!(pte & FPAGING_P)) {
+		return 0;
+	}
 
-	uintptr_t pagePhysic = _get_page(directory, (void*)lowVirt) & PAGE_MASK;
-	if (pagePhysic == 0) return NULL;
-
-	return (void*)(pagePhysic + difference);
+	uintptr_t phys = (pte & 0xFFFFF000) | (virt & 0xFFF);
+	return (void*)phys;
 }
 
 struct PagingDirectory* paging_new_directory(){
@@ -60,20 +59,10 @@ struct PagingDirectory* paging_new_directory(){
 }
 
 void paging_free_directory(struct PagingDirectory *directory){
-	for(size_t i = 0; i < directory->tableCount; i++){
-		PagingTable tableEntry = directory->entry[i];
-
-		if(tableEntry & FPAGING_P){
-			PagingTable* table = (PagingTable*)(tableEntry & PAGE_MASK);
-			kfree(table);
-		}
-	}
-
-	kfree(directory->entry);
-	kfree(directory);
+	panic("paging_free_directory(): NOT IMPLEMENTED!");
 }
 
-int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physicalAddr, uint8_t flags){
+int paging_map(void* virtualAddr, void* physicalAddr, uint8_t flags){
 	if(_ADDRS_NOT_ALING(virtualAddr, physicalAddr)){
 		return BAD_ALIGNMENT;
 	}
@@ -81,59 +70,63 @@ int paging_map(struct PagingDirectory* directory, void* virtualAddr, void* physi
 	uint32_t dirIndex, tblIndex;
 	_get_indexes(virtualAddr, &dirIndex, &tblIndex);
 
-	PagingTable* table = 0x0;
-	if(!(directory->entry[dirIndex] & FPAGING_P)){
-		table = (PagingTable*)kcalloc(sizeof(PagingTable), PAGING_TOTAL_ENTRIES_PER_TABLE);
-		if (!table){
+	uint32_t* pde = VIRT_PDIR;
+	PagingTable* pte = VIRT_PTBL(dirIndex);
+
+	if (!(pde[dirIndex] & FPAGING_P)) {
+		void* newTable = kcalloc(PAGING_TOTAL_ENTRIES_PER_TABLE, sizeof(uint32_t));
+		if (!newTable) {
 			return NO_MEMORY;
 		}
 
-		directory->tableCount++;
-		directory->entry[dirIndex] = (PagingTable)mmu_translate(table) | flags;
-	}else{
-		uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
-		table = (PagingTable*)(tableVirt & PAGE_MASK);
+		pde[dirIndex] = (PagingTable)paging_translate(newTable) | flags;
+		pte = VIRT_PTBL(dirIndex);
+		_currentDirectory->tableCount++;
 	}
 
-	if (table[tblIndex] & FPAGING_P) {
+	if (pte[tblIndex] & FPAGING_P) {
 		return ALREADY_MAPD;
 	}
 
-	table[tblIndex] = (uint32_t) physicalAddr | flags;
+	pte[tblIndex] = ((uintptr_t)physicalAddr & PAGE_MASK) | flags;
 
 	return SUCCESS;
 }
 
-int paging_unmap(struct PagingDirectory* directory, void* virtual){
+int paging_unmap(void* virtualAddr){
 	uint32_t dirIndex, tblIndex;
-	_get_indexes(virtual, &dirIndex, &tblIndex);
+	_get_indexes(virtualAddr, &dirIndex, &tblIndex);
 
-	if (!(directory->entry[dirIndex] & FPAGING_P)) {
+	uint32_t* pde = VIRT_PDIR;
+	if (!(pde[dirIndex] & FPAGING_P)) {
+        return ALREADY_UMAPD;
+    }
+
+	PagingTable* pte = VIRT_PTBL(dirIndex);
+	if (!(pte[tblIndex] & FPAGING_P)) {
 		return ALREADY_UMAPD;
 	}
 
-	uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
-	PagingTable *table = (PagingTable*)(tableVirt & PAGE_MASK);
-	table[tblIndex] = 0;
-
-	_invlpg(virtual);
+	pte[tblIndex] = 0;
+    _invlpg(virtualAddr);
 
 	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
-		if (table[i] & FPAGING_P) {
+		if (pte[i] & FPAGING_P) {
 			return SUCCESS;
 		}
 	}
 
-	kfree(table);
-	directory->entry[dirIndex] = 0x0;
-	directory->tableCount--;
+	kfree(pte);
+    pde[dirIndex] = 0;
+    _invlpg((void*)((uintptr_t)dirIndex << 22));
+	_currentDirectory->tableCount--;
 
 	return SUCCESS;
 }
 
-int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags){
+int paging_map_range(int count, void* virtualAddr, void* physicalAddr, uint8_t flags){
 	for(int i = 0; i < count; i++){
-		int status = paging_map(directory, virtualAddr, physicalAddr, flags);
+		int status = paging_map(virtualAddr, physicalAddr, flags);
 		if(status != SUCCESS)
 			return status;
 
@@ -144,13 +137,13 @@ int paging_map_range(struct PagingDirectory* directory, int count, void* virtual
 	return SUCCESS;
 }
 
-int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual){
+int paging_unmap_range(int count, void* virtualAddr){
 	for (int i = 0; i < count; i++) {
-		int status = paging_unmap(directory, virtual);
+		int status = paging_unmap(virtualAddr);
 		if (status != SUCCESS)
 			return status;
 
-		virtual = (void*)((uintptr_t)virtual + PAGING_PAGE_SIZE);
+		virtualAddr = (void*)((uintptr_t)virtualAddr + PAGING_PAGE_SIZE);
 	}
 	return SUCCESS;
 }

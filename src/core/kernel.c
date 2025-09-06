@@ -176,6 +176,10 @@ void kmain(){
 		syscalls_init()
 	);
 
+	while(1){
+		__asm__ volatile ("hlt");
+	}	
+
 	_INIT_PANIC(
 		"Starting userland",
 		"userland init failed!",

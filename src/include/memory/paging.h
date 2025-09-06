@@ -27,16 +27,16 @@ struct PagingDirectory {
 struct PagingDirectory* paging_new_directory();
 void paging_free_directory(struct PagingDirectory* directory);
 
-void paging_load_directory(uint32_t* addr);
+void paging_load_directory(uint32_t* physicalAddr);
 void paging_enable();
 
-int paging_map(struct PagingDirectory* directory, void* virtual, void* physic, uint8_t flags);
-int paging_map_range(struct PagingDirectory* directory, int count, void* virtualAddr, void* physicalAddr, uint8_t flags);
+int paging_map(void* virtualAddr, void* physicalAddr, uint8_t flags);
+int paging_map_range(int count, void* virtualAddr, void* physicalAddr, uint8_t flags);
 
-int paging_unmap(struct PagingDirectory* directory, void* virtual);
-int paging_unmap_range(struct PagingDirectory* directory, int count, void* virtual);
+int paging_unmap(void* virtualAddr);
+int paging_unmap_range(int count, void* virtualAddr);
 
-void* paging_translate(struct PagingDirectory* directory, void* virt);
+void* paging_translate(void* virtualAddr);
 
 static inline void* paging_align_to_lower(void* addr){
     return (void*)((uintptr_t)addr & ~(PAGING_PAGE_SIZE - 1));
