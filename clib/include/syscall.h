@@ -1,7 +1,7 @@
 #ifndef _SYSCALL_H
 #define _SYSCALL_H
 
-#define SYS_write 1
+#define SYS_write 100
 
 extern long do_syscall(long no, long arg1, long arg2, long arg3, long arg4);
 

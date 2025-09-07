@@ -6,6 +6,7 @@ __pycache__
 # Folders
 /build
 */build
+*/tmp
 
 # Files/Configs
 compile_commands.json

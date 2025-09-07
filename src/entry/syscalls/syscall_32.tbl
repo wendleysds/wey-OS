@@ -1,2 +1,17 @@
 # <number> <abi> <name> <entry point>
-1 i386 write_terminal sys_write_terminal
+# 1 i386 exit sys_exit
+# 2 i386 fork sys_fork
+# 3 i386 read sys_read
+# 4 i386 write sys_write
+# 5 i386 open sys_open
+# 6 i386 close sys_close
+# 7 i386 creat sys_creat
+# 8 i386 unlink sys_unlink
+# 9 i386 execve sys_execve
+# 10 i386 chdir sys_chdir
+# 11 i386 lseek sys_lseek
+# 12 i386 getpid sys_getpid
+# 13 i386 mount sys_mount
+# 14 i386 mkdir sys_mkdir
+# 15 i386 rmdir sys_rmdir
+100 i386 write_terminal sys_write_terminal
