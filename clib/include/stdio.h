@@ -3,5 +3,6 @@
 
 int putchar(int c);
 int puts(const char* str);
+int printf(const char *restrict fmt, ...);
 
 #endif
