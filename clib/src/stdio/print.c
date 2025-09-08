@@ -43,35 +43,26 @@ int printf(const char *restrict fmt, ...) {
 					}
 					break;
 				}
-				case 'u': {
-					utoa(va_arg(args, unsigned int), toabuffer, 10);
+				case 'u':
+				case 'd':
+				case 'i': {
+					if(*ptr == 'u')
+						utoa(va_arg(args, unsigned int), toabuffer, 10);
+					else
+						itoa(va_arg(args, int), toabuffer, 10);
+
 					for (char *s = toabuffer; *s; s++) {
 						if (outpos >= PRINTF_BUF_SIZE) FLUSH_BUF();
 						outbuf[outpos++] = *s;
 					}
 					break;
 				}
-				case 'd': {
-					itoa(va_arg(args, int), toabuffer, 10);
-					for (char *s = toabuffer; *s; s++) {
-						if (outpos >= PRINTF_BUF_SIZE) FLUSH_BUF();
-						outbuf[outpos++] = *s;
-					}
-					break;
-				}
-				case 'x': {
-					utoa(va_arg(args, unsigned int), toabuffer, 16);
-					for (char *s = toabuffer; *s; s++) {
-						if (outpos >= PRINTF_BUF_SIZE) FLUSH_BUF();
-						outbuf[outpos++] = *s;
-					}
-					break;
-				}
+				case 'x':
 				case 'X': {
 					utoa(va_arg(args, unsigned int), toabuffer, 16);
 					for (char *s = toabuffer; *s; s++) {
 						if (outpos >= PRINTF_BUF_SIZE) FLUSH_BUF();
-						outbuf[outpos++] = CONVERT_CHAR_TO_UPPER(*s);
+						outbuf[outpos++] = (*ptr == 'X') ? CONVERT_CHAR_TO_UPPER(*s) : *s;
 					}
 					break;
 				}
