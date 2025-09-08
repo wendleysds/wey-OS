@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <syscall.h>
 
 #define PRINTF_BUF_SIZE 256
 
@@ -17,7 +18,7 @@ int printf(const char *restrict fmt, ...) {
 	// Helper to flush buffer
 	#define FLUSH_BUF() do { \
 		outbuf[outpos] = '\0'; \
-		puts(outbuf); \
+		syscall(SYS_write, (long)outbuf, (outpos+1), 0, 0); \
 		char_count += outpos; \
 		outpos = 0; \
 	} while (0)
