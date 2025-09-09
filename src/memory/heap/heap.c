@@ -21,6 +21,8 @@
 #define _FBLOCK_HAS_NEXT 0x08
 #define _FBLOCK_IS_FIRST 0x04
 
+uint32_t total_memory_allocated_in_blocks = 0;
+
 // Checks if the number of blocks in the heap table matches the actual memory region size
 static uint8_t _validate_table(struct HeapTable *table, void *ptr, void *end)
 {
@@ -94,6 +96,8 @@ static void _set_blocks_free(struct Heap *heap, int startingBlock)
 		uint8_t entry = table->blockEntries[i];
 		uint8_t flag = _get_block_entry_flag(entry);
 
+		total_memory_allocated_in_blocks--;
+
 		if (flag == _FBLOCK_FREE)
 		{
 			break; // Already free, stop
@@ -125,6 +129,8 @@ static void _set_blocks_taken(struct Heap *heap, int startBlock, int totalBlocks
 		{
 			entry |= _FBLOCK_HAS_NEXT;
 		}
+
+		total_memory_allocated_in_blocks++;
 	}
 }
 

@@ -15,7 +15,11 @@
 static struct Heap kernelHeap;
 static struct HeapTable kernelHeapTable;
 
+extern uint32_t total_memory_allocated_in_blocks;
+
 int init_kheap(){
+	total_memory_allocated_in_blocks = 0;
+	
 	kernelHeapTable.blockEntries = (uint8_t*) HEAP_TABLE_VIRT_BASE;
 	kernelHeapTable.total = HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE;
 
