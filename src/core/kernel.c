@@ -30,12 +30,6 @@
 	} else \
 	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
 
-#define _INIT(msg, init_func) \
-	terminal_cwrite(0x00FF00, "[   ] "); \
-	terminal_write(msg); \
-	init_func;\
-	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
-
 #define _INIT_MSGF(init_func, msg, ...) \
 	terminal_cwrite(0x00FF00, "[   ] "); \
 	terminal_write(msg, __VA_ARGS__); \
@@ -116,31 +110,17 @@ void kmain(){
 	// GDT Setup
 	memset(gdt, 0x00, sizeof(gdt));
 	gdt_structured_to_gdt(gdt, gdt_ptr, TOTAL_GDT_SEGMENTS);
+	gdt_load(gdt, sizeof(gdt) - 1);
 
-	int res;
+	pic_init(TIMER_FREQUENCY);
 
-	_INIT(
-		"Loading Global Descriptor Table (GDT)", 
-		gdt_load(gdt, sizeof(gdt) - 1)
-	);
+	init_idt();
 
-	_INIT_MSGF(
-		pic_init(TIMER_FREQUENCY), 
-		"Initializing PIT(IRQ 0x20). Divisor = %d", 
-		TIMER_FREQUENCY
-	);
-
-	_INIT(
-		"Initializing Interrupt Descriptor Table (IDT)", 
-		init_idt()
-	);
-
-	_INIT(
-		"Loading Task State Segment (TSS)", 
-		_load_tss();
-	);
+	_load_tss();
 
 	disable_interrupts();
+
+	int res;
 	
 	_INIT_PANIC(
 		"Initializing Kernel Heap",
@@ -156,25 +136,16 @@ void kmain(){
 
 	enable_interrupts();
 
-	_INIT(
-		"Initializing Drivers",
-		load_drivers()
-	);
+	load_drivers();
+
+	scheduler_init();
+
+	syscalls_init();
 
 	_INIT_PANIC(
 		"Mounting root",
 		"Failed to mount root!",
 		vfs_mount(device_get_name("hda"), "/", "vfat")
-	);
-
-	_INIT(
-		"Initializing Scheduler",
-		scheduler_init()
-	);
-
-	_INIT(
-		"Initializing Syscalls",
-		syscalls_init()
 	);
 
 	_INIT_PANIC(
