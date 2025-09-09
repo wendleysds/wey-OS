@@ -30,17 +30,12 @@
 	} else \
 	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
 
-#define _INIT_MSGF(init_func, msg, ...) \
-	terminal_cwrite(0x00FF00, "[   ] "); \
-	terminal_write(msg, __VA_ARGS__); \
-	init_func; \
-	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
-
 /* 
  * Main module for the protected-mode kernel code
  */ 
 
 extern void load_drivers();
+extern void pcb_set(struct Task* t);
 
 static struct TSS tss;
 static struct GDT gdt[TOTAL_GDT_SEGMENTS];
@@ -55,7 +50,6 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
 	{.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
-extern void pcb_set(struct Task* t);
 static int8_t kernel_userland_init(){
 	struct Process* kernel_p = process_create("init", 0, 0, 0, 0, 0);
 	if(IS_ERR(kernel_p)){
