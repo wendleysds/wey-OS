@@ -21,7 +21,7 @@ struct Task* task_new(struct Process* proc, void* entry_point){
         return ERR_PTR(NO_MEMORY);
     }
 
-    void* userStack = kmalloc(PROC_STACK_SIZE);
+    void* userStack = kmalloc(PROC_USER_STACK_SIZE);
     if (!userStack) {
         kfree(task);
         return ERR_PTR(NO_MEMORY);
@@ -35,7 +35,7 @@ struct Task* task_new(struct Process* proc, void* entry_point){
     }
 
     memset(task, 0, sizeof(struct Task));
-    memset(userStack, 0, PROC_STACK_SIZE);
+    memset(userStack, 0, PROC_USER_STACK_SIZE);
     memset(kernelStack, 0, PROC_KERNEL_STACK_SIZE);
     memset(task->fileDescriptors, 0, sizeof(task->fileDescriptors));
 
@@ -50,7 +50,7 @@ struct Task* task_new(struct Process* proc, void* entry_point){
 
     // Initialize registers
     task->regs.eip = (uint32_t)entry_point;
-    task->regs.esp = PROC_VIRTUAL_STACK_START;
+    task->regs.esp = PROC_USER_STACK_VIRUTAL_TOP;
     task->regs.ss = USER_DATA_SEGMENT;
     task->regs.cs = USER_CODE_SEGMENT;
 

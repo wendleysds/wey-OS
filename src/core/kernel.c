@@ -74,12 +74,15 @@ static int8_t kernel_userland_init(){
 		return PTR_ERR(kernel_t);
 	}
 
+	kfree(kernel_t->userStack);
+	kfree(kernel_t->kernelStack);
+
 	process_add_task(kernel_p, kernel_t);
 
 	int res;
 
 	pcb_set(kernel_t);
-	scheduler_add_task(kernel_t); // Prepare task inside the scheduler whem ready*/
+	scheduler_add_task(kernel_t); // Prepare task inside the scheduler whem ready
 
 	const char* bin1args[] = { "/bin/bash", NULL };
 	const char* bin2args[] = { "/bash", NULL };
@@ -94,15 +97,13 @@ static int8_t kernel_userland_init(){
 		return res;
 	}
 
-	warning("Bash not found in '%s' trying '%s'\n", bin1args[0], bin2args[0]);
-
 	return kernel_exec(bin2args[0], bin2args, envp);
 }
 
 static void _load_tss(){
 	memset(&tss, 0x0, sizeof(tss));
 	tss.ss0 = KERNEL_DATA_SELECTOR;
-	tss.esp0 = KERNEL_STACK_VIRT_TOP;
+	tss.esp0 = PROC_KERNEL_STACK_VIRTUAL_TOP;
 	tss.iopb = sizeof(tss);
 
 	tss_load(0x28); // TSS segment is the 6th entry in the GDT (index 5), so selector is 0x28

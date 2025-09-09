@@ -24,7 +24,7 @@ struct Task {
     int fileDescriptors[PROC_FD_MAX];
 
     void* userStack;
-    uint32_t* kernelStack;
+    void* kernelStack;
 
     enum TaskState state;
     int priority;

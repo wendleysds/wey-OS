@@ -115,7 +115,7 @@ static inline int _count_args_kernel(const char* const* argv) {
 
 static int _copy_args_kernel(int count, const char* const* argv, struct binprm* bprm){
 	uint8_t* top = (uint8_t*)bprm->curMemTop;
-	uint8_t* stack_base = (uint8_t*)((uintptr_t)top - PROC_STACK_SIZE);
+	uint8_t* stack_base = (uint8_t*)((uintptr_t)top - PROC_USER_STACK_SIZE);
 
 	uint8_t* argPtrs[count];
 	for (int i = count-1; i >= 0; i--) {
@@ -184,8 +184,20 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 
 	bprm->envc = res;
 
-	void* newStack = kzalloc(PROC_STACK_SIZE);
-	bprm->curMemTop = ((uintptr_t)newStack + PROC_STACK_SIZE);
+	void* newStack = kzalloc(PROC_USER_STACK_SIZE);
+	if(!newStack){
+		res = NO_MEMORY;
+		goto out_fbrpm;
+	}
+
+	void* newKernelStack = kzalloc(PROC_KERNEL_STACK_SIZE);
+	if(!newKernelStack){
+		res = NO_MEMORY;
+		kfree(newStack);
+		goto out_fbrpm;
+	}
+
+	bprm->curMemTop = ((uintptr_t)newStack + PROC_USER_STACK_SIZE);
 
 	res = _copy_args_kernel(bprm->argc, argv, bprm);
 	if (IS_STAT_ERR(res)) {
@@ -197,11 +209,45 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 		goto out_fstack;
 	}
 
+	res = mmu_map_pages(
+		(void*)PROC_USER_STACK_VIRUTAL_BUTTOM, 
+		mmu_translate(newStack), 
+		PROC_USER_STACK_SIZE, 
+		(FPAGING_P | FPAGING_RW | FPAGING_US)
+	);
+
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
 	res = vma_add(bprm->mm, 
-		(void*)PROC_VIRTUAL_STACK_END, 
+		(void*)PROC_USER_STACK_VIRUTAL_BUTTOM, 
 		newStack, 
-		PROC_STACK_SIZE, 
-		FPAGING_P | FPAGING_RW | FPAGING_US,
+		PROC_USER_STACK_SIZE, 
+		(FPAGING_P | FPAGING_RW | FPAGING_US),
+		1
+	);
+
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	res = mmu_map_pages(
+		(void*)PROC_KERNEL_STACK_VIRTUAL_BUTTOM, 
+		mmu_translate(newKernelStack), 
+		PROC_KERNEL_STACK_SIZE, 
+		(FPAGING_P | FPAGING_RW)
+	);
+
+	if (IS_STAT_ERR(res)) {
+		goto out_fstack;
+	}
+
+	res = vma_add(bprm->mm,
+		(void*)PROC_KERNEL_STACK_VIRTUAL_BUTTOM,
+		newKernelStack,
+		PROC_KERNEL_STACK_SIZE,
+		(FPAGING_P | FPAGING_RW),
 		1
 	);
 
@@ -221,17 +267,13 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 		vma_destroy(process->mm);
 	}
 
-	mmu_map_pages(
-		(void*)PROC_VIRTUAL_STACK_END, 
-		mmu_translate(newStack), 
-		PROC_STACK_SIZE, 
-		FPAGING_P | FPAGING_RW | FPAGING_US
-	);
-
 	process->mm = bprm->mm;
 	bprm->mm = NULL;
 
 	task->userStack = newStack;
+	memset(task->userStack, 0, PROC_USER_STACK_SIZE);
+
+	task->kernelStack = newKernelStack;
 	memset(task->kernelStack, 0, PROC_KERNEL_STACK_SIZE);
 
 	// TODO: Implement -> Close all file descriptors
@@ -240,7 +282,7 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 
 	task->regs.eip = (uint32_t)bprm->entryPoint;
 
-	task->regs.esp = PROC_VIRTUAL_STACK_START;
+	task->regs.esp = PROC_USER_STACK_VIRUTAL_TOP;
 	task->regs.ebp = task->regs.esp;
     task->regs.ss = USER_DATA_SEGMENT;
     task->regs.cs = USER_CODE_SEGMENT;
@@ -249,6 +291,7 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 
 out_fstack:
 	kfree(newStack);
+	kfree(newKernelStack);
 out_fbrpm:
 	bprm_free(bprm);
 	return res;
