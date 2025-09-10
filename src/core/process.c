@@ -61,6 +61,8 @@ struct Process* process_create(const char *name, const char *pwd, int argc, char
         return ERR_PTR(NO_MEMORY);
     }
 
+	memset(process->fileDescriptors, 0, sizeof(process->fileDescriptors));
+
     process->tasks = NULL;
     process->pwd = NULL;
 

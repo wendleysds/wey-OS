@@ -21,7 +21,6 @@ struct Task {
     uint16_t tid;
     struct Registers regs;
     struct Process* process;
-    int fileDescriptors[PROC_FD_MAX];
 
     void* userStack;
     void* kernelStack;

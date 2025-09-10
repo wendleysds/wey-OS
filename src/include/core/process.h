@@ -10,6 +10,7 @@ struct Process
 {
     uint16_t pid;
     char name[PROC_NAME_MAX];
+    int fileDescriptors[PROC_FD_MAX];
 
     struct mm_struct* mm;
 

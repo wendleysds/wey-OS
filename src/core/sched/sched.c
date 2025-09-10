@@ -45,8 +45,6 @@ static void init_task_idle(){
     _idleTask.kernelStack = kmalloc(PROC_KERNEL_STACK_SIZE);
     _idleTask.userStack = NULL;
 
-    memset(_idleTask.fileDescriptors, 0, sizeof(_idleTask.fileDescriptors));
-
     _idleTask.regs.eip = (uintptr_t)_idle_task_entry;
     _idleTask.regs.esp = (uintptr_t)_idleTask.kernelStack + PROC_KERNEL_STACK_SIZE;
     _idleTask.regs.ebp = _idleTask.regs.esp;
