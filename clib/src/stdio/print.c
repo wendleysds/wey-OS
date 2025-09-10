@@ -18,7 +18,7 @@ int printf(const char *restrict fmt, ...) {
 	// Helper to flush buffer
 	#define FLUSH_BUF() do { \
 		outbuf[outpos] = '\0'; \
-		syscall(SYS_write, (long)outbuf, (outpos+1), 0, 0); \
+		syscall(SYS_write, (long)outbuf, outpos, 0, 0); \
 		char_count += outpos; \
 		outpos = 0; \
 	} while (0)
