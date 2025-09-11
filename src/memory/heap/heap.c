@@ -38,20 +38,20 @@ static uint8_t _validate_table(struct HeapTable *table, void *ptr, void *end)
 }
 
 // Verifies if a pointer is aligned to the HEAP_BLOCK_SIZE
-static uint8_t _is_aligned(void *ptr)
+static inline uint8_t _is_aligned(void *ptr)
 {
 	return ((uintptr_t)ptr % HEAP_BLOCK_SIZE) == 0;
 }
 
 // Rounds up a value to the nearest multiple of HEAP_BLOCK_SIZE
 // Optimization if the HEAP_BLOCK_SIZE is a multiple of 2 (2, 4, 8, 16, ...)
-static uint32_t _align_value_to_block_size(uint32_t val)
+static inline uint32_t _align_value_to_block_size(uint32_t val)
 {
 	return (val + HEAP_BLOCK_SIZE - 1) & ~(HEAP_BLOCK_SIZE - 1);
 }
 
 // Get the entry flags (used/free)
-static uint8_t _get_block_entry_flag(uint8_t entry)
+static inline uint8_t _get_block_entry_flag(uint8_t entry)
 {
 	return entry & 0x0F;
 }
@@ -209,32 +209,64 @@ void *hcalloc(struct Heap *heap, size_t nmemb, size_t size)
 	return ptr;
 }
 
-// A basic and inefficient version of realloc
-//
-// Avoid using it!!
-//  -> Always allocates new memory and copies over the old data.
 void *hrealloc(struct Heap *heap, void *ptr, size_t newSize)
 {
 	if (!ptr)
-	{
 		return hmalloc(heap, newSize);
-	}
 
-	if (newSize == 0)
-	{
+	if (newSize == 0) {
 		hfree(heap, ptr);
 		return 0x0;
 	}
 
-	void *new_ptr = hmalloc(heap, newSize);
-	if (!new_ptr)
-	{
+	size_t aligned_size = _align_value_to_block_size(newSize);
+	int total_blocks = aligned_size / HEAP_BLOCK_SIZE;
+	int start_block = _address_to_block(heap, ptr);
+	if (start_block < 0)
 		return 0x0;
+
+	// Count current allocated blocks
+	size_t current_blocks = 0;
+	for (int i = start_block; i < heap->table->total; i++) {
+		current_blocks++;
+		if (!(heap->table->blockEntries[i] & _FBLOCK_HAS_NEXT))
+			break;
 	}
 
-	memcpy(new_ptr, ptr, newSize);
+	if (current_blocks >= total_blocks)
+		return ptr; // Enough space
 
-	hfree(heap, ptr);
+	// Check if we can extend in place
+	int extendable = 1;
+	for (int i = start_block + current_blocks; i < start_block + total_blocks && i < heap->table->total; i++) {
+		if (_get_block_entry_flag(heap->table->blockEntries[i]) != _FBLOCK_FREE) {
+			extendable = 0;
+			break;
+		}
+	}
+
+	if (extendable) {
+		// Mark additional blocks as used
+		for (int i = start_block + current_blocks; i < start_block + total_blocks; i++) {
+			uint8_t entry = _FBLOCK_USED;
+			if (i != start_block + total_blocks - 1)
+				entry |= _FBLOCK_HAS_NEXT;
+			heap->table->blockEntries[i] = entry;
+			total_memory_allocated_in_blocks++;
+		}
+
+		return ptr;
+	}
+
+	// Allocate new block and copy data
+	void *new_ptr = _malloc_blocks(heap, total_blocks);
+	if (!new_ptr)
+		return 0x0;
+
+	size_t copy_size = current_blocks * HEAP_BLOCK_SIZE;
+	memcpy(new_ptr, ptr, copy_size);
+	_set_blocks_free(heap, start_block);
+
 	return new_ptr;
 }
 

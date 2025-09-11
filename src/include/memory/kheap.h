@@ -7,6 +7,7 @@
 int init_kheap();
 void* kmalloc(size_t size);
 void* kcalloc(size_t nmemb, size_t size);
+void* krealloc(void *ptr, size_t newSize);
 void kfree(void* ptr);
 
 static inline void* kzalloc(size_t size) {

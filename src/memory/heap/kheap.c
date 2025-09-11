@@ -34,6 +34,10 @@ void* kcalloc(size_t nmemb, size_t size){
 	return hcalloc(&kernelHeap, nmemb, size);
 }
 
+void* krealloc(void *ptr, size_t newSize){
+	return hrealloc(&kernelHeap, ptr, newSize);
+}
+
 void kfree(void *ptr){
 	hfree(&kernelHeap, ptr);
 }
