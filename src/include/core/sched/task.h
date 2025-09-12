@@ -37,9 +37,19 @@ struct Task {
     struct Task* sprev;
 } __attribute__((packed));
 
+struct TaskQueue{
+    struct Task* head;
+    struct Task* tail;
+    int count;
+};
+
 struct Task* task_new(struct Process* proc, void* entry_point);
 void task_dispose(struct Task* task);
 void task_set_priority(struct Task* task, int priority);
 void task_set_state(struct Task* task, enum TaskState state);
+
+void task_enqueue(struct TaskQueue* queue, struct Task* task);
+struct Task* task_dequeue(struct TaskQueue* queue);
+void task_queue_remove(struct TaskQueue* queue, struct Task* task);
 
 #endif

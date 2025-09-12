@@ -8,13 +8,12 @@
 
 extern uint8_t scheduling;
 
-void schedule();
+void schedule(uint8_t saveCurrent);
 
 void scheduler_init();
 void scheduler_start();
 void scheduler_add_task(struct Task* task);
 void scheduler_remove_task(struct Task* task);
-void scheduler_sleep_task(struct Task* task);
 
 struct Task* scheduler_pick_next();
 

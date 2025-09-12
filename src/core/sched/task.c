@@ -88,3 +88,65 @@ void task_set_state(struct Task* task, enum TaskState state){
 
     task->state = state;
 }
+
+void task_enqueue(struct TaskQueue* queue, struct Task* task){
+    if (!queue || !task){
+        return;
+    }
+
+    task->snext = NULL;
+    task->sprev = queue->tail;
+
+    if (queue->tail) {
+        queue->tail->snext = task;
+    } else {
+        queue->head = task;
+    }
+
+    queue->tail = task;
+    queue->count++;
+}
+
+struct Task* task_dequeue(struct TaskQueue* queue){
+    if (!queue || queue->count <= 0) {
+        return NULL;
+    }
+
+    struct Task* task = queue->head;
+    queue->head = task->snext;
+
+    if (queue->head) {
+        queue->head->sprev = NULL;
+    } else {
+        queue->tail = NULL;
+    }
+
+    task->snext = NULL;
+    task->sprev = NULL;
+    queue->count--;
+    return task;
+}
+
+void task_queue_remove(struct TaskQueue* queue, struct Task* task){
+    if (!queue || !task || queue->count <= 0) {
+        return;
+    }
+
+    if (task->sprev) {
+        task->sprev->snext = task->snext;
+    } else {
+        queue->head = task->snext;
+    }
+
+    if (task->snext) {
+        task->snext->sprev = task->sprev;
+    } else {
+        queue->tail = task->sprev;
+    }
+
+    task->snext = NULL;
+    task->sprev = NULL;
+    if (queue->count > 0) {
+        queue->count--;
+    }
+}
