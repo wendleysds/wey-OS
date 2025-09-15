@@ -8,7 +8,7 @@
 
 extern uint8_t scheduling;
 
-void schedule(uint8_t saveCurrent);
+void schedule();
 
 void scheduler_init();
 void scheduler_start();

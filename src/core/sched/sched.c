@@ -11,7 +11,7 @@
 
 #define PIC_TIMER 0x20
 
-extern int __must_check dispatcher_load(struct Task* task, uint8_t saveCurrent);
+extern int __must_check dispatcher_load(struct Task* task);
 
 static struct TaskQueue _readyQueue;
 static struct TaskQueue _terminateQueue;
@@ -60,7 +60,7 @@ static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
 	schedule(0); // Do not save current again
 }
 
-void schedule(uint8_t saveCurrent){
+void schedule(){
 	struct Task* next = scheduler_pick_next();
 	if(!next){
 		// if has a task running, continue with it
@@ -72,7 +72,7 @@ void schedule(uint8_t saveCurrent){
 	}
 
 	next->state = TASK_RUNNING;
-	if(dispatcher_load(next, saveCurrent) != SUCCESS){
+	if(dispatcher_load(next) != SUCCESS){
 		panic("dispatcher_load(): Invalid task!");
 	}
 }
