@@ -1,9 +1,50 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
 #include <syscall.h>
 
 #define PRINTF_BUF_SIZE 256
+
+static void toa_base(long long value, char* result, int base, int is_unsigned) {
+	const char* digits = "0123456789abcdef";
+	char buffer[32];
+	int i = 0, j = 0;
+	int max_result_len = sizeof(buffer);
+
+	if (base < 2 || base > 16) {
+		if (result && max_result_len > 0)
+			result[0] = '\0';
+		return;
+	}
+
+	unsigned long long uvalue;
+	if (!is_unsigned && value < 0 && base == 10) {
+		if (j < max_result_len - 1)
+			result[j++] = '-';
+		uvalue = (unsigned long long)(-value);
+	} else {
+		uvalue = (unsigned long long)value;
+	}
+
+	do {
+		if (i < (int)sizeof(buffer) - 1)
+			buffer[i++] = digits[uvalue % base];
+		uvalue /= base;
+	} while(uvalue);
+
+	while(i > 0 && j < max_result_len - 1){
+		result[j++] = buffer[--i];
+	}
+
+	result[j] = '\0';
+}
+
+static inline void itoa(long long value, char* result, int base){
+	return toa_base(value, result, base, 0);
+}
+
+static inline void utoa(long long value, char* result, int base){
+	return toa_base(value, result, base, 1);
+}
 
 int printf(const char *restrict fmt, ...) {
 	va_list args;
