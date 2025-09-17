@@ -67,5 +67,24 @@ SYSCALL_DEFINE2(kb_read, char*, buffer, int, count){
 		return INVALID_ARG;
 	}
 
-	return NOT_IMPLEMENTED;
+	int read = 0;
+
+	while(read < count){
+		char c;
+		while((c = kb_pop()) != 0){
+			if(c == '\n'){
+				goto out;
+			}
+
+			buffer[read++] = c;
+		}
+
+		_sleep_current();
+	}
+
+out:
+
+	buffer[read] = '\0';
+
+	return count;
 }
