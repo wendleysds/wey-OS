@@ -52,12 +52,12 @@ static void init_task_idle(){
 }
 
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
-	if(pcb_save_current(frame) == NULL_PTR){
-		panic("pcb_save_current(*frame): Invalid frame pointer!");
+	if(pcb_save_current_from_frame(frame) == NULL_PTR){
+		panic("pcb_save_current_from_frame(*frame): Invalid frame pointer!");
 	}
 
 	pic_send_eoi(PIC_TIMER);
-	schedule(0); // Do not save current again
+	schedule();
 }
 
 void schedule(){
@@ -75,6 +75,11 @@ void schedule(){
 	if(dispatcher_load(next) != SUCCESS){
 		panic("dispatcher_load(): Invalid task!");
 	}
+}
+
+void schedule_next(struct Task* current){
+	// save regs
+	// schedule
 }
 
 void scheduler_start(){

@@ -10,25 +10,6 @@ static struct Task* _currentTask = 0x0;
 extern __no_return void pcb_return(struct Registers* regs);
 extern void sheduler_enqueue_auto(struct Task* task);
 
-static void pcb_save(struct Task* task, struct InterruptFrame* frame){
-    task->regs.eax = frame->eax;
-    task->regs.ebx = frame->ebx;
-    task->regs.ecx = frame->ecx;
-    task->regs.edx = frame->edx;
-
-    task->regs.ss = frame->ss;
-    task->regs.cs = frame->cs;
-
-    task->regs.ebp = frame->ebp;
-    task->regs.esp = frame->esp;
-    task->regs.eip = frame->eip;
-
-    task->regs.edi = frame->edi;
-    task->regs.esi = frame->esi;
-
-    task->regs.eflags = frame->eflags;
-}
-
 static inline int pcb_load(struct Task* task){
     if(task->tid == 0){
         _currentTask = task;
@@ -60,7 +41,7 @@ void pcb_set(struct Task* t){
 	_currentTask = t;
 }
 
-int pcb_save_current(struct InterruptFrame* frame){
+int pcb_save_current_from_frame(struct InterruptFrame* frame){
     if(!frame){
         return NULL_PTR;
     }
@@ -69,7 +50,23 @@ int pcb_save_current(struct InterruptFrame* frame){
         return NO_TASKS;
     }
 
-    pcb_save(_currentTask, frame);
+    _currentTask->regs.eax = frame->eax;
+    _currentTask->regs.ebx = frame->ebx;
+    _currentTask->regs.ecx = frame->ecx;
+    _currentTask->regs.edx = frame->edx;
+
+    _currentTask->regs.ss = frame->ss;
+    _currentTask->regs.cs = frame->cs;
+
+    _currentTask->regs.ebp = frame->ebp;
+    _currentTask->regs.esp = frame->esp;
+    _currentTask->regs.eip = frame->eip;
+
+    _currentTask->regs.edi = frame->edi;
+    _currentTask->regs.esi = frame->esi;
+
+    _currentTask->regs.eflags = frame->eflags;
+
     return SUCCESS;
 }
 
