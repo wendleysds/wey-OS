@@ -218,8 +218,6 @@ int mmu_init(){
 	if(IS_STAT_ERR(res)){
 		return res;
 	}
-
-	dir->entry[1023] = (PagingTable)((uintptr_t)mmu_translate(dir->entry) | FPAGING_P | FPAGING_RW); // self-referencing PDE
 	
 	idt_register_callback(14, &_page_fault_handler);
 
@@ -228,7 +226,15 @@ int mmu_init(){
 }
 
 struct PagingDirectory* mmu_create_page(){
-	return paging_new_directory();
+	struct PagingDirectory* dir = paging_new_directory();
+	if(!dir){
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	dir->entry[SELF_PDE_INDEX] = (PagingTable)((uintptr_t)mmu_translate(dir->entry) | FPAGING_P | FPAGING_RW);
+	dir->tableCount = 1;
+
+	return dir;
 }
 
 int mmu_page_switch(struct PagingDirectory* directory){
@@ -332,7 +338,10 @@ void* phys_to_virt(void* physicalAddr){
 }
 
 void mmu_copy_kernel_to_directory(struct PagingDirectory* directory){
-	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1024; i++){
+	PagingTable selfPde = directory->entry[SELF_PDE_INDEX];
+	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++){
 		directory->entry[i] = _kernelDirectory->entry[i];
 	}
+
+	directory->entry[SELF_PDE_INDEX] = selfPde;
 }
