@@ -58,29 +58,26 @@ static void _page_fault_handler(struct InterruptFrame* frame){
 	struct mm_struct* mm = 0x0;
 	struct Task* task = pcb_current();
 
+	_show_pf_info(pf);
+
 	if(task && task->process){
 		mm = task->process->mm;
 	}else{
 		panic("Page fault in kernel mode!");
 	}
-	
-	_show_pf_info(pf);
 
 	struct mem_region* v = vma_lookup(mm, faultingAddress);
 
 	if(!v){
-		// Invalid memory access
 		panic(
-			"Invalid memory access at 0x%x (ec=0x%x) [present=%d, write=%d, user=%d, rsvd=%d, exec=%d] in task %d (%s)\n", 
-			faultingAddress, pf.ec, pf.present, pf.write, pf.user, pf.rsvd, pf.exec,
+			"Invalid memory access in task %d (%s)\n",
 			task->tid, task->process ? task->process->name : "unknown"
 		);
 	}
 
 	if(!pf.present){
 		panic(
-			"Protection fault at 0x%x (ec=0x%x) [present=%d, write=%d, user=%d, rsvd=%d, exec=%d] in task %d (%s)\n", 
-			faultingAddress, pf.ec, pf.present, pf.write, pf.user, pf.rsvd, pf.exec,
+			"Protection fault in task %d (%s)\n", 
 			task->tid, task->process ? task->process->name : "unknown"
 		);
 	}
