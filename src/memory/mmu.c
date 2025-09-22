@@ -338,10 +338,10 @@ void* phys_to_virt(void* physicalAddr){
 }
 
 void mmu_copy_kernel_to_directory(struct PagingDirectory* directory){
-	PagingTable selfPde = directory->entry[SELF_PDE_INDEX];
-	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++){
+	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1023; i++){
 		directory->entry[i] = _kernelDirectory->entry[i];
 	}
 
-	directory->entry[SELF_PDE_INDEX] = selfPde;
+	// ensurence self PDE
+	directory->entry[SELF_PDE_INDEX] = (PagingTable)((uintptr_t)mmu_translate(directory->entry) | FPAGING_P | FPAGING_RW);
 }

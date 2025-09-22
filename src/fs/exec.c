@@ -32,7 +32,6 @@ static struct binprm* alloc_binprm(char* filename, int flags) {
 
 	struct PagingDirectory* dir = mmu_create_page();
 	mmu_copy_kernel_to_directory(dir);
-	dir->entry[1023] = (PagingTable)mmu_translate(dir->entry);
 
 	if(IS_ERR_OR_NULL(dir)){
 		kfree(bprm);
