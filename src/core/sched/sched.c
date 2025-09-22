@@ -11,7 +11,8 @@
 
 #define PIC_TIMER 0x20
 
-extern int __must_check dispatcher_load(struct Task* task);
+extern int __must_check pcb_load(struct Task* task);
+extern void pcb_set(struct Task* t);
 
 static struct TaskQueue _readyQueue;
 static struct TaskQueue _terminateQueue;
@@ -38,48 +39,57 @@ static void init_task_idle(){
 	_idleTask.kernelStack = kmalloc(PROC_KERNEL_STACK_SIZE);
 	_idleTask.userStack = NULL;
 
-	mmu_map_pages(
-		(void*)PROC_KERNEL_STACK_VIRTUAL_BUTTOM, 
-		mmu_translate(_idleTask.kernelStack), 
-		PROC_KERNEL_STACK_SIZE, 
-		(FPAGING_P | FPAGING_RW)
-	);
-
 	_idleTask.regs.eip = (uintptr_t)_idle_task_entry;
 	_idleTask.regs.esp = (uintptr_t)_idleTask.kernelStack + PROC_KERNEL_STACK_SIZE;
 	_idleTask.regs.ebp = _idleTask.regs.esp;
 	_idleTask.regs.cs = KERNEL_CODE_SELECTOR;
 }
 
+static struct Task* scheduler_pick_next(){
+	return task_dequeue(&_readyQueue);
+}			
+
+static void _switch_to(struct Task* prev, struct Task* to){
+	if(prev == to){
+		return;
+	}
+
+	if(!to){
+		if(prev && prev->state != TASK_WAITING){
+			return;
+		}
+
+		to = &_idleTask;
+	}
+
+	to->state = TASK_RUNNING;
+	if(pcb_load(to) != SUCCESS){
+		panic("pcb_load(): Invalid task!");
+	}
+}
+
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
-	if(pcb_save_current_from_frame(frame) == NULL_PTR){
+	struct Task* prev = pcb_current();
+	if(pcb_save_from_frame(prev, frame) == NULL_PTR){
 		panic("pcb_save_current_from_frame(*frame): Invalid frame pointer!");
 	}
 
 	pic_send_eoi(PIC_TIMER);
-	schedule();
+	struct Task* next = scheduler_pick_next();
+
+	_switch_to(prev, next);
 }
 
 void schedule(){
+	struct Task* prev = pcb_current();
+
+	if(pcb_save_context(&prev->regs) == 0){
+		return;
+	}
+
 	struct Task* next = scheduler_pick_next();
-	if(!next){
-		// if has a task running, continue with it
-		if(pcb_current()){
-			return;
-		}
 
-		next = &_idleTask;
-	}
-
-	next->state = TASK_RUNNING;
-	if(dispatcher_load(next) != SUCCESS){
-		panic("dispatcher_load(): Invalid task!");
-	}
-}
-
-void schedule_next(struct Task* current){
-	// save regs
-	// schedule
+	_switch_to(prev, next);
 }
 
 void scheduler_start(){
@@ -87,13 +97,13 @@ void scheduler_start(){
 		return;
 	}
 
+	pcb_set(0x0);
 	idt_register_callback(PIC_TIMER, _schedule_iqr_PIT_handler);
 	ticks = 0;
 	scheduling = 1;
 }
 
 void scheduler_init(){
-	extern void pcb_set(struct Task* t);
 	pcb_set(NULL);
 
 	init_task_idle();
@@ -140,8 +150,4 @@ void scheduler_remove_task(struct Task* task){
 	}
 
 	task_queue_remove(queue, task);
-}
-
-struct Task* scheduler_pick_next(){
-	return task_dequeue(&_readyQueue);
 }
