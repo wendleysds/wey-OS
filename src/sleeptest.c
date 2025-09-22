@@ -20,9 +20,10 @@ static void _sleep_current(){
 	struct Task* t = pcb_current();
 	if(!t) return;
 
-	// Save regs
-
+	t->state = TASK_WAITING;
 	task_enqueue(&_queue, t);
+	
+	schedule();
 }
 
 static void _wakeup_last(){
@@ -76,6 +77,7 @@ SYSCALL_DEFINE2(kb_read, char*, buffer, int, count){
 				goto out;
 			}
 
+			terminal_putchar(c, TERMINAL_DEFAULT_COLOR);
 			buffer[read++] = c;
 		}
 

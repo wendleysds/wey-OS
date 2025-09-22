@@ -142,19 +142,18 @@ void kmain(){
 		vfs_mount(device_get_name("hda"), "/", "vfat")
 	);
 
-	/*_INIT_PANIC(
+	extern void sleep_test();
+	sleep_test();
+
+	_INIT_PANIC(
 		"Starting userland",
 		"userland init failed!",
 		kernel_userland_init()
 	);
 
-	terminal_clear();
+	//terminal_clear();
 
-	pcb_set(0x0);
-	scheduler_start();*/
-
-	extern void sleep_test();
-	sleep_test();
+	scheduler_start();
 
 	while(1){
 		__asm__ volatile ("hlt");
