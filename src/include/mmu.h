@@ -16,6 +16,8 @@
 #define MAP_PRIVATE   0x2
 #define MAP_ANONYMOUS 0x4
 
+#define SELF_PDE_INDEX 1023
+
 #define VIRT_PDIR ((uint32_t*)0xFFFFF000)
 #define VIRT_PTBL(i) ((uint32_t*)(0xFFC00000 + (i) * PAGING_PAGE_SIZE))
 
