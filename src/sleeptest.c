@@ -73,11 +73,13 @@ SYSCALL_DEFINE2(kb_read, char*, buffer, int, count){
 	while(read < count){
 		char c;
 		while((c = kb_pop()) != 0){
+
+			terminal_putchar(c, TERMINAL_DEFAULT_COLOR);
+
 			if(c == '\n'){
 				goto out;
 			}
 
-			terminal_putchar(c, TERMINAL_DEFAULT_COLOR);
 			buffer[read++] = c;
 		}
 
