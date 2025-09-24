@@ -8,7 +8,6 @@
 static struct Task* _currentTask = 0x0;
 
 extern __no_return void pcb_return(struct Registers* regs);
-extern void sheduler_enqueue_auto(struct Task* task);
 
 int __must_check pcb_load(struct Task* task){
 	if(task->tid == 0){
@@ -18,10 +17,6 @@ int __must_check pcb_load(struct Task* task){
 
 	if(!task || !task->process){
 		return INVALID_ARG;
-	}
-
-	if(_currentTask && _currentTask->tid != 0){
-		sheduler_enqueue_auto(_currentTask);
 	}
 
 	int res;
@@ -39,13 +34,9 @@ void pcb_set(struct Task* t){
 }
 
 int pcb_save_from_frame(struct Task* task, struct InterruptFrame* frame){
-    if(!frame){
+    if(!frame || !task){
         return NULL_PTR;
     }
-
-	if(!task){
-		return INVALID_ARG;
-	}
 
     task->regs.eax = frame->eax;
     task->regs.ebx = frame->ebx;

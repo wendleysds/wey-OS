@@ -3,7 +3,7 @@
 #include <core/kernel.h>
 #include <memory/kheap.h>
 #include <lib/mem.h>
-#include <def/status.h>
+#include <def/err.h>
 #include <stdint.h>
 #include <drivers/terminal.h>
 #include <io/ports.h>
@@ -46,7 +46,9 @@ static void init_task_idle(){
 }
 
 static struct Task* scheduler_pick_next(){
-	return task_dequeue(&_readyQueue);
+	struct Task* t = task_dequeue(&_readyQueue);
+	if(!t) t = &_idleTask;
+	return t;
 }			
 
 static void _switch_to(struct Task* prev, struct Task* to){
@@ -54,24 +56,38 @@ static void _switch_to(struct Task* prev, struct Task* to){
 		return;
 	}
 
-	if(!to){
-		if(prev && prev->state != TASK_WAITING){
-			return;
-		}
+	if(to->tid == 0 && prev->state != TASK_WAITING){
+		return;
+	}
 
-		to = &_idleTask;
+	if(prev){
+		if(prev->state == TASK_RUNNING || prev->state == TASK_READY){
+			prev->state = TASK_READY;
+			task_enqueue(&_readyQueue, prev);
+		}else if(prev->state == TASK_FINISHED){
+			task_enqueue(&_terminateQueue, prev);
+		}else if(prev->state != TASK_WAITING){
+			panic("_switch_to(): Unknown task state!");
+		}
 	}
 
 	to->state = TASK_RUNNING;
-	if(pcb_load(to) != SUCCESS){
+	if(IS_STAT_ERR(pcb_load(to))){
 		panic("pcb_load(): Invalid task!");
 	}
 }
 
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
 	struct Task* prev = pcb_current();
-	if(pcb_save_from_frame(prev, frame) == NULL_PTR){
+
+	uint32_t idle_task_esp = prev->regs.esp;
+	if(IS_STAT_ERR(pcb_save_from_frame(prev, frame))){
 		panic("pcb_save_current_from_frame(*frame): Invalid frame pointer!");
+	}
+
+	// tmp hack
+	if(prev && prev->tid == 0){
+		prev->regs.esp = idle_task_esp;
 	}
 
 	pic_send_eoi(PIC_TIMER);
@@ -97,7 +113,7 @@ void scheduler_start(){
 		return;
 	}
 
-	pcb_set(0x0);
+	pcb_set(&_idleTask);
 	idt_register_callback(PIC_TIMER, _schedule_iqr_PIT_handler);
 	ticks = 0;
 	scheduling = 1;
@@ -112,22 +128,6 @@ void scheduler_init(){
 	memset(&_terminateQueue, 0x0, sizeof(struct TaskQueue));
 
 	scheduling = 0;
-}
-
-void sheduler_enqueue_auto(struct Task* task){
-	switch (task->state) {
-		case TASK_RUNNING:
-		case TASK_READY:
-			task->state = TASK_READY;
-			task_enqueue(&_readyQueue, task);
-			break;
-		case TASK_FINISHED:
-			task_enqueue(&_terminateQueue, task);
-			break;
-
-		default:
-			panic("sheduler_enqueue_auto(): Unknown task state!");
-	}
 }
 
 void scheduler_add_task(struct Task* task){
