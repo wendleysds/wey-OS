@@ -6,7 +6,8 @@
 #include <def/err.h>
 #include <stdint.h>
 
-static uint16_t next_tid = 1;
+extern uint16_t next_tid;
+
 static inline int alloc_tid() {
     return next_tid++; // Increment and return the next TID
 }

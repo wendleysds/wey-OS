@@ -1,5 +1,6 @@
 #include <core/kernel.h>
 #include <core/sched.h>
+#include <pid.h>
 
 #include <drivers/terminal.h>
 
@@ -131,6 +132,8 @@ void kmain(){
 	enable_interrupts();
 
 	load_drivers();
+
+	pid_restart();
 
 	scheduler_init();
 

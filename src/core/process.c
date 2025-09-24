@@ -8,7 +8,7 @@
 #include <memory/kheap.h>
 #include <mmu.h>
 
-static struct Process* _processes[PROC_MAX];
+extern struct Process* _processes[PROC_MAX];
 
 static int alloc_pid(){
     for (uint16_t pid = 0; pid < PROC_MAX; pid++) {
