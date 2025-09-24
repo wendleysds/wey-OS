@@ -15,4 +15,3 @@
 # 14 i386 mkdir sys_mkdir
 # 15 i386 rmdir sys_rmdir
 100 i386 write_terminal sys_write_terminal
-101 i386 kb_read sys_kb_read
