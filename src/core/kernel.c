@@ -154,7 +154,7 @@ void kmain(){
 		kernel_userland_init()
 	);
 
-	//terminal_clear();
+	terminal_clear();
 
 	scheduler_start();
 
