@@ -145,9 +145,6 @@ void kmain(){
 		vfs_mount(device_get_name("hda"), "/", "vfat")
 	);
 
-	extern void sleep_test();
-	sleep_test();
-
 	_INIT_PANIC(
 		"Starting userland",
 		"userland init failed!",
