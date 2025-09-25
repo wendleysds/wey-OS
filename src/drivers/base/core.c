@@ -9,13 +9,13 @@ struct device* devices[DEVICES_MAX] = { 0 };
 int __must_check device_register(struct device *dev){
 	int freeIndex = -1;
     for (int i = 0; i < DEVICES_MAX; i++){
-		if(dev->id == devices[i]->id || dev->devt == devices[i]->devt){
-			return INVALID_ARG;
+		if(devices[i]){
+			if(dev->id == devices[i]->id || dev->devt == devices[i]->devt){
+				return INVALID_ARG;
+			}
+		}else if(freeIndex == -1){
+			freeIndex = i;
 		}
-
-        if(!devices[i] && freeIndex == -1){
-           freeIndex = i;
-        }
     }
 
 	if(freeIndex != -1){
