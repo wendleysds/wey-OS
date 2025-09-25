@@ -7,21 +7,25 @@
 struct device* devices[DEVICES_MAX] = { 0 };
 
 int __must_check device_register(struct device *dev){
+	int freeIndex = -1;
     for (int i = 0; i < DEVICES_MAX; i++){
-        if(!devices[i]){
-            if(dev->id == i){
-                return INVALID_ARG; // Duplicated id;
-            }
+		if(dev->id == devices[i]->id || dev->devt == devices[i]->devt){
+			return INVALID_ARG;
+		}
 
-            dev->id = i;
-            devices[i] = dev;
-            return i;
+        if(!devices[i] && freeIndex == -1){
+           freeIndex = i;
         }
     }
 
+	if(freeIndex != -1){
+		devices[freeIndex] = dev;
+		return SUCCESS;
+	}
+
     warning("device_register(): device '%s' not registered! max devices reached\n", dev->name);
 
-    return OUT_OF_BOUNDS;
+    return LIST_FULL;
 }
 
 int device_unregister(struct device *dev){
