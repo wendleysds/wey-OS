@@ -17,6 +17,7 @@
 #define INVALID_FORMAT  -14
 #define NOT_EXISTS      -15
 #define NOT_FOUND       -16
+#define LIST_FULL       -17
 
 // Memory
 #define NO_MEMORY       -20
@@ -50,11 +51,9 @@
 #define INVALID_PTR     -54
 
 // Mult-task/Processes
-#define TASK_NOT_FOUND  -60
-#define TASK_BLOCKED    -61
-#define TASK_DEAD       -62
-#define INVALID_PID     -63
-#define NO_TASKS        -64
+#define TASK_DEAD       -60
+#define INVALID_PID     -61
+#define NO_TASKS        -62
 
 // File System
 #define FILE_NOT_FOUND  -70
@@ -63,6 +62,5 @@
 #define DIR_NOT_EMPTY   -73
 #define INVALID_FILE    -74
 #define FILE_TOO_LARGE  -75
-#define INVALID_NAME    -76
 
 #endif

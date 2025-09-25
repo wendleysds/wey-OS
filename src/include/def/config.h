@@ -52,7 +52,11 @@
 #define PATH_MAX 128
 #define FILE_DESCRIPTORS_MAX 64
 #define FILESYSTEMS_MAX 8
-#define DEVICES_MAX 8
+
+/*Devices*/
+#define DEVICES_MAX 16
+#define MAJOR_MAX 6
+#define MINOR_MAX 8
 
 /*Processes*/
 #define PROC_MAX 32
