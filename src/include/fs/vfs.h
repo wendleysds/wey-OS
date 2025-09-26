@@ -4,20 +4,12 @@
 #include <memory/kheap.h>
 #include <device.h>
 #include <stdint.h>
+#include <stat.h>
 
 #define FMODE_READ   0x1
 #define FMODE_WRITE  0x2
 #define FMODE_LSEEK  0x4
 #define FMODE_EXEC   0x8
-
-#define S_IFMT  00170000
-#define S_IFREG  0001000
-#define S_IFDIR  0002000
-#define S_IFCHR  0004000
-
-#define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
-#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
-#define S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
@@ -28,6 +20,8 @@ struct inode {
     uint32_t mode;
     uint32_t size;
     void *private_data;
+
+	dev_t i_rdev;
 
     struct inode_operations *i_op;
     struct file_operations *i_fop;
@@ -56,7 +50,9 @@ struct file_operations {
     int (*read)(struct file *file, void *buffer, uint32_t count);
     int (*write)(struct file *file, const void *buffer, uint32_t count);
     int (*lseek)(struct file *file, int offset, int whence);
+	int (*open) (struct inode *ino, struct file *file);
     int (*close)(struct file *file);
+	int (*release) (struct inode *ino, struct file *file);
 };
 
 struct inode_operations {
