@@ -6,14 +6,13 @@
 struct file_operations;
 
 struct blkdev{
-	struct device* dev;
+	char name[16];
 	const struct file_operations *ops;
 	dev_t devt;
+	struct device* dev;
 };
 
-void blkdev_init();
-
-int blkdev_device_add(struct blkdev *blkdev, struct device *dev);
-void blkdev_device_remove(struct blkdev *blkdev, struct device *dev);
+int blkdev_device_add(struct blkdev *blkdev);
+void blkdev_device_remove(struct blkdev *blkdev);
 
 #endif
