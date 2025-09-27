@@ -11,8 +11,6 @@ struct chrdev{
 	dev_t devt;
 };
 
-void chrdev_init();
-
 int chrdev_device_add(struct chrdev *cdev, struct device *dev);
 void chrdev_device_remove(struct chrdev *cdev, struct device *dev);
 
