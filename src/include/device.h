@@ -39,11 +39,10 @@ struct device {
 	int (*close)(struct device* dev);
 };
 
-int __must_check device_register(struct device *dev);
-int device_unregister(struct device *dev);
+void device_init();
 
-int __must_check device_add(struct device *dev);
-void device_remove(struct device *dev);
+int __must_check device_register(struct device *dev);
+void device_unregister(struct device *dev);
 
 struct device* device_get_name(const char* name);
 

@@ -3,8 +3,21 @@
 #include <def/status.h>
 #include <core/kernel.h>
 #include <lib/string.h>
+#include <lib/mem.h>
+
+extern void chrdev_init();
+extern void blkdev_init();
 
 struct device* devices[DEVICES_MAX] = { 0 };
+uint16_t next_id = 1;
+
+void device_init(){
+	blkdev_init();
+	chrdev_init();
+
+	memset(devices, 0x0, sizeof(devices));
+	next_id = 1;
+}
 
 int __must_check device_register(struct device *dev){
 	int freeIndex = -1;
@@ -20,6 +33,7 @@ int __must_check device_register(struct device *dev){
 
 	if(freeIndex != -1){
 		devices[freeIndex] = dev;
+		dev->id = next_id++;
 		return SUCCESS;
 	}
 
@@ -28,22 +42,14 @@ int __must_check device_register(struct device *dev){
     return LIST_FULL;
 }
 
-int device_unregister(struct device *dev){
-    if(devices[dev->id]->id == dev->id){
-        devices[dev->id] = 0x0;
-        return SUCCESS;
-    }
-
+void device_unregister(struct device *dev){
     for (int i = 0; i < DEVICES_MAX; i++){
         struct device* d = devices[i];
         if(d->id == dev->id){
-            d->id = -1;
             devices[i] = 0x0;
-            return SUCCESS;
+            return;
         }
     }
-
-    return NOT_FOUND;
 }
 
 struct device* device_get_name(const char* name){
