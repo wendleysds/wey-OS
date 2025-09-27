@@ -58,10 +58,13 @@ static int blkdev_open(struct inode *ino, struct file *file){
 		return INVALID_ARG;
 
 	struct blkdev *blkdev = blkdevs[minor];
-	if (!blkdev || !blkdev->ops || !blkdev->ops->open)
+	if (!blkdev || !blkdev->ops)
 		return NULL_PTR;
 
 	file->f_op = (struct file_operations*)blkdev->ops;
+
+	if(!blkdev->ops->open)
+		return SUCCESS;
 
 	return file->f_op->open(ino, file);
 }
