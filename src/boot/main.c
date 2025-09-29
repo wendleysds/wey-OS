@@ -1,5 +1,6 @@
 #include <boot/bios.h>
 #include <boot/video.h>
+#include <def/compile.h>
 #include <stdint.h>
 
 /*
@@ -9,6 +10,7 @@
 extern void go_to_protect_mode();
 
 // TODO: Implement missing
+__section(".text.entry")
 void main(){
 
 	// Check CPU
