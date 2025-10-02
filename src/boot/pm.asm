@@ -89,6 +89,9 @@ init_pm:
 	jmp $
 
 .ok:
+	mov ebp, 0x00200000
+	mov esp, ebp
+
 	jmp CODE_SEG:0x0100000
 
 ;Seach a file with the name iquals [entry_file_name] and get wis desired cluster

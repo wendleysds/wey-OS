@@ -8,6 +8,10 @@ SECTIONS
 {
   . = KERNEL_PHYS_BASE;
 
+  .init ALIGN(4096) : AT(ADDR(.init)) {
+    *(.text.init*) *(.rodata.init*) *(.data.init*) *(.bss.init*) *(COMMON)
+  }
+
   .boot ALIGN(4096) : AT(ADDR(.boot)) {
     __boot_start = .;
     *(.text.boot*) *(.rodata.boot*) *(.data.boot*) *(.bss.boot*) *(COMMON)

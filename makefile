@@ -45,19 +45,15 @@ INIT_BIN = $(BIN_DIR)/init.bin
 KERNEL_BIN = $(BIN_DIR)/kernel.bin
 
 # Source Files
-EXCLUDED_B16_FILES = $(SRC_DIR)/boot/entry16.asm $(SRC_DIR)/boot/loader.asm
-EXCLUDED_B32_FILES = $(SRC_DIR)/core/entry32.asm
+EXCLUDED_B16_FILES = $(SRC_DIR)/boot/loader.asm
 
 SRC_C16_FILES = $(shell find $(SRC_DIR)/boot/ -type f -name "*.c")
 SRC_C32_FILES = $(shell find $(SRC_DIR) -type f -name "*.c" ! -path "$(SRC_DIR)/boot/*")
 
 SRC_B16_ASM_FILES = $(filter-out $(EXCLUDED_B16_FILES), $(shell find $(SRC_DIR)/boot/ -type f -name "*.asm"))
-SRC_B32_ASM_FILES = $(filter-out $(EXCLUDED_B32_FILES), $(shell find $(SRC_DIR) -type f -name "*.asm" ! -path "$(SRC_DIR)/boot/*"))
+SRC_B32_ASM_FILES = $(shell find $(SRC_DIR) -type f -name "*.asm" ! -path "$(SRC_DIR)/boot/*")
 
 # Object files
-KERNEL16_ENTRY = $(OBJ_DIR)/boot/entry16.asm.o
-KERNEL32_ENTRY= $(OBJ_DIR)/core/entry32.asm.o
-
 OBJ_C16_FILES = $(patsubst $(SRC_DIR)/boot/%.c, $(OBJ_DIR)/%.o, $(SRC_C16_FILES))
 OBJ_C32_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C32_FILES))
 
@@ -91,28 +87,20 @@ $(BOOTLOADER_BIN): $(SRC_DIR)/boot/loader.asm
 	$(ASM) $(ASMFLAGS) -f bin $^ -o $@
 
 # Kernel
-$(KERNEL_BIN): $(KERNEL32_ENTRY) $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) | $(BIN_DIR)
+$(KERNEL_BIN): $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) | $(BIN_DIR)
 	@echo "Compiling Kernel binary..."
 	@echo "Obj C Files:" $(OBJ_C32_FILES)
 	@echo "Obj ASM Files:" $(OBJ_ASM32_FILES)
 	$(LD) $(LDFLAGS) -T $(LINKER_B32_FILE) -o $@ $^ --oformat binary
 
 # init
-$(INIT_BIN): $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) | $(BIN_DIR)
+$(INIT_BIN): $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) | $(BIN_DIR)
 	@echo "Compiling init binary..."
 	@echo "Obj C Files:" $(OBJ_C16_FILES)
 	@echo "Obj ASM Files:" $(OBJ_ASM16_FILES)
 	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $@ $^ --oformat binary
 
 # Compile Objects
-# Entries
-$(KERNEL16_ENTRY): $(SRC_DIR)/boot/entry16.asm
-	@mkdir -p $(OBJ_DIR)/boot
-	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
-
-$(KERNEL32_ENTRY): $(SRC_DIR)/core/entry32.asm
-	@mkdir -p $(OBJ_DIR)/core
-	$(ASM) $(ASMFLAGS) -f elf32 $^ -o $@
 
 # 16 BITS Files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/boot/%.c | $(OBJ_DIR)
@@ -151,7 +139,7 @@ disassembly-img:
 	i686-elf-objdump -D -b binary -m i386 -M intel build/img/kernel.img | less
 
 create-symbols: $(BUILD_DIRS)
-	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $(SYMBOLS_DIR)/init.elf $(KERNEL16_ENTRY) $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) --oformat elf32-i386
+	$(LD) $(LDFLAGS) -T $(LINKER_B16_FILE) -o $(SYMBOLS_DIR)/init.elf $(OBJ_C16_FILES) $(OBJ_ASM16_FILES) --oformat elf32-i386
 	$(LD) $(LDFLAGS) -T $(LINKER_B32_FILE) -o $(SYMBOLS_DIR)/kernel.elf $(KERNEL32_ENTRY) $(OBJ_C32_FILES) $(OBJ_ASM32_FILES) --oformat elf32-i386
 
 debug:

@@ -12,6 +12,7 @@
 #endif
 
 #define __no_return __attribute__((noreturn))
+#define __section(x) __attribute__((section(x)))
 
 #define asmlinkage __attribute__((regparm(0)))
 #define stringfy(s) #s

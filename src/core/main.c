@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define __section(x) __attribute__((section(x)))
 #define _MASK 0xFFFFF000
 
 #define VIDEO_INFO_LOCATION 0x8000
@@ -208,7 +207,7 @@ static void _map_stack(struct PagingDirectory* directory){
 	);
 }
 
-__section(".text.boot") 
+__section(".text.init")
 void main(){
 	_MALLOC_INIT(_TEMP_PAGE_DIRECTORY_ADDRESS);
 
@@ -233,4 +232,3 @@ void main(){
 		: "r"(KERNEL_STACK_VIRT_TOP), "r"(&kmain)
 	);
 }
-
