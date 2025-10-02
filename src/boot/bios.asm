@@ -1,4 +1,3 @@
-section .asm
 [BITS 16]
 
 global bios_putchar

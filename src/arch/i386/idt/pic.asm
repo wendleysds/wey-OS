@@ -1,5 +1,4 @@
 [BITS 32]
-section .asm
 
 global pic_remap
 

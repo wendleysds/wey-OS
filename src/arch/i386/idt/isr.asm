@@ -1,5 +1,3 @@
-section .asm
-
 global interrupt_pointer_table
 
 extern interrupt_handler

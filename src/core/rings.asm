@@ -1,5 +1,3 @@
-section .asm
-
 global _set_resgisters_segments
 
 _set_resgisters_segments:

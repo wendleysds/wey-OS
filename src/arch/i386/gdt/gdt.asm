@@ -1,4 +1,3 @@
-section .asm
 global gdt_load
 
 gdt_load:

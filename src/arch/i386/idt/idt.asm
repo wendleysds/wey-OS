@@ -1,5 +1,3 @@
-section .asm
-
 global load_idt
 global enable_interrupts
 global disable_interrupts 

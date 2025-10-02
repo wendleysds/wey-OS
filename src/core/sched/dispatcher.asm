@@ -1,5 +1,3 @@
-section .asm
-
 global pcb_return
 global pcb_save_context
 

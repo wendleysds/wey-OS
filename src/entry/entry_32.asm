@@ -1,5 +1,3 @@
-section .asm
-
 global _entry_isr80h_32
 
 extern isr80h_handler

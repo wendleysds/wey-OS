@@ -1,5 +1,3 @@
-section .asm
-
 global tss_load
 
 tss_load:
