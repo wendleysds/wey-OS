@@ -1,3 +1,4 @@
+#include <core/sched/task.h>
 #include <drivers/ata.h>
 #include <drivers/fat_fs.h>
 #include <drivers/keyboard.h>

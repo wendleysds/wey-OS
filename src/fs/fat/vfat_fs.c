@@ -70,8 +70,8 @@ static fat_type_t _fat_get_type(const uint8_t* sector0Buffer){
         return FAT_TYPE_32;
 }
 
-static struct FAT* fat_init(struct device* device){
-	struct Stream* stream = stream_new(device);
+static struct FAT* fat_init(struct blkdev* bdev){
+	struct Stream* stream = stream_new(bdev);
     if(!stream){
         return ERR_PTR(NO_MEMORY);
     }
@@ -114,8 +114,8 @@ err:
     return ERR_PTR(res);
 }
 
-static int fat_mount(struct superblock* sb, struct device* device){
-    if(!sb || !device){
+static int fat_mount(struct superblock* sb, struct blkdev* bdev){
+    if(!sb || !bdev){
         return INVALID_ARG;
     }
 
@@ -131,7 +131,7 @@ static int fat_mount(struct superblock* sb, struct device* device){
         return NO_MEMORY;
     }
 
-    struct FAT* fat = fat_init(device);
+    struct FAT* fat = fat_init(bdev);
     if(IS_ERR(fat)){
         kfree(sb);
         kfree(rootino);

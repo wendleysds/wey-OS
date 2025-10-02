@@ -2,7 +2,7 @@
 #define _VIRTUAL_FILE_SYSTEM_H
 
 #include <memory/kheap.h>
-#include <device.h>
+#include <blkdev.h>
 #include <stdint.h>
 #include <stat.h>
 
@@ -72,7 +72,7 @@ struct superblock {
 
 struct filesystem {
     const char *name;
-    int (*mount)(struct superblock* sb, struct device* device);
+    int (*mount)(struct superblock* sb, struct blkdev* device);
     int (*unmount)(struct superblock* sb);
     struct inode* (*get_root)(struct superblock* sb);
 };
@@ -88,7 +88,7 @@ struct mount {
 extern struct inode* vfs_root_node;
 extern struct mount* mnt_root;
 
-int vfs_mount(struct device *device, const char *mountpoint, const char *filesystemtype);
+int vfs_mount(struct blkdev *device, const char *mountpoint, const char *filesystemtype);
 int vfs_umount(const char *mountpoint);
 
 struct inode* vfs_lookup(const char *restrict path);

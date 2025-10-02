@@ -74,8 +74,8 @@ struct filesystem* _find_fs_by_name(const char* name){
     return 0x0;
 }
 
-int vfs_mount(struct device *device, const char *mountpoint, const char *filesystemtype){
-    if(!device || !mountpoint || !filesystemtype){
+int vfs_mount(struct blkdev *bdev, const char *mountpoint, const char *filesystemtype){
+    if(!bdev || !mountpoint || !filesystemtype){
         return INVALID_ARG;
     }
 
@@ -102,7 +102,7 @@ int vfs_mount(struct device *device, const char *mountpoint, const char *filesys
         return NO_MEMORY;
     }
 
-    int res = fs->mount(sb, device);
+    int res = fs->mount(sb, bdev);
     if(res != SUCCESS){
         kfree(sb);
         kfree(mnt);
