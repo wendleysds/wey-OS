@@ -23,13 +23,14 @@
 #include <fs/vfs.h>
 
 #define _INIT_PANIC(msg, pmsg, init_func) \
-	terminal_cwrite(0x00FF00, "[   ] "); \
+	terminal_cwrite(0xFFFF00, "[...] "); \
 	terminal_write(msg); \
 	if(IS_STAT_ERR((res = init_func))){ \
-		terminal_cwrite(0xFF0000, "\r[%d]\n", res); \
+		terminal_cwrite(0xFF0000, "\n[%d] %s\n", res, msg); \
 		panic(pmsg); \
 	} else \
-	terminal_cwrite(0x00FF00, "\r[ 0 ]\n")
+	terminal_cwrite(0x00FF00, "\n[ 0 ] "); \
+	terminal_write("%s\n", msg)
 
 /* 
  * Main module for the protected-mode kernel code
@@ -51,7 +52,25 @@ struct GDT_Structured gdt_ptr[TOTAL_GDT_SEGMENTS] = {
 	{.base = (uint32_t)&tss, .limit = sizeof(tss) - 1, .type = 0xE9, .flags = 0x0} // TSS Segment
 };
 
-static int8_t kernel_userland_init(){
+static const char* argv_init[] = { NULL, NULL };
+static const char* envp_init[] = { "HOME=/", "PATH=/bin", NULL };
+
+static int try_run_init(const char* filename){
+	argv_init[0] = filename;
+
+	terminal_write("Running ");
+	terminal_cwrite(0xFF1A1A, "%s ", filename);
+	terminal_write("as init process ", filename);
+
+	argv_init[0] = filename;
+
+	int res = kernel_exec(filename, argv_init, envp_init);
+	terminal_write("%d\n", res);
+
+	return res;
+}
+
+static int8_t kernel_prepare_userland(){
 	struct Process* kernel_p = process_create("init", 0, 0, 0, 0, 0);
 	if(IS_ERR(kernel_p)){
 		return PTR_ERR(kernel_p);
@@ -66,27 +85,10 @@ static int8_t kernel_userland_init(){
 	kfree(kernel_t->userStack);
 	kfree(kernel_t->kernelStack);
 
-	process_add_task(kernel_p, kernel_t);
-
-	int res;
-
-	pcb_set(kernel_t);
+	pcb_set(kernel_t); // Set current for the exec replace
 	scheduler_add_task(kernel_t); // Prepare task inside the scheduler whem ready
 
-	const char* bin1args[] = { "/bin/bash", NULL };
-	const char* bin2args[] = { "/bash", NULL };
-
-	const char* envp[] = { "HOME=/home", "PATH=/bin", NULL };
-
-	if((res = kernel_exec(bin1args[0], bin1args, envp)) == SUCCESS){
-		return res;
-	}
-
-	if(res != FILE_NOT_FOUND){
-		return res;
-	}
-
-	return kernel_exec(bin2args[0], bin2args, envp);
+	return SUCCESS;
 }
 
 static void _load_tss(){
@@ -142,22 +144,40 @@ void kmain(){
 	_INIT_PANIC(
 		"Mounting root",
 		"Failed to mount root!",
-		vfs_mount(device_get_name("hda"), "/", "vfat")
+		vfs_mount(blkdev_find_by_name("hda"), "/", "vfat")
 	);
 
 	_INIT_PANIC(
-		"Starting userland",
-		"userland init failed!",
-		kernel_userland_init()
+		"Preparing userland",
+		"failed!",
+		kernel_prepare_userland()
 	);
 
-	terminal_clear();
+	terminal_putchar('\n', 0);
 
-	scheduler_start();
+	if(!try_run_init("/bin/init") ||
+	   !try_run_init("/init") ||
+	   !try_run_init("/bin/bash") ||
+	   !try_run_init("/bash"))
+	{
+		const char* const* p;
+		terminal_write("  with args:\n");
+		for (p = argv_init; *p; p++)
+			terminal_write("    %s\n", *p);
+		terminal_write("  with envp:\n");
+		for (p = envp_init; *p; p++)
+			terminal_write("    %s\n", *p);
 
-	while(1){
-		__asm__ volatile ("hlt");
+		terminal_clear();
+
+		scheduler_start();
+
+		while(1){
+			__asm__ volatile ("hlt"); // Halt until the scheduler pick the task
+		}
 	}
+
+	panic("No init found!");
 }
 
 void panic(const char* fmt, ...){
