@@ -2,6 +2,7 @@
 #include <fs/vfs.h>
 #include <blkdev.h>
 #include <lib/mem.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
 
@@ -67,6 +68,20 @@ static int blkdev_open(struct inode *ino, struct file *file){
 		return SUCCESS;
 
 	return file->f_op->open(ino, file);
+}
+
+struct blkdev* blkdev_find_by_name(const char* name){
+	if(!name) return ERR_PTR(NULL_PTR);
+
+	for (int i = 0; i < MINOR_MAX; i++){
+		if(blkdevs[i]){
+			if(strcmp(blkdevs[i]->dev->name, name) == 0){
+				return blkdevs[i];
+			}
+		}
+	}
+	
+	return ERR_PTR(NOT_FOUND);
 }
 
 const struct file_operations def_blk_fops = {
