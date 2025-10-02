@@ -1,89 +1,93 @@
-#include <drivers/ata.h>
 #include <io/ports.h>
-#include <def/status.h>
-#include <arch/i386/pic.h>
-#include <arch/i386/idt.h>
-#include <core/sched.h>
+#include <def/err.h>
 #include <core/kernel.h>
 #include <lib/string.h>
+#include <core/sched/task.h>
+#include <fs/vfs.h>
+#include <drivers/ata.h>
+#include <blkdev.h>
 #include <device.h>
 
-#define SECTOR_SIZE 512
+#include "ata_internal.h"
 
-#define ATA_PRIMARY_IRQ   14
-#define ATA_SECONDARY_IRQ 15
+struct ATAChannel _ata_primary;
+struct ATAChannel _ata_secondary;
 
-static struct ATADevice ata_devices[4];
-static volatile int8_t ata_irq_invoked = 0;
-
-static void _ata_irq_handler(struct InterruptFrame* frame){
-	ata_irq_invoked = 1;
-}
-
-static void _ata_wait_irq(int channel) {
-    while (!ata_irq_invoked) {
-        // Sleep task
-		__asm__ volatile ("hlt");
-    }
-
-    ata_irq_invoked = 0;
-}
-
-static inline int8_t _ata_polling(struct ATADevice* dev){
-	int i;
-	for (i = 0; i < TRIES; i++)
-	{
-		uint8_t status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-		if (status & ATA_SR_DRQ) return 0;
+static int _ata_open(struct inode *ino, struct file *file){
+	if(!ino || !file){
+		return NULL_PTR;
 	}
 
-	return TIMEOUT;
-}
-
-static inline uint8_t _is_ata(struct device* dev){
-	if(dev->type != DEVICE_BLOCK){
-		return 0;
-	}
-	
+	struct ATADevice* atadev = 0x0;
 	for (int i = 0; i < 4; i++)
 	{
-		if(dev->driver_data == &ata_devices[i]){
-			return 1;
+		struct ATAChannel* channel = (i < 2) ?
+			&_ata_primary : &_ata_secondary;
+
+		atadev = &channel->devices[(i < 2 ? i : i - 2)];
+
+		if(!atadev->exists){
+			continue;
 		}
+
+		if(atadev->info.devt == ino->i_rdev){
+			break;
+		}
+
+		atadev = 0x0;
 	}
 
-	return 0;
-}
-
-static inline int ata_flush(struct ATADevice* dev, uint8_t lba48) {
-	int channel = (dev->ioBase == 0x1F0) ? 0 : 1;
-
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0xE0 | (dev->slave << 4));
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), lba48 ? ATA_CMD_CACHE_FLUSH_EXT : ATA_CMD_CACHE_FLUSH);
-
-	int i;
-	for (i = TRIES; i > 0; i--) {
-		uint8_t status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (!(status & ATA_SR_BSY)) break;
+	if(!atadev){
+		return NOT_FOUND;
 	}
 
-	if (i <= 0) return TIMEOUT;
-
-	_ata_wait_irq(channel);
-
-	uint8_t status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-	if (status & ATA_SR_ERR)
-		return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-
+	file->private_data = atadev;
+	
 	return SUCCESS;
 }
 
-static void _ata_register_irq(uint8_t channel){
-	uint8_t irq = (channel == 0 ? ATA_PRIMARY_IRQ : ATA_SECONDARY_IRQ);
+static struct file_operations fops = {
+	.open = _ata_open,
+	.write = ata_write,
+	.read = ata_read,
+	.lseek = ata_lseek
+};
 
-	idt_register_callback(IRQ(irq), _ata_irq_handler);
-	IRQ_clear_mask(irq);
+static int _ata_register_device(struct ATADevice* atadev, char channel){
+	if(!atadev){
+		return INVALID_ARG;
+	}
+
+	struct device* dev = (struct device*)kzalloc(sizeof(struct device));
+	if(!dev){
+		return NO_MEMORY;
+	}
+
+	struct blkdev* bdev = (struct blkdev*)kzalloc(sizeof(struct blkdev));
+	if(!bdev){
+		kfree(dev);
+		return NO_MEMORY;
+	}
+
+	const char* names[] = {"hda", "hdb", "hdc", "hdd"};
+
+	strncpy(dev->name, names[channel * 2 + atadev->drive], sizeof(dev->name));
+	strncpy(bdev->name, (char*)atadev->model, sizeof(bdev->name));
+
+	dev->driver_data = (void*)atadev;
+	bdev->dev = dev;
+	bdev->ops = &fops;
+
+	int res = blkdev_device_add(bdev);
+	if(IS_STAT_ERR(res)){
+		kfree(dev);
+		kfree(bdev);
+		return NO_MEMORY;
+	}
+
+	atadev->info.devt = dev->devt;
+
+	return SUCCESS;
 }
 
 static void _ata_probe_all() {
@@ -92,22 +96,27 @@ static void _ata_probe_all() {
 
 	for (int channel = 0; channel < 2; channel++) {
 		for (int drive = 0; drive < 2; drive++) {
-			struct ATADevice* atadev = &ata_devices[channel * 2 + drive];
-			atadev->ioBase = ioBases[channel];
-			atadev->ctrlBase = ctrlBases[channel];
-			atadev->slave = drive;
+			struct ATAChannel* ch = (channel == 0) ?
+				&_ata_primary : &_ata_secondary;
+
+			ch->ioBase = ioBases[channel];
+			ch->ctrlBase = ctrlBases[channel];
+
+			struct ATADevice* atadev = &ch->devices[drive];
+			atadev->channel = ch;
+			atadev->drive = drive;
 
 			uint16_t buffer[WORDS_PER_SECTOR];
 			if (ata_identify(atadev, buffer) == SUCCESS) {
-				_ata_register_irq(channel);
+				ata_register_irq(channel);
 
 				atadev->exists = 1;
-				atadev->isHD = buffer[0];
+				atadev->info.isHardDrive = buffer[0];
 				atadev->UDMAmodes = buffer[88];
 
-				atadev->lba48 = (buffer[83] & (1 << 10)) != 0;
+				atadev->info.isLBA48 = (buffer[83] & (1 << 10)) != 0;
 
-				if (atadev->lba48) {
+				if (atadev->info.isLBA48) {
 					atadev->addressableSectors = 
 					((uint64_t)buffer[100] |
 					((uint64_t)buffer[101] << 16) |
@@ -127,35 +136,11 @@ static void _ata_probe_all() {
 				}
 				*dst = 0;
 
-				struct device* dev = (struct device*)kmalloc(sizeof(struct device));
-				if(!dev){
-					panic("_ata_probe_all(): dev malloc failed!");
+				int res = _ata_register_device(atadev, channel);
+
+				if(IS_STAT_ERR(res)){
+					warning("_ata_probe_all(): error registering dev! %d\n", res);
 				}
-
-				struct device devbuffer = {
-					.id = -1,
-					.type = DEVICE_BLOCK,
-
-					.mode = 0,
-					.flags = 0,
-
-					.driver_data = (void*)atadev,
-
-					.read = ata_read,
-					.write = ata_write,
-					.ioctl = ata_ioctl,
-					.close = ata_close
-				};
-
-				const char* names[] = {"hda", "hdb", "hdc", "hdd"};
-				strcpy(devbuffer.name, names[channel * 2 + drive]);
-				memcpy(dev, &devbuffer, sizeof(devbuffer));
-
-				if(device_register(dev) == OUT_OF_BOUNDS){
-					warning("Failed to register '%s'!\n", dev->name);
-					kfree(dev);
-				}
-
 			} else {
 				atadev->exists = 0;
 			}
@@ -163,271 +148,33 @@ static void _ata_probe_all() {
 	}
 }
 
-void ata_init(){
-	memset(&ata_devices, 0x0, sizeof(ata_devices));
-	ata_irq_invoked = 0;
+int ata_identify(struct ATADevice* atadev, uint16_t* buffer) {
+	struct ATAChannel* channel = atadev->channel;
+	channel->active = atadev;
 
-	_ata_probe_all();
-}
+	outb_p(ATA_IO(channel, ATA_REG_HDDEVSEL), 0xA0 | (atadev->drive << 4)); // Drive/head register
+	outb_p(ATA_IO(channel, ATA_REG_SECCOUNT0), 0);
+	outb_p(ATA_IO(channel, ATA_REG_LBA0), 0);
+	outb_p(ATA_IO(channel, ATA_REG_LBA1), 0);
+	outb_p(ATA_IO(channel, ATA_REG_LBA2), 0);
+	outb_p(ATA_IO(channel, ATA_REG_COMMAND), ATA_CMD_IDENTIFY);
 
-int ata_identify(struct ATADevice* dev, uint16_t* buffer) {
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0xA0 | (dev->slave << 4)); // Drive/head register
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), 0);
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), 0);
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), 0);
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), 0);
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), ATA_CMD_IDENTIFY);
-
-	int t = TRIES;
 	uint8_t status;
-	do {
-		status = inb(ATA_IO(dev, ATA_REG_STATUS));
-		if (status == 0) return INVALID_ARG;
-        else if (status & ATA_SR_ERR) return ERROR;
-        else if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ)) break;
-	} while (--t > 0);
+	if(IS_STAT_ERR(status = ata_wait_irq(atadev))){
+		return status;
+	}
 
-	if (t <= 0) return TIMEOUT;
+	uint8_t cl = inb_p(ATA_IO(channel, ATA_REG_LBA1));
+	uint8_t ch = inb_p(ATA_IO(channel, ATA_REG_LBA2));
 
-	uint8_t cl = inb_p(ATA_IO(dev, ATA_REG_LBA1));
-	uint8_t ch = inb_p(ATA_IO(dev, ATA_REG_LBA2));
+	if (cl != 0 || ch != 0) return INVALID_STATE;
 
-	if (cl != 0 || ch != 0) return OP_ABORTED;
-
-    insw(ATA_IO(dev, ATA_REG_DATA), buffer, WORDS_PER_SECTOR);
+    insw(ATA_IO(channel, ATA_REG_DATA), buffer, WORDS_PER_SECTOR);
     return SUCCESS;
 }
 
-static inline int ata_read_28(struct ATADevice* dev, void* buffer, uint32_t lba, uint8_t totalSectors){
-	int channel = (dev->ioBase == 0x1F0) ? 0 : 1;
-	uint32_t count = 0; 
-
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0xE0 | (dev->slave << 4) | ((lba >> 24) & 0x0F));
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), totalSectors);
-
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (uint8_t)(lba));
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (uint8_t)(lba >> 8));
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (uint8_t)(lba >> 16));
-
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), ATA_CMD_READ_PIO);
-
-	int i;
-	for (i = TRIES; i > 0; i--) {
-		if (!(inb_p(ATA_IO(dev, ATA_REG_STATUS)) & ATA_SR_BSY)){
-			break;
-		}
-	}
-
-	if (i <= 0) return TIMEOUT;
-
-	uint16_t* ptr = (uint16_t*)buffer;
-	for(uint8_t sector = 0; sector < totalSectors; sector++){
-		_ata_wait_irq(channel);
-		uint8_t status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-
-		insw(ATA_IO(dev, ATA_REG_DATA), ptr, WORDS_PER_SECTOR);
-		ptr += WORDS_PER_SECTOR;
-		count += SECTOR_SIZE;
-	}
-
-	return count;
-}
-
-static inline int ata_read_48(struct ATADevice* dev, void* buffer, uint64_t lba, uint64_t totalSectors){
-	int channel = (dev->ioBase == 0x1F0) ? 0 : 1;
-	uint64_t count = 0;
-
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), (totalSectors >> 8) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (lba >> 24) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (lba >> 32) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (lba >> 40) & 0xFF);
-
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), totalSectors & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (lba >> 0) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (lba >> 8) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (lba >> 16) & 0xFF);
-
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0x40 | (dev->slave << 4));
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), ATA_CMD_READ_PIO_EXT);
-
-	int i;
-	for (i = TRIES; i > 0; i--) {
-		if (!(inb_p(ATA_IO(dev, ATA_REG_STATUS)) & ATA_SR_BSY)){
-			break;
-		}
-	}
-
-	if (i <= 0) return TIMEOUT;
-
-	uint16_t* ptr = (uint16_t*)buffer;
-	for(uint64_t sector = 0; sector < totalSectors; sector++){
-		_ata_wait_irq(channel);
-		uint8_t status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-
-		insw(ATA_IO(dev, ATA_REG_DATA), ptr, WORDS_PER_SECTOR);
-		ptr += WORDS_PER_SECTOR;
-		count += SECTOR_SIZE;
-	}
-
-	return count;
-}
-
-static inline int ata_write_28(struct ATADevice* dev, const void* buffer, uint32_t lba, uint8_t totalSectors){
-	//int channel = (dev->ioBase == 0x1F0) ? 0 : 1;
-	uint32_t count = 0; 
-
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0xE0 | (dev->slave << 4) | ((lba >> 24) & 0x0F));
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), totalSectors);
-
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (uint8_t)(lba));
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (uint8_t)(lba >> 8));
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (uint8_t)(lba >> 16));
-
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), ATA_CMD_WRITE_PIO);
-
-	int i;
-	for (i = TRIES; i > 0; i--) {
-		if (!(inb_p(ATA_IO(dev, ATA_REG_STATUS)) & ATA_SR_BSY)){
-			break;
-		}
-	}
-
-	if (i <= 0) return TIMEOUT;
-
-	uint16_t* ptr = (uint16_t*)buffer;
-	for(uint8_t sector = 0; sector < totalSectors; sector++){
-		uint8_t status;
-		if((status = _ata_polling(dev)) != 0){
-			return status;
-		}
-			
-		status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-
-		for (int i = 0; i < WORDS_PER_SECTOR; i++) {
-			outw_p(ATA_IO(dev, ATA_REG_DATA), *ptr++);
-			count++;
-		}
-	}
-
-	ata_flush(dev, 0);
-
-	return count;
-}
-
-static inline int ata_write_48(struct ATADevice* dev, const void* buffer, uint64_t lba, uint16_t totalSectors){
-	//int channel = (dev->ioBase == 0x1F0) ? 0 : 1;
-	uint64_t count = 0;
-
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), (totalSectors >> 8) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (lba >> 24) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (lba >> 32) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (lba >> 40) & 0xFF);
-
-	outb_p(ATA_IO(dev, ATA_REG_SECCOUNT0), totalSectors & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA0), (lba >> 0) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA1), (lba >> 8) & 0xFF);
-	outb_p(ATA_IO(dev, ATA_REG_LBA2), (lba >> 16) & 0xFF);
-
-	outb_p(ATA_IO(dev, ATA_REG_HDDEVSEL), 0x40 | (dev->slave << 4));
-	outb_p(ATA_IO(dev, ATA_REG_COMMAND), ATA_CMD_WRITE_PIO_EXT);
-
-	int i;
-	for (i = TRIES; i > 0; i--) {
-		if (!(inb_p(ATA_IO(dev, ATA_REG_STATUS)) & ATA_SR_BSY)){
-			break;
-		}
-	}
-
-	if (i <= 0) return TIMEOUT;
-
-	uint16_t* ptr = (uint16_t*)buffer;
-	for(uint8_t sector = 0; sector < totalSectors; sector++){
-		uint8_t status;
-		if((status = _ata_polling(dev)) != 0){
-			return status;
-		}	
-
-		status = inb_p(ATA_IO(dev, ATA_REG_STATUS));
-		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(dev, ATA_REG_ERROR));
-
-		for (int i = 0; i < WORDS_PER_SECTOR; i++) {
-			outw_p(ATA_IO(dev, ATA_REG_DATA), *ptr++);
-			count++;
-		}
-	}
-
-	ata_flush(dev, 1);
-
-	return count;
-}
-
-int ata_read(struct device* dev, void* buffer, uint32_t size, uint64_t offset){
-	if(!dev || offset < 0 || size <= 0 || !buffer){
-		return INVALID_ARG;
-	}
-
-	if(!_is_ata(dev)){
-		return INVALID_ARG;
-	}
-
-	if (offset % SECTOR_SIZE != 0 || size % SECTOR_SIZE != 0){
-		return BAD_ALIGNMENT;
-	}
-
-	uint32_t lba = offset / SECTOR_SIZE;
-	uint32_t totalSectors = size / SECTOR_SIZE;
-
-	struct ATADevice* atadev = (struct ATADevice*)dev->driver_data;
-
-	if(lba >= 0x10000000){
-		if(atadev->lba48)
-			return ata_read_48(atadev, buffer, lba, totalSectors);
-		return OUT_OF_BOUNDS;
-	}
-
-	if(size < 0xFF)
-		return OUT_OF_BOUNDS;
-
-	return ata_read_28(atadev, buffer, lba, totalSectors);
-}
-
-int ata_write(struct device* dev, const void* buffer, uint32_t size, uint64_t offset){
-	if(!dev || offset < 0 || size <= 0 || !buffer){
-		return INVALID_ARG;
-	}
-
-	if(!_is_ata(dev)){
-		return INVALID_ARG;
-	}
-
-	if (offset % SECTOR_SIZE != 0 || size % SECTOR_SIZE != 0){
-		return BAD_ALIGNMENT;
-	}
-
-	uint32_t lba = offset / SECTOR_SIZE;
-	uint32_t totalSectors = size / SECTOR_SIZE;
-
-	struct ATADevice* atadev = (struct ATADevice*)dev->driver_data;
-
-	if(lba >= 0x10000000){
-		if(atadev->lba48 && size < 0xFFFF)
-			return ata_write_48(atadev, buffer, lba, totalSectors);
-		return OUT_OF_BOUNDS;
-	}
-
-	if(size < 0xFF)
-		return OUT_OF_BOUNDS;
-
-	return ata_write_28(atadev, buffer, lba, totalSectors);
-}
-
-long ata_ioctl(struct device* dev, unsigned int cmd, unsigned long arg){
-	return NOT_IMPLEMENTED;
-}
-
-int ata_close(struct device* dev){
-	return NOT_IMPLEMENTED;
+void ata_init(){
+	memset(&_ata_primary, 0x0, sizeof(struct ATAChannel));
+	memset(&_ata_secondary, 0x0, sizeof(struct ATAChannel));
+	_ata_probe_all();
 }
