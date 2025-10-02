@@ -31,12 +31,6 @@ struct device {
 	dev_t devt;
 
 	struct list_head list;
-
-	// TMP ops
-	int (*read)(struct device* dev, void* buffer, uint32_t size, uint64_t offset);
-	int (*write)(struct device* dev, const void* buffer, uint32_t size, uint64_t offset);
-	long (*ioctl)(struct device* dev, unsigned int cmd, unsigned long arg);
-	int (*close)(struct device* dev);
 };
 
 void device_init();
