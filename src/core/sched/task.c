@@ -114,6 +114,11 @@ struct Task* task_dequeue(struct TaskQueue* queue){
     }
 
     struct Task* task = queue->head;
+	if(!task){
+		queue->count = 0;
+		return NULL;
+	}
+
     queue->head = task->snext;
 
     if (queue->head) {

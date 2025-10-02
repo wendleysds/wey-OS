@@ -60,7 +60,7 @@ static void _switch_to(struct Task* prev, struct Task* to){
 		return;
 	}
 
-	if(prev){
+	if(prev && prev->tid != 0){
 		if(prev->state == TASK_RUNNING || prev->state == TASK_READY){
 			prev->state = TASK_READY;
 			task_enqueue(&_readyQueue, prev);
@@ -78,6 +78,10 @@ static void _switch_to(struct Task* prev, struct Task* to){
 }
 
 static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
+	if(!scheduling){
+		return;
+	}
+
 	struct Task* prev = pcb_current();
 
 	uint32_t idle_task_esp = prev->regs.esp;
@@ -97,6 +101,10 @@ static void _schedule_iqr_PIT_handler(struct InterruptFrame* frame){
 }
 
 void schedule(){
+	if(!scheduling){
+		return;
+	}
+
 	struct Task* prev = pcb_current();
 
 	if(pcb_save_context(&prev->regs) == 0){
