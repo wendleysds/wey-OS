@@ -73,8 +73,6 @@ struct file_system_type{
 
 	struct inode* (*mount)(struct file_system_type*, int flags, const char* dev_name, void* data);
 	int (*unmount)(struct super_block*);
-
-	struct list_head list;
 };
 
 struct super_block {
@@ -102,29 +100,16 @@ struct super_operations{
 	int (*statfs)(struct inode*, struct stat*);
 };
 
-struct filesystem {
-    const char *name;
-    int (*mount)(struct super_block* sb, struct blkdev* device);
-    int (*unmount)(struct super_block* sb);
-    struct inode* (*get_root)(struct super_block* sb);
-};
-
 struct mount {
-    char *mountpoint;
-    struct filesystem *fs;
-
+	char *mountpoint;
 	struct inode* mnt_root;
 	struct super_block *mnt_sb;
-
-    struct super_block *sb;
-
-    struct mount *next;
+	struct mount *next;
 };
 
-extern struct inode* vfs_root_node;
 extern struct mount* mnt_root;
 
-int vfs_mount(struct blkdev *device, const char *mountpoint, const char *filesystemtype);
+int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, void* data);
 int vfs_umount(const char *mountpoint);
 
 struct inode* vfs_lookup(const char *restrict path);
@@ -143,8 +128,8 @@ int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 
-int vfs_register_filesystem(struct filesystem* fs);
-int vfs_unregister_filesystem(struct filesystem* fs);
+int vfs_register_filesystem(struct file_system_type* fs);
+int vfs_unregister_filesystem(struct file_system_type* fs);
 
 static inline void inode_dispose(struct inode *ino) {
     if (ino->private_data)
