@@ -70,6 +70,16 @@ struct super_block {
     void *private_data;
 };
 
+struct super_operations{
+	struct inode* (*alloc_inode)(struct super_block*);
+	void (*destroy_inode)(struct inode*);
+	void (*free_inode)(struct inode*);
+
+	int (*statfs)(struct inode*, struct stat*);
+	int (*remount)(struct super_block*, int*, char*);
+	int (*unmount)(struct super_block*);
+};
+
 struct filesystem {
     const char *name;
     int (*mount)(struct super_block* sb, struct blkdev* device);
