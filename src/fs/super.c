@@ -1,12 +1,11 @@
 #include <fs/vfs.h>
 #include <def/config.h>
-#include <def/status.h>
+#include <def/err.h>
 #include <lib/string.h>
 #include <memory/kheap.h>
 
-static struct filesystem* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
+static struct file_system_type* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
 struct mount* mnt_root = 0x0;
-struct inode* vfs_root_node = 0x0;
 
 static inline void _register_mount(struct mount* mount){
     mount->next = 0x0;
@@ -41,7 +40,7 @@ static inline int _unregister_mount(struct mount* mount){
     return NOT_FOUND;
 }
 
-int vfs_register_filesystem(struct filesystem* fs){
+int vfs_register_filesystem(struct file_system_type* fs){
     for (int i = 0; i < FILESYSTEMS_MAX; i++){
         if(!_registered_filesystems[i]){
             _registered_filesystems[i] = fs;
@@ -52,7 +51,7 @@ int vfs_register_filesystem(struct filesystem* fs){
     return OUT_OF_BOUNDS;
 }
 
-int vfs_unregister_filesystem(struct filesystem* fs){
+int vfs_unregister_filesystem(struct file_system_type* fs){
     for (int i = 0; i < FILESYSTEMS_MAX; i++){
         if(_registered_filesystems[i] == fs){
             _registered_filesystems[i] = 0x0;
@@ -63,7 +62,7 @@ int vfs_unregister_filesystem(struct filesystem* fs){
     return NOT_FOUND;
 }
 
-struct filesystem* _find_fs_by_name(const char* name){
+struct file_system_type* _find_fs_by_name(const char* name){
     for (int i = 0; i < FILESYSTEMS_MAX; i++)
     {
         if(strcmp(_registered_filesystems[i]->name, name) == 0){
@@ -74,49 +73,41 @@ struct filesystem* _find_fs_by_name(const char* name){
     return 0x0;
 }
 
-int vfs_mount(struct blkdev *bdev, const char *mountpoint, const char *filesystemtype){
-    if(!bdev || !mountpoint || !filesystemtype){
+int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, void* data){
+    if(!source || !mountpoint || !filesystemtype){
         return INVALID_ARG;
     }
 
-    struct filesystem* fs = _find_fs_by_name(filesystemtype);
+    struct file_system_type* fs = _find_fs_by_name(filesystemtype);
     if(!fs){
         return NOT_FOUND;
     }
 
-    struct super_block* sb = (struct super_block*)kmalloc(sizeof(struct super_block));
-    if(!sb){
-        return NO_MEMORY;
-    }
-
     struct mount* mnt = (struct mount*)kcalloc(sizeof(struct mount), 1);
     if(!mnt){
-        kfree(sb);
         return NO_MEMORY;
     }
 
     char* mts = strdup(mountpoint);
     if(!mts){
-        kfree(sb);
         kfree(mnt);
         return NO_MEMORY;
     }
 
-    int res = fs->mount(sb, bdev);
-    if(res != SUCCESS){
-        kfree(sb);
+	if(strncmp(source, "/dev", 3) == 0){
+		source += 5;
+	}
+
+	struct inode* root = fs->mount(fs, 0x0, source, data);
+    if(IS_ERR(root)){
         kfree(mnt);
         kfree(mts);
 
-        return res;
+        return PTR_ERR(root);
     }
 
-    if(!vfs_root_node){
-        vfs_root_node = fs->get_root(sb);
-    }
-
-    mnt->sb = sb;
-    mnt->fs = fs;
+	mnt->mnt_root = root;	
+    mnt->mnt_sb = (struct super_block *)root->i_sb;
     mnt->mountpoint = mts;
 
     _register_mount(mnt);
@@ -129,7 +120,7 @@ int vfs_umount(const char *mountpoint){
         if(strcmp(current->mountpoint, mountpoint) == 0){
             int res;
 
-            if((res = current->fs->unmount(current->sb)) != SUCCESS){
+            if((res = current->mnt_sb->fs_type->unmount(current->mnt_sb)) != SUCCESS){
                 return res;
             }
 
@@ -137,7 +128,6 @@ int vfs_umount(const char *mountpoint){
                 return res;
             }
 
-            kfree(current->sb);
             kfree(current->mountpoint);
             kfree(current);
 

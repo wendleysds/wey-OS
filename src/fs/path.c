@@ -7,9 +7,9 @@
 
 static struct inode *_find_mount_for_path(const char *path, const char **out_relative){
     size_t best_match_len = 0;
-    struct inode *result = vfs_root_node;
+	struct mount* current = mnt_root;
+    struct inode *result = current->mnt_root;
 
-    struct mount* current = mnt_root;
     while(current){
         const char* mntPath = current->mountpoint;
         size_t len = strlen(mntPath);  
@@ -17,7 +17,7 @@ static struct inode *_find_mount_for_path(const char *path, const char **out_rel
         if(strncmp(path, mntPath, len) == 0 && (path[len] == '/' || path[len] == '\0')){
             if(len > best_match_len){
                 best_match_len = len;
-                result = current->fs->get_root(current->sb);
+                result = current->mnt_root;
                 *out_relative = (path[len] == '/') ? path + len + 1 : path + len;
             }
         }

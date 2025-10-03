@@ -144,7 +144,7 @@ void kmain(){
 	_INIT_PANIC(
 		"Mounting root",
 		"Failed to mount root!",
-		vfs_mount(blkdev_find_by_name("hda"), "/", "vfat")
+		vfs_mount("/dev/hda", "/", "vfat", NULL)
 	);
 
 	_INIT_PANIC(
@@ -178,9 +178,11 @@ void kmain(){
 	}
 
 	panic("No init found!");
+
+	__builtin_unreachable();
 }
 
-void panic(const char* fmt, ...){
+void __no_return panic(const char* fmt, ...){
 	disable_interrupts();
 	terminal_write("\nPanic!\n  ");
 
@@ -192,6 +194,8 @@ void panic(const char* fmt, ...){
 	while(1){
 		__asm__ volatile ("hlt");
 	}
+
+	__builtin_unreachable();
 }
 
 void warning(const char* fmt, ...){

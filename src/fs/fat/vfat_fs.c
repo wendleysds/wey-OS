@@ -114,29 +114,40 @@ err:
     return ERR_PTR(res);
 }
 
-static int fat_mount(struct super_block* sb, struct blkdev* bdev){
-    if(!sb || !bdev){
-        return INVALID_ARG;
+static struct inode* fat_mount(struct file_system_type* fs_type, int flags, const char* dev_name, void* data){
+    if(!fs_type || !dev_name){
+        return ERR_PTR(INVALID_ARG);
     }
 
-    struct inode* rootino = (struct inode*)kmalloc(sizeof(struct inode));
-    if(!rootino){
-        return NO_MEMORY;
+	struct blkdev* bdev = blkdev_find_by_name(dev_name);
+	if(IS_ERR(bdev)){
+		return ERR_CAST(bdev);
+	}
+
+	struct super_block* fat_sb = (struct super_block*)kzalloc(sizeof(struct super_block));
+	if(!fat_sb){
+		return ERR_PTR(NO_MEMORY);
+	}
+
+    struct inode* fat_root = (struct inode*)kmalloc(sizeof(struct inode));
+    if(!fat_root){
+		kfree(fat_sb);
+        return ERR_PTR(NO_MEMORY);
     }
 
     struct FATFileDescriptor* root_fd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
     if(!root_fd){
-        kfree(sb);
-        kfree(rootino);
-        return NO_MEMORY;
+        kfree(fat_sb);
+        kfree(fat_root);
+        return ERR_PTR(NO_MEMORY);
     }
 
     struct FAT* fat = fat_init(bdev);
     if(IS_ERR(fat)){
-        kfree(sb);
-        kfree(rootino);
+        kfree(fat_sb);
+        kfree(fat_root);
         kfree(root_fd);
-        return PTR_ERR(fat);
+        return ERR_CAST(fat);
     }
     
     root_fd->fat = fat;
@@ -150,16 +161,19 @@ static int fat_mount(struct super_block* sb, struct blkdev* bdev){
     root_fd->entry.fstClusHI = root_fd->firstCluster >> 16;
     root_fd->entry.fstClusLO = root_fd->firstCluster & 0xFFFF;
 
-    rootino->i_op = &vfat_fs_iop;
-    rootino->i_fop = &vfat_fs_fop;
-    rootino->size = 0;
-    rootino->mode = S_IFDIR;
-    rootino->private_data = (void*)root_fd;
+    fat_root->i_op = &vfat_fs_iop;
+    fat_root->i_fop = &vfat_fs_fop;
+    fat_root->size = 0;
+    fat_root->mode = S_IFDIR;
+    fat_root->private_data = (void*)root_fd;
+	fat_root->i_sb = fat_sb;
 
-    sb->root_inode = rootino;
-    sb->private_data = (void*)fat;
+    fat_sb->root_inode = fat_root;
+    fat_sb->private_data = (void*)fat;
+	fat_sb->bdev = bdev;
+	fat_sb->fs_type = fs_type;
 
-    return SUCCESS;
+    return fat_root;
 }
 
 static int fat_unmount(struct super_block* sb){
@@ -192,15 +206,10 @@ static int fat_unmount(struct super_block* sb){
     return SUCCESS;
 }
 
-static struct inode* fat_get_root(struct super_block* sb){
-    return sb->root_inode;
-}
-
-static struct filesystem fat_fs = {
+static struct file_system_type fat_fs = {
     .name = "vfat",
     .mount = fat_mount,
-    .unmount = fat_unmount,
-    .get_root = fat_get_root
+    .unmount = fat_unmount
 };
 
 void fat_fs_init(){
