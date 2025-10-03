@@ -62,7 +62,7 @@ static int blkdev_open(struct inode *ino, struct file *file){
 	if (!blkdev || !blkdev->ops)
 		return NULL_PTR;
 
-	file->f_op = (struct file_operations*)blkdev->ops;
+	file->f_op = blkdev->ops;
 
 	if(!blkdev->ops->open)
 		return SUCCESS;

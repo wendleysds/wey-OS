@@ -2,6 +2,7 @@
 #define _VIRTUAL_FILE_SYSTEM_H
 
 #include <memory/kheap.h>
+#include <lib/list.h>
 #include <blkdev.h>
 #include <stdint.h>
 #include <stat.h>
@@ -16,15 +17,17 @@
 #define SEEK_END 2
 
 struct inode {
-    uint32_t ino;
-    uint32_t mode;
-    uint32_t size;
-    void *private_data;
+	uint32_t ino;
+
+	uint16_t mode;
+	uint32_t size;
+	void *private_data;
 
 	dev_t i_rdev;
 
-    struct inode_operations *i_op;
-    struct file_operations *i_fop;
+	const struct inode_operations *i_op;
+	const struct super_block* i_sb;
+	const struct file_operations *i_fop;
 };
 
 struct file {
@@ -33,7 +36,7 @@ struct file {
     uint32_t flags;
     void *private_data;
 
-    struct file_operations *f_op;
+    const struct file_operations *f_op;
 };
 
 struct stat {
@@ -65,9 +68,30 @@ struct inode_operations {
     int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
 };
 
+struct file_system_type{
+	const char *name;
+
+	struct inode* (*mount)(struct file_system_type*, int flags, const char* dev_name, void* data);
+	int (*unmount)(struct super_block*);
+
+	struct list_head list;
+};
+
 struct super_block {
-    struct inode *root_inode;
-    void *private_data;
+	struct list_head s_sbs;
+	
+	struct inode *root_inode;
+	void *private_data;
+	unsigned long flags;
+
+	struct file_system_type* fs_type;
+
+	const struct super_operations* s_op;
+
+	struct blkdev* bdev;
+	struct file* bdev_file;
+
+	struct list_head s_inodes;
 };
 
 struct super_operations{
@@ -76,8 +100,6 @@ struct super_operations{
 	void (*free_inode)(struct inode*);
 
 	int (*statfs)(struct inode*, struct stat*);
-	int (*remount)(struct super_block*, int*, char*);
-	int (*unmount)(struct super_block*);
 };
 
 struct filesystem {
@@ -90,6 +112,10 @@ struct filesystem {
 struct mount {
     char *mountpoint;
     struct filesystem *fs;
+
+	struct inode* mnt_root;
+	struct super_block *mnt_sb;
+
     struct super_block *sb;
 
     struct mount *next;
