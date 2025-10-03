@@ -1,4 +1,4 @@
-ENTRY(_entry32)
+ENTRY(main)
 OUTPUT_FORMAT(binary)
 
 KERNEL_PHYS_BASE = 0x00100000;
