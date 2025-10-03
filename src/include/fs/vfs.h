@@ -65,22 +65,22 @@ struct inode_operations {
     int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
 };
 
-struct superblock {
+struct super_block {
     struct inode *root_inode;
     void *private_data;
 };
 
 struct filesystem {
     const char *name;
-    int (*mount)(struct superblock* sb, struct blkdev* device);
-    int (*unmount)(struct superblock* sb);
-    struct inode* (*get_root)(struct superblock* sb);
+    int (*mount)(struct super_block* sb, struct blkdev* device);
+    int (*unmount)(struct super_block* sb);
+    struct inode* (*get_root)(struct super_block* sb);
 };
 
 struct mount {
     char *mountpoint;
     struct filesystem *fs;
-    struct superblock *sb;
+    struct super_block *sb;
 
     struct mount *next;
 };

@@ -84,7 +84,7 @@ int vfs_mount(struct blkdev *bdev, const char *mountpoint, const char *filesyste
         return NOT_FOUND;
     }
 
-    struct superblock* sb = (struct superblock*)kmalloc(sizeof(struct superblock));
+    struct super_block* sb = (struct super_block*)kmalloc(sizeof(struct super_block));
     if(!sb){
         return NO_MEMORY;
     }

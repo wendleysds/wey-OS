@@ -114,7 +114,7 @@ err:
     return ERR_PTR(res);
 }
 
-static int fat_mount(struct superblock* sb, struct blkdev* bdev){
+static int fat_mount(struct super_block* sb, struct blkdev* bdev){
     if(!sb || !bdev){
         return INVALID_ARG;
     }
@@ -162,7 +162,7 @@ static int fat_mount(struct superblock* sb, struct blkdev* bdev){
     return SUCCESS;
 }
 
-static int fat_unmount(struct superblock* sb){
+static int fat_unmount(struct super_block* sb){
     if(!sb){
         return INVALID_ARG;
     }
@@ -192,7 +192,7 @@ static int fat_unmount(struct superblock* sb){
     return SUCCESS;
 }
 
-static struct inode* fat_get_root(struct superblock* sb){
+static struct inode* fat_get_root(struct super_block* sb){
     return sb->root_inode;
 }
 
