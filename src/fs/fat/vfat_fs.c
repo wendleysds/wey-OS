@@ -5,7 +5,11 @@
 #include <io/stream.h>
 #include <lib/string.h>
 
-struct inode_operations vfat_fs_iop = {
+static void vfat_destroy_inode(struct inode* inode){
+	kfree(inode->private_data);
+}
+
+const struct inode_operations vfat_fs_iop = {
     .lookup = fat_lookup,
     .create = fat_create,
     .unlink = fat_unlink,
@@ -15,11 +19,15 @@ struct inode_operations vfat_fs_iop = {
     .setarrt = fat_setarrt
 };
 
-struct file_operations vfat_fs_fop = {
+const struct file_operations vfat_fs_fop = {
     .read = fat_read,
     .write = fat_write,
     .lseek = fat_lseek,
     .close = fat_close
+};
+
+const struct super_operations vfat_fs_sop = {
+	.destroy_inode = vfat_destroy_inode
 };
 
 static int8_t _valid_fat_sector(const uint8_t* sector0){
@@ -124,7 +132,7 @@ static struct inode* fat_mount(struct file_system_type* fs_type, int flags, cons
 		return ERR_CAST(bdev);
 	}
 
-	struct super_block* fat_sb = (struct super_block*)kzalloc(sizeof(struct super_block));
+	struct super_block* fat_sb = alloc_super();
 	if(!fat_sb){
 		return ERR_PTR(NO_MEMORY);
 	}
@@ -172,6 +180,7 @@ static struct inode* fat_mount(struct file_system_type* fs_type, int flags, cons
     fat_sb->private_data = (void*)fat;
 	fat_sb->bdev = bdev;
 	fat_sb->fs_type = fs_type;
+	fat_sb->s_op = &vfat_fs_sop;
 
     return fat_root;
 }
@@ -183,6 +192,8 @@ static int fat_unmount(struct super_block* sb){
 
     if(sb->private_data){
         struct FAT* fat = (struct FAT*)sb->private_data;
+
+		fat_update(fat);
 
         switch (fat->type)
         {

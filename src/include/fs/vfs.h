@@ -25,9 +25,11 @@ struct inode {
 
 	dev_t i_rdev;
 
+	struct super_block* i_sb;
 	const struct inode_operations *i_op;
-	const struct super_block* i_sb;
 	const struct file_operations *i_fop;
+
+	struct list_head i_sb_list;
 };
 
 struct file {
@@ -131,12 +133,12 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 int vfs_register_filesystem(struct file_system_type* fs);
 int vfs_unregister_filesystem(struct file_system_type* fs);
 
-static inline void inode_dispose(struct inode *ino) {
-    if (ino->private_data)
-        kfree(ino->private_data);
+struct super_block* alloc_super();
 
-    kfree(ino);
-}
+struct inode* inode_alloc(struct super_block *sb);
+struct inode* inode_new(struct super_block *sb);
+
+void inode_destroy(struct inode*);
 
 int kernel_exec(const char* pathname, const char* argv[], const char* envp[]);
 

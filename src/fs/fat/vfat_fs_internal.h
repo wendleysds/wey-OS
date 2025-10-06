@@ -160,11 +160,11 @@ struct FATFileDescriptor{
 	uint32_t parentDirCluster;
 };
 
-typedef int (*_fat_loader_func_t)(struct FAT*, struct Stream* stream, const uint8_t* sector0Buffer);
+typedef int (*fat_loader_func_t)(struct FAT*, struct Stream* stream, const uint8_t* sector0Buffer);
 
-extern _fat_loader_func_t loaders[];
-extern struct inode_operations vfat_fs_iop;
-extern struct file_operations vfat_fs_fop;
+extern const fat_loader_func_t loaders[];
+extern const struct inode_operations vfat_fs_iop;
+extern const struct file_operations vfat_fs_fop;
 
 // vfat dir
 struct inode* fat_lookup(struct inode *dir, const char *name);

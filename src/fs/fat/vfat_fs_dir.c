@@ -86,10 +86,10 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
                 continue;
             }
 
-            struct inode* inode = (struct inode*)kmalloc(sizeof(struct inode));
-            if(!inode){
-                return ERR_PTR(NO_MEMORY);
-            }
+			struct inode* inode = inode_new(dir->i_sb);
+			if(!inode){
+				return ERR_PTR(NO_MEMORY);
+			}
 
             struct FATFileDescriptor* newfd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
             if(!newfd){
@@ -157,7 +157,7 @@ int fat_rmdir(struct inode *dir, const char* name){
 
     struct FATFileDescriptor* tfd = (struct FATFileDescriptor*)tinode->private_data; 
     int itensCount = _fat_count_entries(fat, tfd->firstCluster);
-    inode_dispose(tinode);
+    inode_destroy(tinode);
 
     if(IS_STAT_ERR(itensCount)){
         return itensCount;

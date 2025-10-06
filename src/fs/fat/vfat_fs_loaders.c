@@ -158,7 +158,7 @@ static int fat32_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
     return SUCCESS;
 }
 
-_fat_loader_func_t loaders[] = {
+const fat_loader_func_t loaders[] = {
     [0] = fat12_load,
     [1] = fat16_load,
     [2] = fat32_load,

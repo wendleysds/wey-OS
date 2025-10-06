@@ -49,18 +49,24 @@ static inline struct inode* vfs_traverse_path(const char* path){
     struct inode *current = root;
     struct inode *next = NULL;
 
+	int res;
+
     char *token = strtok(pathcopy, "/");
     while(token){
-        if (!current->i_op || !current->i_op->lookup)
-            return ERR_PTR(NOT_SUPPORTED);
+        if (!current->i_op || !current->i_op->lookup){
+			res = NOT_SUPPORTED;
+			goto out_free;
+		}
 
         next = current->i_op->lookup(current, token);
         if (IS_ERR(next)) {
-            return next;
+			res = PTR_ERR(next);
+			goto out_free;
         }
 
-        if (current != root)
-            inode_dispose(current);
+        if (current != root){
+			inode_destroy(current);
+		}
         
         current = next;
         token = strtok(NULL, "/");
@@ -68,13 +74,20 @@ static inline struct inode* vfs_traverse_path(const char* path){
 
     if(!current->i_fop || !current->i_fop->read){
         if (current != root){
-            inode_dispose(current);
+            inode_destroy(current);
         }
 
         return ERR_PTR(INVALID_FILE);
     }
 
     return current;
+
+out_free:
+	if (current != root){
+		inode_destroy(current);
+	}
+
+	return ERR_PTR(res);
 }
 
 struct inode* vfs_lookup(const char *restrict path){

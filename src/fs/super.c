@@ -73,6 +73,16 @@ struct file_system_type* _find_fs_by_name(const char* name){
     return 0x0;
 }
 
+struct super_block* alloc_super(){
+	struct super_block* sb = (struct super_block*)kzalloc(sizeof(struct super_block));
+	if(sb){
+		INIT_LIST_HEAD(&sb->s_sbs);
+		INIT_LIST_HEAD(&sb->s_inodes);
+	}
+
+	return sb;
+}
+
 int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, void* data){
     if(!source || !mountpoint || !filesystemtype){
         return INVALID_ARG;

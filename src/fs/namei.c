@@ -54,7 +54,7 @@ int vfs_create(const char *restrict path, uint16_t mode){
 
 	char* filename = strrchr(path, '/') + 1;
     int res = dir->i_op->create(dir, filename, mode);
-    inode_dispose(dir);
+    inode_destroy(dir);
 
     return res;
 }
@@ -71,7 +71,7 @@ int vfs_unlink(const char *restrict path){
 
 	char* filename = strrchr(path, '/') + 1;
     int res = dir->i_op->unlink(dir, filename);
-    inode_dispose(dir);
+    inode_destroy(dir);
 
     return res;
 }
@@ -88,7 +88,7 @@ int vfs_mkdir(const char *restrict path){
 
 	char* filename = strrchr(path, '/') + 1;
     int res = dir->i_op->mkdir(dir, filename);
-    inode_dispose(dir);
+    inode_destroy(dir);
 
     return res;
 }
@@ -105,7 +105,7 @@ int vfs_rmdir(const char *restrict path){
 
 	char* filename = strrchr(path, '/') + 1;
     int res = dir->i_op->rmdir(dir, filename);
-    inode_dispose(dir);
+    inode_destroy(dir);
 
     return res;
 }

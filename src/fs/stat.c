@@ -32,6 +32,6 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
     res = dir->i_op->getattr(dir, filename, statbuf);
     
 out:
-    inode_dispose(dir);
+    inode_destroy(dir);
     return res;
 }

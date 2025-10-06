@@ -36,7 +36,7 @@ int vfs_close(struct file *file){
     }
 
     int res = file->f_op->close(file);
-    inode_dispose(file->inode);
+    inode_destroy(file->inode);
     kfree(file);
 
     return res;
