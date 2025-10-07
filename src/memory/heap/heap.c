@@ -31,7 +31,7 @@ static uint8_t _validate_table(struct HeapTable *table, void *ptr, void *end)
 
 	if (table->total != totalBlocks)
 	{
-		return FAILED;
+		return OUT_OF_BOUNDS;
 	}
 
 	return SUCCESS;
@@ -166,7 +166,7 @@ int create_heap(struct Heap *heap, struct HeapTable *table, void *startPtr, void
 {
 	if (!_is_aligned(startPtr) || !_is_aligned(end))
 	{
-		return INVALID_ARG;
+		return BAD_ALIGNMENT;
 	}
 
 	memset(heap, 0, sizeof(struct Heap));
@@ -175,7 +175,7 @@ int create_heap(struct Heap *heap, struct HeapTable *table, void *startPtr, void
 
 	if (_validate_table(table, startPtr, end))
 	{
-		return FAILED;
+		return OUT_OF_BOUNDS;
 	}
 
 	size_t tableSize = sizeof(uint8_t) * table->total;
