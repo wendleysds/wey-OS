@@ -1,12 +1,10 @@
-#include <core/process.h>
-#include <core/sched.h>
-#include <core/sched/task.h>
+#include <wey/process.h>
+#include <wey/sched.h>
+#include <wey/mmu.h>
+#include <lib/string.h>
+#include <mm/kheap.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <lib/string.h>
-#include <lib/mem.h>
-#include <memory/kheap.h>
-#include <mmu.h>
 
 extern struct Process* _processes[PROC_MAX];
 

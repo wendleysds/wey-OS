@@ -1,9 +1,9 @@
-#include <uaccess.h>
-#include <core/kernel.h>
-#include <core/sched.h>
+#include <wey/uaccess.h>
+#include <wey/panic.h>
+#include <wey/sched.h>
+#include <wey/mmu.h>
 #include <def/status.h>
 #include <def/config.h>
-#include <mmu.h>
 
 int copy_from_user(void* kdst, const void* usrc, uint64_t size){
    return NOT_IMPLEMENTED;

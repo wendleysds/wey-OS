@@ -1,5 +1,3 @@
-#include <lib/mem.h>
-
 void* memset(void* ptr, int c, unsigned long size){
 	char* temp = (char*) ptr;
 
@@ -61,4 +59,3 @@ void* memmove(void *dest, const void *src, unsigned long n){
 
 	return dest;
 }
-

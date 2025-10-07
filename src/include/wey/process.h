@@ -1,7 +1,7 @@
-#ifndef _TASK_H
-#define _TASK_H
+#ifndef _PROCESS_H
+#define _PROCESS_H
 
-#include <core/process.h>
+#include <wey/mmu.h>
 #include <def/config.h>
 #include <stdint.h>
 
@@ -14,8 +14,25 @@ struct Registers {
 } __attribute__((packed));
 
 enum TaskState { 
-    TASK_NEW, TASK_READY, TASK_RUNNING, TASK_WAITING, TASK_FINISHED
+	TASK_NEW, TASK_READY, TASK_RUNNING, TASK_WAITING, TASK_FINISHED
 };
+
+struct Process
+{
+    uint16_t pid;
+    char name[PROC_NAME_MAX];
+    int fileDescriptors[PROC_FD_MAX];
+
+    struct mm_struct* mm;
+
+    struct Task *tasks;
+
+    int argc, envc;
+    char **argv;
+    char **envp;
+
+    char *pwd;
+} __attribute__((packed));
 
 struct Task {
     uint16_t tid;
@@ -42,6 +59,14 @@ struct TaskQueue{
     struct Task* tail;
     int count;
 };
+
+struct Process *process_get(uint16_t pid);
+struct Process *process_create(const char *name, const char *pwd, int argc, char **argv, int envc, char **envp);
+
+int process_terminate(struct Process *process);
+int process_add_task(struct Process *process, struct Task *task);
+int process_remove_task(struct Process *process, struct Task *task);
+int process_chdir(struct Process *process, const char *path);
 
 struct Task* task_new(struct Process* proc, void* entry_point);
 void task_dispose(struct Task* task);

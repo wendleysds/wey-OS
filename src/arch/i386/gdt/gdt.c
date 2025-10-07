@@ -1,5 +1,5 @@
 #include <arch/i386/gdt.h>
-#include <core/kernel.h>
+#include <wey/panic.h>
 #include <stdint.h>
 
 /*

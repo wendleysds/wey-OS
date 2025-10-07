@@ -1,4 +1,4 @@
-#include <memory/paging.h>
+#include <mm/paging.h>
 #include <def/config.h>
 #include <def/compile.h>
 #include <drivers/terminal.h>

@@ -1,14 +1,13 @@
-#include "def/status.h"
-#include <mmu.h>
-#include <memory/paging.h>
+#include <wey/mmu.h>
+#include <wey/panic.h>
+#include <wey/sched.h>
+#include <mm/paging.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <core/kernel.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <arch/i386/idt.h>
 #include <drivers/terminal.h>
-#include <core/sched.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #define _ADDRS_NOT_ALING(virt, phys) \
 	(((uintptr_t)(virt) & (PAGING_PAGE_SIZE - 1)) || \

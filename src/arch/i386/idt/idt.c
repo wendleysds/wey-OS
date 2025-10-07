@@ -3,9 +3,9 @@
 #include <drivers/terminal.h>
 #include <def/config.h>
 #include <io/ports.h>
-#include <lib/mem.h>
-#include <core/kernel.h>
-#include <core/sched.h>
+#include <lib/string.h>
+#include <wey/panic.h>
+#include <wey/sched.h>
 #include <def/compile.h>
 
 #include <stdint.h>
@@ -15,39 +15,42 @@
  */
 
 static const char* _exceptionMessages[] = {
-  "Division By Zero",
-  "Debug",
-  "Non Maskable Interrupt",
-  "Breakpoint",
-  "Into Detected Overflow",
-  "Out of Bounds",
-  "Invalid Opcode",
-  "No Coprocessor",
-  "Double fault",
-  "Coprocessor Segment Overrun",
-  "Bad TSS",
-  "Segment not present",
-  "Stack fault",
-  "General protection fault",
-  "Page fault",
-  "Unknown Interrupt",
-  "x87 Floating-Point",
-  "Alignment Fault",
-  "Machine Check", 
-  "SIMD Floating-Point",
-  "Vitualization",
-  "Reserved",
+	"Division By Zero",
+	"Debug",
+	"Non Maskable Interrupt",
+	"Breakpoint",
+	"Into Detected Overflow",
+	"Out of Bounds",
+	"Invalid Opcode",
+	"No Coprocessor",
+	"Double fault",
+	"Coprocessor Segment Overrun",
+	"Bad TSS",
+	"Segment not present",
+	"Stack fault",
+	"General protection fault",
+	"Page fault",
+	"Unknown Interrupt",
+	"x87 Floating-Point",
+	"Alignment Fault",
+	"Machine Check", 
+	"SIMD Floating-Point",
+	"Vitualization",
 	"Reserved",
-  "Reserved",
-  "Reserved",
-  "Reserved",
-  "Reserved",
-  "Reserved",
-  "Reserved",
-  "Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
 	"Reserved",
 	"Reserved"
 };
+
+extern void kernel_registers();
+extern void user_registers();
 
 static void _print_frame(struct InterruptFrame* frame);
 

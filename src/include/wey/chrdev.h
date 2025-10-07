@@ -1,7 +1,7 @@
 #ifndef _CDEV_H
 #define _CDEV_H
 
-#include <device.h>
+#include <wey/device.h>
 
 struct file_operations;
 

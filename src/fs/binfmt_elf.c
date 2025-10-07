@@ -1,8 +1,8 @@
-#include <loaders/elf.h>
-#include <fs/binfmts.h>
-#include <fs/vfs.h>
-#include <mmu.h>
-#include <core/sched.h>
+#include <wey/elf.h>
+#include <wey/binfmts.h>
+#include <wey/vfs.h>
+#include <wey/mmu.h>
+#include <wey/sched.h>
 #include <def/err.h>
 
 static int load_elf_binarie(struct binprm *bprm);

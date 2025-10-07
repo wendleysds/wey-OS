@@ -1,5 +1,5 @@
-#include <memory/heap.h>
-#include <lib/mem.h>
+#include <mm/heap.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/status.h>
 #include <stdint.h>

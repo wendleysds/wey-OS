@@ -1,5 +1,4 @@
-#include <core/sched/task.h>
-#include <core/sched.h>
+#include <wey/sched.h>
 #include <drivers/ata.h>
 #include <arch/i386/idt.h>
 #include <arch/i386/pic.h>

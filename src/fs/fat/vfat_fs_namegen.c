@@ -1,5 +1,4 @@
 #include <lib/string.h>
-#include <lib/mem.h>
 #include <lib/utils.h>
 #include <stdint.h>
 

@@ -1,8 +1,8 @@
 #ifndef _STREAM_H
 #define _STREAM_H
 
-#include <blkdev.h>
-#include <fs/vfs.h>
+#include <wey/blkdev.h>
+#include <wey/vfs.h>
 #include <stdint.h>
 
 #define SECTOR_SIZE 512

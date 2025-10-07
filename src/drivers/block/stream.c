@@ -1,6 +1,6 @@
 #include <io/stream.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <mm/kheap.h>
+#include <lib/string.h>
 #include <def/status.h>
 
 struct Stream* stream_new(struct blkdev* bdev){

@@ -1,9 +1,9 @@
 #ifndef _MEMORY_MAP_H
 #define _MEMORY_MAP_H
 
-#include <memory/paging.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <mm/paging.h>
+#include <mm/kheap.h>
+#include <lib/string.h>
 #include <stdint.h>
 
 #define PROT_NONE  0x0

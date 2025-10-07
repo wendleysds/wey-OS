@@ -1,13 +1,12 @@
-#include <core/sched.h>
-#include <core/sched/task.h>
-#include <core/kernel.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <wey/sched.h>
+#include <wey/panic.h>
+#include <mm/kheap.h>
+#include <lib/string.h>
 #include <def/err.h>
-#include <stdint.h>
 #include <drivers/terminal.h>
 #include <io/ports.h>
 #include <arch/i386/pic.h>
+#include <stdint.h>
 
 #define PIC_TIMER 0x20
 

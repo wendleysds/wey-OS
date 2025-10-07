@@ -2,7 +2,7 @@
 #include <drivers/terminal.h>
 #include <arch/i386/idt.h>
 #include <io/ports.h>
-#include <lib/mem.h>
+#include <lib/string.h>
 #include <stdint.h>
 
 /*

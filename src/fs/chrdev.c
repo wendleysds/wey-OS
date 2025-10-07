@@ -1,7 +1,7 @@
-#include <device.h>
-#include <fs/vfs.h>
-#include <chrdev.h>
-#include <lib/mem.h>
+#include <wey/device.h>
+#include <wey/vfs.h>
+#include <wey/chrdev.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
 

@@ -1,4 +1,4 @@
-#include <fs/binfmts.h>
+#include <wey/binfmts.h>
 #include <def/status.h>
 
 static int load_script(struct binprm *bprm);

@@ -1,6 +1,6 @@
-#include <core/sched/task.h>
+#include <wey/process.h>
 #include <def/config.h>
-#include <lib/mem.h>
+#include <lib/string.h>
 
 struct Process* _processes[PROC_MAX];
 uint16_t next_tid;

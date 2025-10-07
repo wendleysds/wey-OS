@@ -1,7 +1,7 @@
-#include <fs/vfs.h>
+#include <wey/vfs.h>
+#include <wey/panic.h>
 #include <lib/list.h>
-#include <core/kernel.h>
-#include <memory/kheap.h>
+#include <mm/kheap.h>
 
 struct inode* inode_alloc(struct super_block* sb){
 	struct inode* inode;

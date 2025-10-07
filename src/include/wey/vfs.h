@@ -1,11 +1,11 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
-#include <memory/kheap.h>
+#include <wey/blkdev.h>
+#include <wey/stat.h>
+#include <mm/kheap.h>
 #include <lib/list.h>
-#include <blkdev.h>
 #include <stdint.h>
-#include <stat.h>
 
 #define FMODE_READ   0x1
 #define FMODE_WRITE  0x2

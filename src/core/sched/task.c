@@ -1,7 +1,6 @@
-#include <core/sched/task.h>
-#include <core/process.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <wey/process.h>
+#include <mm/kheap.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
 #include <stdint.h>

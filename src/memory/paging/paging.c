@@ -1,6 +1,5 @@
-#include "drivers/terminal.h"
-#include <mmu.h>
-#include <core/kernel.h>
+#include <wey/mmu.h>
+#include <wey/panic.h>
 #include <def/status.h>
 #include <stdint.h>
 

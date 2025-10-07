@@ -1,4 +1,4 @@
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 #include <def/err.h>
 #include <def/config.h>
 #include <lib/string.h>

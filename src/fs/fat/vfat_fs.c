@@ -1,7 +1,7 @@
 #include "vfat_fs_internal.h"
-#include <fs/vfs.h>
+#include <wey/vfs.h>
+#include <wey/mmu.h>
 #include <def/err.h>
-#include <mmu.h>
 #include <io/stream.h>
 #include <lib/string.h>
 

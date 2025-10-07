@@ -2,7 +2,7 @@
 #define _FAT_INTERNALS_H
 
 #include <io/stream.h>
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 #include <stdint.h>
 
 #define _SEC(lba) \

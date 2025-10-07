@@ -1,10 +1,9 @@
-#include <syscall.h>
-#include <core/kernel.h>
-#include <core/process.h>
-#include <core/sched.h>
+#include <wey/syscall.h>
+#include <wey/panic.h>
+#include <wey/sched.h>
 #include <def/err.h>
 #include <def/config.h>
-#include <lib/mem.h>
+#include <lib/string.h>
 
 #define ll long long
 
@@ -15,6 +14,9 @@
 
 extern void _entry_isr80h_32();
 extern void _set_idt(uint8_t interrupt_num, void* address, uint8_t flags);
+
+extern void kernel_registers();
+extern void user_registers();
 
 static long _invsys(ll, ll, ll, ll, ll, ll){
 	return INVALID_ARG;

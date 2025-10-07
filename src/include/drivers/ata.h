@@ -1,7 +1,7 @@
 #ifndef _ATA_LBA_H
 #define _ATA_LBA_H
 
-#include <device.h>
+#include <wey/device.h>
 #include <stdint.h>
 
 struct TaskQueue;

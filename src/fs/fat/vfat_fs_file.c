@@ -1,7 +1,6 @@
 #include "vfat_fs_internal.h"
 #include <def/err.h>
 #include <def/config.h>
-#include <lib/mem.h>
 #include <lib/string.h>
 
 static inline uint8_t _lfn_chksum(const uint8_t* shortName){

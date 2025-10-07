@@ -1,6 +1,6 @@
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 #include <def/err.h>
-#include <memory/kheap.h>
+#include <mm/kheap.h>
 
 struct file* vfs_open(const char *restrict path, uint32_t flags){
     if(!path){

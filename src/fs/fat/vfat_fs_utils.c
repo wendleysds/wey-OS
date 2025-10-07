@@ -1,6 +1,5 @@
 #include "vfat_fs_internal.h"
 #include <def/status.h>
-#include <lib/mem.h>
 
 uint8_t fat32_fsinfo_sig_valid(struct FAT32FSInfo* fsInfo){
     return (fsInfo->leadSignature == 0x41615252 &&

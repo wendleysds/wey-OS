@@ -1,6 +1,7 @@
-#include <core/kernel.h>
-#include <core/sched.h>
-#include <pid.h>
+#include <wey/panic.h>
+#include <wey/sched.h>
+#include <wey/pid.h>
+#include <wey/syscall.h>
 
 #include <drivers/terminal.h>
 
@@ -9,18 +10,17 @@
 #include <arch/i386/pic.h>
 #include <arch/i386/tss.h>
 
-#include <lib/mem.h>
 #include <lib/utils.h>
 #include <lib/string.h>
 
-#include <mmu.h>
-#include <memory/kheap.h>
+#include <wey/mmu.h>
+#include <mm/kheap.h>
 
 #include <def/config.h>
 #include <def/err.h>
 #include <stdint.h>
 
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 
 #define _INIT_PANIC(msg, pmsg, init_func) \
 	terminal_cwrite(0xFFFF00, "[...] "); \

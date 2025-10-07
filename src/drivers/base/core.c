@@ -1,9 +1,8 @@
-#include <device.h>
+#include <wey/device.h>
 #include <def/config.h>
 #include <def/status.h>
-#include <core/kernel.h>
+#include <wey/panic.h>
 #include <lib/string.h>
-#include <lib/mem.h>
 
 extern void chrdev_init();
 extern void blkdev_init();

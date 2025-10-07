@@ -1,7 +1,5 @@
 #include <lib/string.h>
-#include <lib/mem.h>
-#include <memory/kheap.h>
-#include <lib/mem.h>
+#include <mm/kheap.h>
 
 #define NULL ((void *)0)
 

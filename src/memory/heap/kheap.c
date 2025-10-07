@@ -1,10 +1,8 @@
-#include <memory/kheap.h>
-#include <memory/heap.h>
-
-#include <drivers/terminal.h>
-#include <core/kernel.h>
+#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <def/config.h>
-#include <lib/mem.h>
+#include <wey/panic.h>
+#include <lib/string.h>
 
 /*
  * Kernel heap manager

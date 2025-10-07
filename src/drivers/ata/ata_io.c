@@ -1,7 +1,7 @@
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 #include <def/err.h>
 #include <io/ports.h>
-#include <core/sched/task.h>
+#include <wey/process.h>
 #include <drivers/ata.h>
 
 #include "ata_internal.h"

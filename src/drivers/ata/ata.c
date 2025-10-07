@@ -1,12 +1,12 @@
 #include <io/ports.h>
 #include <def/err.h>
-#include <core/kernel.h>
+#include <wey/panic.h>
 #include <lib/string.h>
-#include <core/sched/task.h>
-#include <fs/vfs.h>
+#include <wey/process.h>
+#include <wey/vfs.h>
 #include <drivers/ata.h>
-#include <blkdev.h>
-#include <device.h>
+#include <wey/blkdev.h>
+#include <wey/device.h>
 
 #include "ata_internal.h"
 

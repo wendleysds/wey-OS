@@ -1,9 +1,8 @@
-#include <core/sched.h>
-#include <core/sched/task.h>
-#include <core/rings.h>
+#include <wey/sched.h>
+#include <wey/process.h>
 #include <def/status.h>
 #include <def/compile.h>
-#include <memory/paging.h>
+#include <mm/paging.h>
 
 static struct Task* _currentTask = 0x0;
 

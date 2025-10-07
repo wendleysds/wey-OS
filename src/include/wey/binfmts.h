@@ -1,9 +1,9 @@
 #ifndef _BINARY_FORMATS_H
 #define _BINARY_FORMATS_H
 
-#include <core/process.h>
-#include <fs/vfs.h>
-#include <mmu.h>
+#include <wey/process.h>
+#include <wey/vfs.h>
+#include <wey/mmu.h>
 #include <stdint.h>
 
 #define BINPRM_BUFF_SIZE 256

@@ -1,7 +1,7 @@
 #ifndef _CPU_SCHEDULER_H
 #define _CPU_SCHEDULER_H
 
-#include <core/sched/task.h>
+#include <wey/process.h>
 #include <arch/i386/idt.h>
 #include <def/compile.h>
 #include <stdint.h>

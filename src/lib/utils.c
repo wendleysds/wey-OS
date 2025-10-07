@@ -1,6 +1,5 @@
 #include <lib/utils.h>
 #include <lib/string.h>
-#include <lib/mem.h>
 #include <stdint.h>
 
 void itoa(int value, char* result, int base){

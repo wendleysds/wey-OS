@@ -1,7 +1,6 @@
-#include <fs/vfs.h>
+#include <wey/vfs.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <lib/mem.h>
 #include <lib/string.h>
 
 // /some/path/to/file.txt -> outdirs = "/some/path/to", outfname = "file.txt"

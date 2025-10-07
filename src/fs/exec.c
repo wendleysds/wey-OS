@@ -1,10 +1,10 @@
-#include <fs/binfmts.h>
-#include <fs/vfs.h>
-#include <mmu.h>
-#include <core/sched.h>
-#include <lib/string.h>
+#include <wey/binfmts.h>
+#include <wey/vfs.h>
+#include <wey/mmu.h>
+#include <wey/sched.h>
 #include <def/config.h>
 #include <def/err.h>
+#include <lib/string.h>
 
 extern struct binfmt elf_format;
 extern struct binfmt script_format;

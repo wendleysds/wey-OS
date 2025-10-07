@@ -1,15 +1,15 @@
-#include "core/kernel.h"
+#include <wey/panic.h>
 #include <drivers/terminal.h>
 #include <lib/font.h>
 #include <lib/utils.h>
-#include <lib/mem.h>
+#include <lib/string.h>
 #include <io/ports.h>
 #include <stdint.h>
 #include <stdarg.h>
 
 #include <def/err.h>
-#include <uaccess.h>
-#include <syscall.h>
+#include <wey/uaccess.h>
+#include <wey/syscall.h>
 
 /*
  * Main video stdout module
