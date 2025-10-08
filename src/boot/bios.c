@@ -2,8 +2,6 @@
 #include <stdarg.h>
 #include <stdint.h>
 
-extern void bios_int10h(const struct biosreg *ireg, struct biosreg *oreg);
-
 extern void bios_putchar(char c);
 
 static void itoa(int value, char *result, int base)
@@ -78,18 +76,8 @@ void bios_printf(const char *fmt, ...)
 	va_end(args);
 }
 
-/*
- * bios interrupt call
- */
-void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outReg)
-{
-	switch (int_no)
-	{
-	case 0x10:
-		bios_int10h(inReg, outReg);
-		return;
-	default:
-		bios_printf("bios int 0x%x not defined!\r\n", int_no);
-		return;
-	}
+void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outReg){
+	return;
 }
+
+void intcall(uint8_t int_no, const struct biosreg *ireg, struct biosreg *oreg);
