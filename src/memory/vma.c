@@ -91,9 +91,9 @@ int vma_clean(struct mm_struct* mm){
 				kfree(current->physBaseAddress);
 			}
 
-			kfree(current);
 		}
 		
+		kfree(current);
 		current = next;
 	}
 

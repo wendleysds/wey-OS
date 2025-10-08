@@ -53,6 +53,13 @@ struct PagingDirectory* paging_new_directory(){
         return NULL;
     }
 
+    directory->virt_addrs = (uint32_t*)kcalloc(sizeof(uint32_t), PAGING_TOTAL_ENTRIES_PER_TABLE);
+    if (!directory->virt_addrs) {
+		kfree(directory->entry);
+        kfree(directory);
+        return NULL;
+    }
+
     directory->tableCount = 0;
     return directory;
 }
@@ -63,15 +70,13 @@ void paging_free_directory(struct PagingDirectory *directory){
 	}
 
 	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
-		if (directory->entry[i] & FPAGING_P) {
-			PagingTable* pte = (PagingTable*)VIRT_PTBL(i);
-			kfree(pte);
-
-			directory->entry[i] = 0;
+		if (directory->virt_addrs[i] & FPAGING_P) {
+			kfree((void*)directory->virt_addrs[i]);
 		}
 	}
 
 	kfree(directory->entry);
+	kfree(directory->virt_addrs);
 	kfree(directory);
 }
 
@@ -92,7 +97,9 @@ int paging_map(void* virtualAddr, void* physicalAddr, uint8_t flags){
 			return NO_MEMORY;
 		}
 
+		_currentDirectory->virt_addrs[dirIndex] = (PagingTable)newTable | flags;
 		pde[dirIndex] = (PagingTable)paging_translate(newTable) | flags;
+
 		pte = VIRT_PTBL(dirIndex);
 		_currentDirectory->tableCount++;
 	}
@@ -112,8 +119,8 @@ int paging_unmap(void* virtualAddr){
 
 	uint32_t* pde = VIRT_PDIR;
 	if (!(pde[dirIndex] & FPAGING_P)) {
-        return ALREADY_UMAPD;
-    }
+		return ALREADY_UMAPD;
+	}
 
 	PagingTable* pte = VIRT_PTBL(dirIndex);
 	if (!(pte[tblIndex] & FPAGING_P)) {
@@ -121,7 +128,7 @@ int paging_unmap(void* virtualAddr){
 	}
 
 	pte[tblIndex] = 0;
-    _invlpg(virtualAddr);
+	_invlpg(virtualAddr);
 
 	for (int i = 0; i < PAGING_TOTAL_ENTRIES_PER_TABLE; i++) {
 		if (pte[i] & FPAGING_P) {
@@ -129,9 +136,11 @@ int paging_unmap(void* virtualAddr){
 		}
 	}
 
-	kfree(pte);
-    pde[dirIndex] = 0;
-    _invlpg((void*)((uintptr_t)dirIndex << 22));
+	kfree((void*)_currentDirectory->virt_addrs[dirIndex]);
+	_currentDirectory->virt_addrs[dirIndex] = 0;
+	pde[dirIndex] = 0;
+
+	_invlpg((void*)((uintptr_t)dirIndex << 22));
 	_currentDirectory->tableCount--;
 
 	return SUCCESS;

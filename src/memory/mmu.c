@@ -108,6 +108,7 @@ static int _map_kernel(struct PagingDirectory* directory, void* virtualAddr, voi
 
 		directory->tableCount++;
 		directory->entry[dirIndex] = (PagingTable)mmu_translate(table) | flags;
+		directory->virt_addrs[dirIndex] = (PagingTable)table | flags;
 	}else{
 		uintptr_t tableVirt = (uintptr_t)phys_to_virt((void*)directory->entry[dirIndex]);
 		table = (PagingTable*)(tableVirt & PAGE_MASK);
@@ -278,10 +279,6 @@ int mmu_destroy_page(struct PagingDirectory* directory){
 		return INVALID_ARG;
 	}else{
 		mmu_page_switch(_kernelDirectory);
-	}
-
-	for (uint16_t i = (KERNEL_VIRT_BASE >> 22); i < 1024; i++){
-		directory->entry[i] = 0;
 	}
 
 	paging_free_directory(directory);

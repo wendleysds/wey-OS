@@ -21,6 +21,7 @@ typedef uint32_t PagingTable;
 
 struct PagingDirectory {
 	uint32_t* entry;
+	uint32_t* virt_addrs; // keep track allocateds tables
 	uint32_t tableCount;
 };
 

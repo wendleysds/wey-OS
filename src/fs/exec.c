@@ -224,7 +224,7 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 		newStack, 
 		PROC_USER_STACK_SIZE, 
 		(FPAGING_P | FPAGING_RW | FPAGING_US),
-		1
+		0
 	);
 
 	if (IS_STAT_ERR(res)) {
@@ -247,13 +247,13 @@ int kernel_exec(const char* pathname, const char* argv[], const char* envp[]) {
 		newKernelStack,
 		PROC_KERNEL_STACK_SIZE,
 		(FPAGING_P | FPAGING_RW),
-		1
+		0
 	);
-
+	
 	if (IS_STAT_ERR(res)) {
 		goto out_fstack;
 	}
-
+	
 	res = bprm_load(bprm);
 	if (IS_STAT_ERR(res)) {
 		goto out_fstack;
