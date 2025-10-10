@@ -72,6 +72,6 @@ void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg)
 
 void setup_video();
 
-void bios_printf(const char* fmt, ...);
+void printf(const char* restrict fmt, ...);
 
 #endif

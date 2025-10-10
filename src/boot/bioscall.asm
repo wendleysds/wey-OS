@@ -1,18 +1,6 @@
 [BITS 16]
 
-global bios_putchar
 global intcall
-
-bios_putchar:
-	push bp
-	mov bp, sp
-
-	mov al, [bp+6]
-	mov ah, 0x0E
-	int 0x10
-
-	pop bp
-	ret
 
 ; void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 intcall:

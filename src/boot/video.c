@@ -102,7 +102,7 @@ void setup_video(){
 		videoStruct.isVesa = !(findedMode >= 0 && findedMode <= 0x16);
 	}
 	else{
-		bios_printf("%s\r\n", "Vesa Not Detected");
+		printf("%s\n", "Vesa Not Detected");
 	}
 
 	memcpy(
