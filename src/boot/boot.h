@@ -6,8 +6,9 @@
 #define SEG(ptr) (uint16_t)(((uint32_t)(ptr) >> 4) & 0xFFFF)
 #define OFF(ptr) (uint16_t)((uint32_t)(ptr) & 0xF)
 #define memset(d,c,l) __builtin_memset(d,c,l)
+#define memcpy(d,s,l) __builtin_memcpy(d,s,l)
 
-struct biosreg {
+struct biosregs {
 	union {
 		struct {
 			uint32_t edi;
@@ -66,10 +67,11 @@ static inline uint16_t gs(void){
 	return seg;
 }
 
-void initregs(struct biosreg *reg);
-void intcall(uint8_t int_no, const struct biosreg *ireg, struct biosreg *oreg);
+void initregs(struct biosregs *reg);
+void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 
-void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg* outReg);
+void setup_video();
+
 void bios_printf(const char* fmt, ...);
 
 #endif

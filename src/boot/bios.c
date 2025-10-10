@@ -1,4 +1,4 @@
-#include <boot/bios.h>
+#include "boot.h"
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -76,8 +76,8 @@ void bios_printf(const char *fmt, ...)
 	va_end(args);
 }
 
-void bios_intcall(int int_no, const struct biosreg *inReg, struct biosreg *outReg){
+void bios_intcall(int int_no, const struct biosregs *inReg, struct biosregs *outReg){
 	return;
 }
 
-void intcall(uint8_t int_no, const struct biosreg *ireg, struct biosreg *oreg);
+void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);

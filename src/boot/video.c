@@ -1,5 +1,6 @@
-#include <boot/video.h>
-#include <boot/bios.h>
+#include "boot.h"
+#include "vesa.h"
+#include <drivers/terminal.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -13,13 +14,17 @@
 // Try to find the mode with the desired resolution and bpp.
 // If it doesn't find it, it returns DEFAULT_MODE and fills outinfo with its data.
 static uint16_t _find_mode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_t x, uint16_t y, uint8_t bpp){
-	struct biosreg oreg;
-	struct biosreg ireg = { .ax=0x4F01, .ah=0x4F, .es=SEG(outinfo), .di=OFF(outinfo)};
+	struct biosregs ireg, oreg;
+	initregs(&ireg);
+	ireg.ax = 0x4F01;
+	ireg.ah = 0x4F;
+	ireg.es = SEG(outinfo);
+	ireg.di = OFF(outinfo);
 
 	int i;
 	for(i = 0; modes[i] != 0xFFFF; i++){
 		ireg.cx = modes[i];
-		bios_intcall(0x10, &ireg, &oreg);
+		intcall(0x10, &ireg, &oreg);
 
 		if(oreg.ax != 0x004F) continue;
 
@@ -39,7 +44,7 @@ static uint16_t _find_mode(uint16_t* modes, struct VbeInfoMode* outinfo, uint16_
 	}
 
 	ireg.cx = DEFAULT_MODE;
-	bios_intcall(0x10, &ireg, &oreg);
+	intcall(0x10, &ireg, &oreg);
 	return DEFAULT_MODE;
 }
 
@@ -59,9 +64,14 @@ void setup_video(){
 		.isVesa = 0
 	};
 
-	struct biosreg oreg;
-	struct biosreg ireg = { .ax=0x4F00, .ah=0x4F, .es=SEG(&infoBlock), .di=OFF(&infoBlock) };
-	bios_intcall(0x10, &ireg, &oreg);
+	struct biosregs ireg, oreg;
+	initregs(&ireg);
+	ireg.ax = 0x4F00;
+	ireg.ah = 0x4F;
+	ireg.es = SEG(&infoBlock);
+	ireg.di = OFF(&infoBlock);
+
+	intcall(0x10, &ireg, &oreg);
 
 	if(oreg.ax == 0x004f){
 		uint16_t *modes = (uint16_t*)((infoBlock.VideoModePtr[1] << 4) + infoBlock.VideoModePtr[0]);
@@ -77,7 +87,7 @@ void setup_video(){
 		ireg.es = 0;
 		ireg.di = 0;
 
-		bios_intcall(0x10, &ireg, 0x0);
+		intcall(0x10, &ireg, 0x0);
 
 		videoStruct.mode = findedMode;
 		videoStruct.width = info.width;
@@ -95,12 +105,10 @@ void setup_video(){
 		bios_printf("%s\r\n", "Vesa Not Detected");
 	}
 
-	uint8_t* dst = (uint8_t*)VIDEO_STRUCT_ADDR;
-	uint8_t* src = (uint8_t*)&videoStruct;
-
-	// Save Video struct
-	// for equals memcpy :D 
-	for(size_t i = 0; i < sizeof(struct VideoStruct); i++)
-    dst[i] = src[i];
+	memcpy(
+		(uint8_t*)VIDEO_STRUCT_ADDR, 
+		&videoStruct, 
+		sizeof(struct VideoStructPtr)
+	);
 }
 
