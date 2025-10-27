@@ -1,0 +1,59 @@
+src := $(srctree)/$(obj)
+
+# src = abspath of target
+# obj = target/
+#
+# obj-y = file1.o file2.o file3.o
+# subdir-y = dir1/ dir2/ dir3/
+#
+# $(Q)$(MAKE) $(build)=core/
+#    obj = core/
+#    src = /home/.../kernel/src/core/
+#
+#    %.o -> $(OBJ_DIR)/$(obj)/
+#
+
+obj-y :=
+subdir-y :=
+
+subdir-asflags-y :=
+subdir-ccflags-y :=
+
+-include $(src)/Makefile
+
+target := $(OBJ_DIR)/$(obj)built-in.o
+
+KBUILD_AFLAGS += $(subdir-asflags-y)
+KBUILD_CFLAGS += $(subdir-ccflags-y)
+
+subdir-y := $(sort $(subdir-y) $(patsubst %/,%, $(filter %/, $(obj-y))))
+obj-y := $(filter-out %/, $(obj-y))
+
+# Compile rules
+$(OBJ_DIR)/$(obj)%.o: $(src)%.c
+	@echo "  CC    $<"
+	@mkdir -p $(dir $@)
+	$(Q)$(CC) $(KBUILD_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/$(obj)%.asm.o: $(src)%.asm
+	@echo "  AS    $<"
+	@mkdir -p $(dir $@)
+	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $<
+
+subdir-obj := $(foreach dir, $(subdir-y), $(obj)$(dir)built-in.o)
+obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
+
+subdir-files := $(addprefix $(OBJ_DIR)/, $(subdir-obj))
+
+compile-objs := $(sort $(obj-y) $(subdir-files))
+
+all: $(subdir-obj) $(target)
+
+# Link all built-in.o subtargets and curdir object files into one top-level built-in.o
+$(target): $(compile-objs)
+	@echo "  LD    $@"
+	$(Q)$(LD) $(KBUILD_LDFLAGS) -r -o $@ $(compile-objs)
+
+# Make subtarget built-in.o
+$(subdir-obj):
+	$(Q)$(MAKE) $(build)=$(dir $@)
