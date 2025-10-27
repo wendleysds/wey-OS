@@ -1,0 +1,1 @@
+obj-y += heap.o kheap.o

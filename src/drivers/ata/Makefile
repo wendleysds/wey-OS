@@ -1,0 +1,1 @@
+obj-y += ata_io.o ata_irq.o ata.o

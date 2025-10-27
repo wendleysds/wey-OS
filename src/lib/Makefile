@@ -1,0 +1,1 @@
+obj-y += font.o list.o mem.o string.o uaccess.o utils.o

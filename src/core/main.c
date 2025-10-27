@@ -227,7 +227,7 @@ void main(){
 	__asm__ volatile (
 		"mov %0, %%esp\n\t"
 		"mov %%esp, %%ebp\n\t"
-		"jmp %1\n\t"
+		"jmp *%1\n\t"
 		:
 		: "r"(KERNEL_STACK_VIRT_TOP), "r"(&kmain)
 	);
