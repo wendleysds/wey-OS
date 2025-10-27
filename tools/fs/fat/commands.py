@@ -1,7 +1,7 @@
 from lib.fat.defs import FAT32, FAT32DirectoryEntry, FATFS
 import lib.fat.attributes as attr
 
-import os, sys
+import os
 
 def cluster_to_lba(fat: FAT32, cluster: int) -> int:
     return fat.firstDataSector + ((cluster - 2) * fat.headers.boot.secPerClus)

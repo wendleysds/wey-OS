@@ -96,18 +96,21 @@ def main():
 
         FATFS.format_file(None, img, createFSInfo == "True")
         fs = FATFS(img, int(startCluster))
+        
+        rootCluster = fs.fat.headers.extended.rootClus
 
-        fs.create(2, "boot", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
-        fs.create(2, "home", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
-        fs.create(2, "bin", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
+        fs.create(rootCluster, "boot", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
+        fs.create(rootCluster, "home", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
+        fs.create(rootCluster, "bin", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
+        fs.create(rootCluster, "dev", attr.DIRECTORY | attr.SYSTEM | attr.READY_ONLY)
 
-        bootEntry = fs.search(2, 'boot')
+        bootEntry = fs.search(rootCluster, 'boot')
         bootCluster = (bootEntry.fstClusHI << 16) | bootEntry.fstClusLO
 
-        fs.create(bootCluster, 'init.bin', attr.ARCHIVE | attr.SYSTEM | attr.READY_ONLY)
+        fs.create(bootCluster, 'setup.bin', attr.ARCHIVE | attr.SYSTEM | attr.READY_ONLY)
         fs.create(bootCluster, 'kernel.bin', attr.ARCHIVE | attr.SYSTEM | attr.READY_ONLY)
 
-        cmd.cp(fs, ['-ex'], os.path.join(bins, "init.bin"), '/boot/init.bin')
+        cmd.cp(fs, ['-ex'], os.path.join(bins, "setup.bin"), '/boot/setup.bin')
         cmd.cp(fs, ['-ex'], os.path.join(bins, "kernel.bin"), '/boot/kernel.bin')
         return 0
     
@@ -127,7 +130,10 @@ def main():
     res: int = 0
 
     if op in operations:
-        res = operations[op]()
+        try:
+            res = operations[op]()
+        except Exception as a:
+            print(f"Invalid arg! try {sys.argv[0]} --help")
     else:
         print(f"Invalid option! try {sys.argv[0]} --help")
 
