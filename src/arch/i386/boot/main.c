@@ -6,8 +6,6 @@
  * Main module for the real-mode kernel code
  */
 
-extern void go_to_protect_mode();
-
 // TODO: Implement missing
 __section(".text.entry")
 void main(){

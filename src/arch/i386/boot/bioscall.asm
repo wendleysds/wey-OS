@@ -8,9 +8,9 @@ intcall:
 	mov dx, [esp +8]  ; ireg
 	mov cx, [esp +12] ; oreg
 
-	cmp al, byte [no]
+	cmp al, byte [int_no]
 	je .do
-	mov [no], al
+	mov [int_no], al
 	jmp .do
 
 .do:
@@ -35,7 +35,7 @@ intcall:
 	popfd
 
 	db 0xCD
-no: db 0x0
+int_no: db 0x0
 
 	; Save cpu current state on stack
 	pushfd

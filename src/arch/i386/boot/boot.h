@@ -74,4 +74,6 @@ void setup_video();
 
 void printf(const char* restrict fmt, ...);
 
+void go_to_protect_mode();
+
 #endif
