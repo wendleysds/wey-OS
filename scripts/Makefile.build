@@ -15,28 +15,37 @@ src := $(srctree)/$(obj)
 
 obj-y :=
 subdir-y :=
-
+target :=
 subdir-asflags-y :=
 subdir-ccflags-y :=
 
+relocable := y
+
 -include $(src)/Makefile
 
-target := $(OBJ_DIR)/$(obj)built-in.o
+ifeq ($(target),)
+    target := $(OBJ_DIR)/$(obj)built-in.o
+endif
+
+relocflag :=
+ifeq ($(relocable), y)
+    relocflag += -r
+endif
 
 KBUILD_AFLAGS += $(subdir-asflags-y)
 KBUILD_CFLAGS += $(subdir-ccflags-y)
 
-subdir-y := $(sort $(subdir-y) $(patsubst %/,%, $(filter %/, $(obj-y))))
+subdir-y := $(sort $(subdir-y) $(patsubst %/,%/, $(filter %/, $(obj-y))))
 obj-y := $(filter-out %/, $(obj-y))
 
 # Compile rules
 $(OBJ_DIR)/$(obj)%.o: $(src)%.c
-	@echo "  CC    $<"
+	@echo "  CC         $<"
 	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(KBUILD_CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/$(obj)%.asm.o: $(src)%.asm
-	@echo "  AS    $<"
+	@echo "  AS         $<"
 	@mkdir -p $(dir $@)
 	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $<
 
@@ -51,8 +60,8 @@ all: $(subdir-obj) $(target)
 
 # Link all built-in.o subtargets and curdir object files into one top-level built-in.o
 $(target): $(compile-objs)
-	@echo "  LD    $@"
-	$(Q)$(LD) $(KBUILD_LDFLAGS) -r -o $@ $(compile-objs)
+	@echo "  LD         $@"
+	$(Q)$(LD) $(KBUILD_LDFLAGS) $(relocflag) -o $@ $(compile-objs)
 
 # Make subtarget built-in.o
 $(subdir-obj):

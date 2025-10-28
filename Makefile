@@ -148,8 +148,6 @@ core-y := core/ block/ fs/ memory/ drivers/
 lib-y := lib/
 arch-y := arch/$(ARCH)/
 
-boot := $(arch-y)boot/
-
 all-y := $(core-y) $(lib-y) $(arch-y)
 
 dirs := $(foreach dir, $(all-y), $(srcroot)/$(dir))
@@ -167,30 +165,25 @@ $(dirs): $(BUILD_DIRS)
 
 # ---- ELF Files (Symbols) ----
 $(BIN_DIR)/kernel.elf: $(builtins) | $(BIN_DIR)
-	@echo "  LD    $@"
+	@echo "  LD         $@"
 	@mkdir -p $(dir $@)
 	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $@ $^
 
-$(BIN_DIR)/setup.elf: | $(BIN_DIR)
-	$(Q)$(MAKE) -f $(srctree)/$(boot)Makefile obj=$(boot) target=$(BIN_DIR)/setup.elf
-
-# ---- Binary Files ----
 $(BIN_DIR)/kernel.bin: $(BIN_DIR)/kernel.elf | $(BIN_DIR)
 	@echo "  OBJCOPY    $@"
-	$(Q)$(OBJCOPY) --pad-to=0x2000 -O binary $< $@
-
-$(BIN_DIR)/setup.bin: $(BIN_DIR)/setup.elf | $(BIN_DIR)
-	@echo "  OBJCOPY    $@"
-	$(Q)$(OBJCOPY) --pad-to=0x2000 -O binary $< $@
+	$(Q)$(OBJCOPY) -O binary $< $@
 
 $(isoimage): $(BIN_DIR)/kernel.bin $(BIN_DIR)/setup.bin
 	@echo "Creating os image in $@"
 	dd if=/dev/zero of=$@ bs=512 count=65536
-	$(TOOLS_DIR)/boot/legacy/Install $@
+	$(TOOLS_DIR)/boot/legacy/install $@
 	$(TOOLS_DIR)/fs/fat/main.py init
 
 run: $(isoimage)
-	qemu-system-i386 -serial stdio -drive format=raw,file=$(isoimage)
+	qemu-system-i386 -serial stdio -drive format=raw,file=$<
+
+debug: $(isoimage)
+	qemu-system-i386 -serial stdio -drive format=raw,file=$< -s -S &
 
 clean:
 	@echo "  CLEAN    $(BUILD_DIR)"
