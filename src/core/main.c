@@ -207,7 +207,7 @@ static void _map_stack(struct PagingDirectory* directory){
 	);
 }
 
-__section(".text.entry")
+__section(".entry.boot")
 void main(){
 	_MALLOC_INIT(_TEMP_PAGE_DIRECTORY_ADDRESS);
 
