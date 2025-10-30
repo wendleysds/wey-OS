@@ -1,1 +1,0 @@
-obj-y += paging.o paging.asm.o
