@@ -4,6 +4,8 @@
 #include <wey/panic.h>
 #include <lib/string.h>
 
+#define HEAP_OFFSET (HEAP_VIRT_BASE - HEAP_PHYS_BASE)
+
 /*
  * Kernel heap manager
  */
@@ -40,3 +42,14 @@ void kfree(void *ptr){
 	hfree(&kernelHeap, ptr);
 }
 
+int kfree_phys(void* ptr){
+	uintptr_t phys = (uintptr_t)ptr;
+
+	if(phys > HEAP_PHYS_END || phys < HEAP_PHYS_BASE){
+		warning("kfree_phys(): invalid pointer: %x\n", phys);
+		return -1;
+	}
+
+	hfree(&kernelHeap, (void*)(phys + HEAP_OFFSET));
+	return 0;
+}
