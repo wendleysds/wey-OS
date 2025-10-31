@@ -24,7 +24,7 @@ typedef unsigned long pgd_t;
 
 extern pgd_t* _current_pgd;
 
-static inline void invlpg(uintptr_t virtaddr){
+static inline void invlpg(void* virtaddr){
 	__asm__ volatile("invlpg (%0)" : : "r"(virtaddr) : "memory");
 }
 
@@ -39,8 +39,11 @@ int pgd_unmap(uintptr_t virtaddr);
 int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags);
 void* pgd_translate(void* virtaddr);
 
+void pgd_copy(pgd_t* dest, pgd_t* src);
+void pgd_copy_kernel(pgd_t* kernel_pgd, pgd_t* dest);
+void pgd_remove_kernel(pgd_t* dest);
+
 int pgd_dup_current(pgd_t* dest, uint8_t copy_kernel_area);
-int pgd_copy(pgd_t* dest, pgd_t* src);
 
 #endif
 
