@@ -168,6 +168,37 @@ int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags){
 	return SUCCESS;
 }
 
+mem_flags_t pte_get_flags(uintptr_t virtaddr){
+	uint32_t dir_idx = virtaddr >> 22;
+	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
+
+	pgd_t* pde = PGD_VADDR;
+	if (!(pde[dir_idx] & _PAGE_P)) {
+		return 0;
+	}
+
+	pte_t* pte = PT_VADDR(dir_idx);
+	if (!(pte[tbl_idx] & _PAGE_P)) {
+		return 0;
+	}
+
+	mem_flags_t flags = 0;
+
+	flags |= MEM_READ;
+
+	if (pte[tbl_idx] & _PAGE_RW) {
+		flags |= MEM_WRITE;
+	}
+	
+	if (pte[tbl_idx] & _PAGE_US) {
+		flags |= MEM_USER;
+	}else{
+		flags |= MEM_KERNEL;
+	}
+
+	return flags;
+}
+
 void* pgd_translate(void* virtaddr){
 	uint32_t dir_idx = (uintptr_t)virtaddr >> 22;
 	uint32_t tbl_idx = ((uintptr_t)virtaddr >> 12) & 0x3FF;

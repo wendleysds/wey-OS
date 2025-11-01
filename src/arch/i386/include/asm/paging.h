@@ -37,6 +37,8 @@ int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, mem_flags_t flags);
 int pgd_unmap(uintptr_t virtaddr);
 
 int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags);
+mem_flags_t pte_get_flags(uintptr_t virtaddr);
+
 void* pgd_translate(void* virtaddr);
 
 void pgd_copy(pgd_t* dest, pgd_t* src);
