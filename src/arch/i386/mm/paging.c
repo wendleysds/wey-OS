@@ -1,5 +1,5 @@
-#include <wey/mmu.h>
 #include <wey/panic.h>
+#include <wey/mm_types.h>
 #include <asm/paging.h>
 #include <mm/kheap.h>
 #include <def/err.h>
@@ -189,7 +189,7 @@ mem_flags_t pte_get_flags(uintptr_t virtaddr){
 	if (pte[tbl_idx] & _PAGE_RW) {
 		flags |= MEM_WRITE;
 	}
-	
+
 	if (pte[tbl_idx] & _PAGE_US) {
 		flags |= MEM_USER;
 	}else{
