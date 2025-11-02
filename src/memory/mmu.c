@@ -49,7 +49,7 @@ int mmu_init(){
 	return res;
 }
 
-int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem_flags_t flags){
+int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags, uint8_t map_flags){
 	if(!physaddr || !virtaddr || size <= 0){
 		return INVALID_ARG;
 	}
@@ -62,32 +62,35 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 
 	struct mem_region* mem_region = NULL;
 	if(mm){
-		mem_region = vma_region_create(physaddr, virtaddr, size, flags, MAP_ANONYMOUS);
+		mem_region = vma_add(mm, physaddr, virtaddr, size, mem_flags, map_flags);
 		if(!mem_region){
 			return NO_MEMORY;
 		}
 	}
 
 	for(unsigned int i = 0; i < count; i++){
-		int status = pgd_map(paddr, vaddr, flags);
+		int status = pgd_map(paddr, vaddr, mem_flags);
 		if(status != SUCCESS){
 			vaddr = (uintptr_t)virtaddr;
 			for(unsigned int j = 0; j < i; j++){
-				if(pgd_unmap(vaddr) != SUCCESS)
+				if(pgd_unmap(vaddr) != SUCCESS){
 					warning("mmu_mmap(): failed to rollback map!\n");
+				}
 
 				vaddr += PTE_PAGE_SIZE;
 			}
 
-			kfree(mem_region);
+			if(mm){
+				vma_remove(mm, mem_region, virtaddr, size);
+				kfree(mem_region);
+			}
+
 			return status;
 		}
 
 		vaddr += PTE_PAGE_SIZE;
 		paddr += PTE_PAGE_SIZE;
 	}
-
-	if(mm) vma_add(mm, mem_region);
 
 	return SUCCESS;
 }
@@ -106,6 +109,10 @@ int mmu_munmap(struct mm_struct* mm, void* virtaddr, int size){
 		if(IS_ERR(mem_region)){
 			return PTR_ERR(mem_region);
 		}
+
+		if(mem_region->size > size){
+			return OUT_OF_BOUNDS;
+		}
 	}
 
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
@@ -121,9 +128,7 @@ int mmu_munmap(struct mm_struct* mm, void* virtaddr, int size){
 	}
 
 	if(mm){
-		// TODO: implement resize mem size if possible
-
-		vma_remove(mm, mem_region);
+		vma_remove(mm, mem_region, virtaddr, size);
 	}
 
 	return SUCCESS;
