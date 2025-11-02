@@ -1,117 +1,160 @@
+#include <wey/mm_types.h>
+#include <wey/vma.h>
 #include <wey/mmu.h>
+#include <mm/kheap.h>
 #include <def/err.h>
 
 struct mem_region* vma_lookup(struct mm_struct* mm, void* virtualAddr){
 	if(!mm || !virtualAddr){
-		return 0x0;
+		return ERR_PTR(INVALID_ARG);
 	}
 
-	struct mem_region* region = mm->regions;
-	while(region){
-		if(virtualAddr >= region->virtualBaseAddress && virtualAddr < region->virtualEndAddress){
-			return region;
+	struct mem_region* cur = mm->regions;
+
+	while(cur){
+		if(virtualAddr >= cur->virtualBaseAddress && 
+			virtualAddr < cur->virtualEndAddress
+		){
+			return cur;
 		}
 
-		region = region->next;
+		cur = cur->next;
 	}
 
-	return 0x0;
+	return ERR_PTR(NOT_FOUND);
 }
 
-int vma_add(struct mm_struct* mm, void* virtualAddr, void* physicalAddr, uint32_t size, uint8_t flags, uint8_t isPrivate){
-	if (!mm || !mm->pageDirectory) {
-		return NULL_PTR;
+struct mm_struct* vma_alloc(pgd_t* pgd){
+	struct mm_struct* mm = (struct mm_struct*)kzalloc(sizeof(struct mm_struct));
+	if(mm){
+		mm->pgd = pgd;
 	}
 
-	struct mem_region* region = (struct mem_region*)kzalloc(sizeof(struct mem_region));
-	if (!region) {
-		return NO_MEMORY;
-	}
-
-	region->physBaseAddress = physicalAddr;
-
-	region->virtualBaseAddress = virtualAddr;
-	region->virtualEndAddress = paging_align_address((void*)((uintptr_t)virtualAddr + size));
-
-	region->flags = flags;
-	region->size = size;
-	region->isPrivite = isPrivate;
-
-	region->next = mm->regions;
-	mm->regions = region;
-
-	return SUCCESS;
+	return mm;
 }
 
-int vma_remove(struct mm_struct* mm, void* virtualAddr, uint32_t size){
-	if (!mm || !mm->pageDirectory) {
-		return NULL_PTR;
+struct mem_region* vma_add(struct mm_struct* mm, 
+	void* physicalAddr, void* virtualAddr, uint32_t size, 
+	mem_flags_t mem_flags, uint8_t map_flags)
+{
+	if(!mm) return NULL;
+
+	struct mem_region* mem_region = NULL;
+
+	mem_region = vma_lookup(mm, virtualAddr);
+	if(!IS_ERR(mem_region)){
+		uintptr_t virtEnd = (uintptr_t)virtualAddr + size;
+		if((uintptr_t)mem_region->virtualEndAddress > virtEnd){
+			uint32_t new_size = (uint32_t)(virtEnd - (uintptr_t)mem_region->virtualBaseAddress);
+			mem_region->virtualEndAddress = (void*)virtEnd;
+			mem_region->size = new_size;
+		}
+
+		goto out;
 	}
 
-	struct mem_region* prev = NULL;
-	struct mem_region* current = mm->regions;
+	mem_region = (struct mem_region*)kzalloc(sizeof(struct mem_region));
+	if(mem_region){
+		mem_region->physBaseAddress = physicalAddr;
+		mem_region->virtualBaseAddress = virtualAddr;
+		mem_region->virtualEndAddress = (void*)((uintptr_t)virtualAddr + size);
 
-	while (current) {
-		if (current->virtualBaseAddress == virtualAddr && current->size == size) {
-			if (prev) {
-				prev->next = current->next;
-			} else {
-				mm->regions = current->next;
-			}
+		mem_region->size = size;
 
-			if(current->physBaseAddress){
-				kfree(current->physBaseAddress);
-			}
+		mem_region->map_flags = map_flags;
+		mem_region->mem_flags = mem_flags;
+		mem_region->next = mm->regions;
+		mm->regions = mem_region;
+	}
 
-			kfree(current);
+out:
+	return mem_region;
+}
+
+int vma_remove(struct mm_struct* mm, struct mem_region* mm_region, void* virtualAddr, uint32_t size) {
+	if (!mm) {
+		return INVALID_ARG;
+	}
+
+	struct mem_region *prev = NULL, *cur = mm->regions;
+	void* virtend = (void*)((uintptr_t)virtualAddr + size);
+
+	// Find the target region
+	while (cur) {
+		if ((mm_region && cur == mm_region) || 
+			(!mm_region && cur->virtualBaseAddress == virtualAddr && cur->size == size)) {
 			break;
 		}
-		prev = current;
-		current = current->next;
+		prev = cur;
+		cur = cur->next;
+	}
+
+	// If not found directly, try lookup by virtual address
+	if (!cur) {
+		cur = vma_lookup(mm, virtualAddr);
+		if (!cur) {
+			return NOT_FOUND;
+		}
+	}
+
+	// Case 1: Exact size match - remove entire region
+	if (cur->size == size) {
+		if ((cur->map_flags & MAP_PRIVATE) && cur->physBaseAddress) {
+			kfree(cur->physBaseAddress);
+		}
+		if (prev) {
+			prev->next = cur->next;
+		} else {
+			mm->regions = cur->next;
+		}
+		kfree(cur);
+		return SUCCESS;
+	}
+
+	// Case 2: Resize from end
+	if (virtend == cur->virtualEndAddress && virtualAddr != cur->virtualBaseAddress) {
+		cur->virtualBaseAddress = virtualAddr;
+		cur->size = (uint32_t)virtend - (uint32_t)virtualAddr;
+		return SUCCESS;
+	}
+
+	// Case 3: Resize from start
+	if(virtualAddr == cur->virtualBaseAddress && virtend < cur->virtualEndAddress){
+		cur->virtualEndAddress = virtend;
+		cur->size = (uint32_t)virtend - (uint32_t)virtualAddr;
+		return SUCCESS;
+	}
+
+	// Case 4: Invalid size
+	if (cur->size > size && virtend != cur->virtualEndAddress) {
+		return OUT_OF_BOUNDS;
 	}
 
 	return SUCCESS;
 }
 
 int vma_clean(struct mm_struct* mm){
-	if (!mm) {
-		return NULL_PTR;
+	if(!mm){
+		return INVALID_ARG;
 	}
 
-	struct mem_region* current = mm->regions;
-	while (current) {
-		struct mem_region* next = current->next;
+	struct mem_region *next, *cur = mm->regions;
 
-		if(current->isPrivite){
-			if(current->virtualBaseAddress && current->size > 0){
-				mmu_unmap_pages(current->virtualBaseAddress, current->size);
+	while(cur){
+		next = cur->next;
+		if(cur->map_flags & MAP_PRIVATE){
+			if(cur->virtualBaseAddress && cur->size > 0){
+				mmu_munmap(NULL, cur->virtualBaseAddress, cur->size);
 			}
 
-			if(current->physBaseAddress){
-				kfree(current->physBaseAddress);
+			if(cur->physBaseAddress){
+				kfree(cur->physBaseAddress);
 			}
-
 		}
-		
-		kfree(current);
-		current = next;
+
+		kfree(cur);
+		cur = next;
 	}
 
-	return SUCCESS;
-}
-
-int vma_destroy(struct mm_struct* mm){
-	if (!mm) {
-		return NULL_PTR;
-	}
-
-	vma_clean(mm);
-
-	if (mm->pageDirectory) {
-		mmu_destroy_page(mm->pageDirectory);
-	}
-
-	kfree(mm);
-
-	return SUCCESS;
+	return NOT_IMPLEMENTED;
 }
