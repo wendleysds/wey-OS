@@ -1,5 +1,3 @@
-#include <wey/mm_types.h>
-#include <asm/paging.h>
 #include <wey/mmu.h>
 #include <wey/vfs.h>
 #include <wey/vma.h>

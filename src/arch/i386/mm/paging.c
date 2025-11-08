@@ -77,7 +77,7 @@ void pgd_free(pgd_t* pgd){
 	kfree(pgd);	
 }
 
-int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, mem_flags_t flags){
+int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, int flags){
 	if(ADDRS_NOT_ALING(virtaddr, physaddr)){
 		return BAD_ALIGNMENT;
 	}
@@ -88,17 +88,13 @@ int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, mem_flags_t flags){
 	pgd_t* pde = PGD_VADDR;
 	pte_t* pte = PT_VADDR(dir_idx);
 
-	uint8_t pg_flags = _PAGE_P;
-	if(flags & MEM_WRITE)   pg_flags |= _PAGE_RW;
-	if(flags & MEM_USER)    pg_flags |= _PAGE_US;
-
 	if (!(pde[dir_idx] & _PAGE_P)) {
 		void* newTable = kcalloc(PTE_MAX_ENTRIES, sizeof(pte_t));
 		if (!newTable) {
 			return NO_MEMORY;
 		}
 
-		pde[dir_idx] = (pte_t)pgd_translate(newTable) | pg_flags;
+		pde[dir_idx] = (pte_t)pgd_translate(newTable) | flags;
 		pte = PT_VADDR(dir_idx);
 	}
 
@@ -106,7 +102,7 @@ int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, mem_flags_t flags){
 		return ALREADY_MAPD;
 	}
 
-	pte[tbl_idx] = ((uintptr_t)physaddr & PAGE_MASK) | pg_flags;
+	pte[tbl_idx] = ((uintptr_t)physaddr & PAGE_MASK) | flags;
 
 	return SUCCESS;
 }
@@ -142,7 +138,7 @@ int pgd_unmap(uintptr_t virtaddr){
 	return SUCCESS;
 }
 
-int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags){
+int pte_update_flags(uintptr_t virtaddr, int flags){
 	uint32_t dir_idx = virtaddr >> 22;
 	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
 
@@ -158,17 +154,13 @@ int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags){
 
 	uintptr_t physaddr = pte[tbl_idx] & PAGE_MASK;
 
-	uint8_t pg_flags = _PAGE_P;
-	if(flags & MEM_WRITE)   pg_flags |= _PAGE_RW;
-	if(flags & MEM_USER)    pg_flags |= _PAGE_US;
-
-	pte[tbl_idx] = physaddr | pg_flags;
+	pte[tbl_idx] = physaddr | flags;
 	invlpg((void*)virtaddr);
 
 	return SUCCESS;
 }
 
-mem_flags_t pte_get_flags(uintptr_t virtaddr){
+int pte_get_flags(uintptr_t virtaddr){
 	uint32_t dir_idx = virtaddr >> 22;
 	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
 
@@ -182,21 +174,7 @@ mem_flags_t pte_get_flags(uintptr_t virtaddr){
 		return 0;
 	}
 
-	mem_flags_t flags = 0;
-
-	flags |= MEM_READ;
-
-	if (pte[tbl_idx] & _PAGE_RW) {
-		flags |= MEM_WRITE;
-	}
-
-	if (pte[tbl_idx] & _PAGE_US) {
-		flags |= MEM_USER;
-	}else{
-		flags |= MEM_KERNEL;
-	}
-
-	return flags;
+	return pte[tbl_idx] & FLAGS_MASK;
 }
 
 void* pgd_translate(void* virtaddr){

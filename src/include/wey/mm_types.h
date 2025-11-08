@@ -1,6 +1,7 @@
 #ifndef _MM_TYPES_H
 #define _MM_TYPES_H
 
+#include <asm/paging.h>
 #include <stdint.h>
 
 typedef enum {
@@ -10,8 +11,6 @@ typedef enum {
 	MEM_USER = 1 << 3,
 	MEM_KERNEL = 1 << 4,
 } mem_flags_t;
-
-#include <asm/paging.h>
 
 #define MAP_POPULATE  0x0
 #define MAP_FIXED     0x1

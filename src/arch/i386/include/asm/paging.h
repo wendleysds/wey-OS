@@ -33,11 +33,11 @@ int pgd_load(pgd_t* pgd);
 pgd_t* pgd_alloc();
 void pgd_free(pgd_t* pgd);
 
-int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, mem_flags_t flags);
+int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, int flags);
 int pgd_unmap(uintptr_t virtaddr);
 
-int pte_update_flags(uintptr_t virtaddr, mem_flags_t flags);
-mem_flags_t pte_get_flags(uintptr_t virtaddr);
+int pte_update_flags(uintptr_t virtaddr, int flags);
+int pte_get_flags(uintptr_t virtaddr);
 
 void* pgd_translate(void* virtaddr);
 

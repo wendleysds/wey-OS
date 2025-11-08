@@ -1,6 +1,9 @@
 #ifndef _MEMORY_MANAGER_UNIT_H
 #define _MEMORY_MANAGER_UNIT_H
 
+#include <asm/paging.h>
+#include <wey/mm_types.h>
+
 struct mm_struct;
 
 int mmu_init();
