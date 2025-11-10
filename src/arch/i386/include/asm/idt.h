@@ -1,5 +1,5 @@
-#ifndef _IDT_H
-#define _IDT_H
+#ifndef _X86_INTERRUPTS_H
+#define _X86_INTERRUPTS_H
 
 #include <stdint.h>
 
@@ -38,11 +38,7 @@ struct InterruptFrame {
 	uint32_t esp, ss;
 } __attribute__((packed));
 
-typedef void(*INTERRUPT_CALLBACK_FUNCTION)(struct InterruptFrame* frame);
-
-void init_idt();
-void enable_interrupts();
-void disable_interrupts();
-void idt_register_callback(int interrupt, INTERRUPT_CALLBACK_FUNCTION callback);
+void idt_init();
+void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
 
 #endif

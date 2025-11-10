@@ -1,1 +1,1 @@
-obj-y += pic.o pic.asm.o idt.asm.o isr.asm.o
+obj-y += pic.o pic.asm.o isr.asm.o

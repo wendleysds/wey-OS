@@ -2,7 +2,7 @@
 #define _CPU_SCHEDULER_H
 
 #include <wey/process.h>
-#include <arch/i386/idt.h>
+#include <wey/interrupt.h>
 #include <def/compile.h>
 #include <stdint.h>
 

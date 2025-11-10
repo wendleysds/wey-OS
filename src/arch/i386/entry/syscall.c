@@ -1,6 +1,7 @@
 #include <wey/syscall.h>
 #include <wey/panic.h>
 #include <wey/sched.h>
+#include <asm/idt.h>
 #include <def/err.h>
 #include <def/config.h>
 #include <lib/string.h>
@@ -31,7 +32,12 @@ static inline long _dispatch_syscall(long sys_no, long arg1, long arg2, long arg
 }
 
 void syscalls_init(){
-	_set_idt(SYSCALL_INTERRUPT_NUM, _entry_isr80h_32, IDT_PRESENT | IDT_DPL3 | IDT_TYPE_INT_GATE32);
+	idt_set_gate(
+		SYSCALL_INTERRUPT_NUM,
+		(uint32_t)_entry_isr80h_32,
+		KERNEL_CODE_SELECTOR,
+		(IDT_PRESENT | IDT_DPL3 | IDT_TYPE_INT_GATE32)
+	);
 }
 
 long isr80h_handler(struct InterruptFrame* frame){

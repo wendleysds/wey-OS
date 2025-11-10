@@ -1,5 +1,5 @@
 #include <arch/i386/pic.h>
-#include <arch/i386/idt.h>
+#include <wey/interrupt.h>
 #include <io/ports.h>
 #include <def/config.h>
 #include <stdint.h>
@@ -70,7 +70,7 @@ void pic_init(uint32_t frequency) {
 	outb(PIC_COMMAND, divisor & 0xFF);         // low end
 	outb(PIC_CHANNEL0, (divisor >> 8) & 0xFF); // high end
 
-	idt_register_callback(0x20, _timer_iqr_handler);
+	interrupt_register(0x20, _timer_iqr_handler);
 }
 
 void pic_send_eoi(uint8_t irq)
