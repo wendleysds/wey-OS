@@ -73,47 +73,47 @@ void interrupt_register(int interrupt, irq_handler_t handler){
 	interrupt_callbacks[interrupt] = handler;
 }
 
-static void _print_frame(struct InterruptFrame* frame){
+static void _print_frame(struct registers* regs){
 	terminal_write(
 		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n",
-		frame->eax, frame->ebx, frame->ecx, frame->edx
+		regs->ax, regs->bx, regs->cx, regs->dx
 	);
 
 	terminal_write( 
 		"esi 0x%x edi 0x%x esp 0x%x ebp 0x%x\n",
-		frame->esi, frame->edi, frame->esp, frame->ebp
+		regs->si, regs->di, regs->sp, regs->bp
 	);
 
 	terminal_write(
 		"ip 0x%x cs 0x%x ss 0x%x\n",
-		frame->eip, frame->cs, frame->ss
+		regs->ip, regs->cs, regs->ss
 	);
 
 	terminal_write(
 		"eflags 0x%x kesp 0x%x\n",
-		frame->eflags, frame->kesp
+		regs->flags, regs->ksp
 	);
 
 	terminal_write(
 		"int 0x%x err 0x%x\n",
-		frame->int_no, frame->err_code
+		regs->int_no, regs->err_code
 	);
 }
 
-void __cdecl interrupt_handler(struct InterruptFrame* frame){
+void __cdecl interrupt_handler(struct registers* regs){
 	kernel_registers();
 
-	int interrupt = frame->int_no;
+	int interrupt = regs->int_no;
 
 	if(interrupt_callbacks[interrupt] != 0){
-		interrupt_callbacks[interrupt](frame);
+		interrupt_callbacks[interrupt](regs);
 	}
 	else if(interrupt < 32){
 		terminal_write(
 			"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-			interrupt, interrupt, exception_messages[interrupt], frame->eip);
+			interrupt, interrupt, exception_messages[interrupt], regs->ip);
 
-		_print_frame(frame);
+		_print_frame(regs);
 
 		terminal_write("System Halted!\n");
 		while(1){

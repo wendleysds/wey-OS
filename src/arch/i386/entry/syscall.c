@@ -40,17 +40,17 @@ void syscalls_init(){
 	);
 }
 
-long isr80h_handler(struct InterruptFrame* frame){
+long isr80h_handler(struct registers* regs){
 	kernel_registers();
 
 	int res = _dispatch_syscall(
-		frame->eax,
-		frame->ebx,
-		frame->ecx,
-		frame->edx,
-		frame->esi,
-		frame->edi,
-		frame->ebp
+		regs->ax,
+		regs->bx,
+		regs->cx,
+		regs->dx,
+		regs->si,
+		regs->di,
+		regs->bp
 	);
 
 	user_registers();

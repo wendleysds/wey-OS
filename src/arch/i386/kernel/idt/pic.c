@@ -31,7 +31,7 @@ static uint16_t __pic_get_irq_reg(int ocw3)
     return (inb(PIC2_COMMAND) << 8) | inb(PIC1_COMMAND);
 }
 
-static void _timer_iqr_handler(struct InterruptFrame* frame){
+static void _timer_iqr_handler(struct registers* regs){
 	outb(PIC1_COMMAND, PIC_EOI);
 }
 
