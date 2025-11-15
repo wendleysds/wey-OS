@@ -13,11 +13,15 @@
 
 #define __no_return __attribute__((noreturn))
 #define __section(x) __attribute__((section(x)))
-
-#define asmlinkage __attribute__((regparm(0)))
-#define stringfy(s) #s
-
+#define __used __attribute__((used))
+#define __unused __attribute__((unused))
+#define __cold __attribute__((cold))
+#define __always_inline inline __attribute__((always_inline))
 #define __packed __attribute__((packed))
 #define __cdecl __attribute__((cdecl))
+
+#define asmlinkage __attribute__((regparm(0)))
+#define notrace __attribute__((no_instrument_function))
+#define stringfy(s) #s
 
 #endif
