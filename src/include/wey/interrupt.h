@@ -2,10 +2,11 @@
 #define _INTERRUPTS_H
 
 #include <asm/idt.h>
+#include <asm/ptrace.h>
 
-struct InterruptFrame;
+struct registers;
 
-typedef void (*irq_handler_t)(struct InterruptFrame* frame);
+typedef void (*irq_handler_t)(struct registers*);
 
 void interrupts_enable();
 void interrupts_disable();

@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#define IRQ(x) (0x20 + x)
-
 #define IDT_PRESENT 0x80
 #define IDT_DPL0    0x00
 #define IDT_DPL1    0x20
@@ -29,14 +27,6 @@ struct IDTr_ptr{
 	uint16_t limit;
 	uint32_t base;
 }__attribute__((packed));
-
-struct InterruptFrame {	
-	uint32_t edi, esi, ebp, kesp;
-	uint32_t ebx, edx, ecx, eax;
-	uint32_t int_no, err_code;
-	uint32_t eip, cs, eflags;
-	uint32_t esp, ss;
-} __attribute__((packed));
 
 void idt_init();
 void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
