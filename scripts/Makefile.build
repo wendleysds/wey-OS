@@ -49,6 +49,11 @@ $(OBJ_DIR)/$(obj)%.asm.o: $(src)%.asm
 	@mkdir -p $(dir $@)
 	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $<
 
+$(OBJ_DIR)/$(obj)%.lds: $(src)%.lds.S
+	@echo "  CPP        $<"
+	@mkdir -p $(dir $@)
+	$(Q)$(CPP) $(KINCLUDE) -P -U$(ARCH) -o $@ $<
+
 subdir-obj := $(foreach dir, $(subdir-y), $(obj)$(dir)built-in.o)
 obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
 
@@ -61,7 +66,7 @@ all: $(subdir-obj) $(target)
 # Link all built-in.o subtargets and curdir object files into one top-level built-in.o
 $(target): $(compile-objs)
 	@echo "  LD         $@"
-	$(Q)$(LD) $(KBUILD_LDFLAGS) $(relocflag) -o $@ $(compile-objs)
+	$(Q)$(LD) $(KBUILD_LDFLAGS) $(relocflag) -o $@ $(filter-out %.lds, $(compile-objs))
 
 # Make subtarget built-in.o
 $(subdir-obj):
