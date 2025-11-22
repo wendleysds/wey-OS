@@ -73,9 +73,9 @@ ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(ASM_FILES))
 # Compile rules
 
 all: $(BUILD_DIRS) $(STAGE1_BIN) $(STAGE2_BIN)
-	dd if=/dev/zero of=img bs=1MB count=4
-	dd if=$(STAGE1_BIN) of=img conv=notrunc
-	dd if=$(STAGE2_BIN) of=img seek=2048 conv=notrunc
+	dd if=/dev/zero of=$(BUILD_DIR)/img bs=1MB count=4
+	dd if=$(STAGE1_BIN) of=$(BUILD_DIR)/img conv=notrunc
+	dd if=$(STAGE2_BIN) of=$(BUILD_DIR)/img seek=2048 conv=notrunc
 
 $(BUILD_DIRS):
 	@mkdir $@
@@ -98,10 +98,10 @@ $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm
 	$(AS) $(ASFLAGS) -o $@ $< 
 
 r: all
-	qemu-system-i386 -drive format=raw,file=img
+	qemu-system-i386 -drive format=raw,file=$(BUILD_DIR)/img
 
 d: all
-	qemu-system-i386 -drive format=raw,file=img -s -S &
+	qemu-system-i386 -drive format=raw,file=$(BUILD_DIR)/img -s -S &
 
 clean:
 	rm -rf $(BUILD_DIR)

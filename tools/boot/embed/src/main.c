@@ -9,7 +9,7 @@ void main(){
 		platform_die();
 	}
 
-	struct e820_entry entries[32];
+	struct e820_entry entries[64];
 	uint32_t counter = 0;
 	status = platform_get_memory_map(entries, sizeof(entries), &counter);
 
@@ -20,12 +20,11 @@ void main(){
 		for (uint32_t i = 0; i < counter; i++){
 			uint64_t end = entries[i].base_addr + entries[i].length;
 
-			printf("[0x%x%x - 0x%x%x] %d ",
+			printf("[0x%x%x - 0x%x%x] ",
 				(uint32_t)(entries[i].base_addr >> 32),
 				(uint32_t)(entries[i].base_addr & 0xFFFFFFFF),
 				(uint32_t)(end >> 32),
 				(uint32_t)(end & 0xFFFFFFFF),
-				entries[i].acpi_attrs
 			);
 
 			switch (entries[i].type)

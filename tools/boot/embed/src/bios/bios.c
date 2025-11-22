@@ -53,9 +53,6 @@ int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *c
 
 		*desc++ = buf;
 		*count += 1;
-
-		buf.acpi_attrs = 1;
-
 	} while (ireg.ebx && *count < tablesize);
 
 	return SUCCESS;
