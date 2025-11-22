@@ -4,12 +4,12 @@
 __pycache__
 
 # Folders
-/build
-*/build
-*/tmp
+build
+tmp
 
 # Files/Configs
 compile_commands.json
 .clangd
 
 syscalltbl.h
+kernelsecs.h
