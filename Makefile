@@ -29,13 +29,14 @@ ARCH ?= i386
 CROSS_COMPILE ?= i686-elf-
 
 # Tools
-AS      := nasm
-CC      := $(CROSS_COMPILE)gcc
-LD      := $(CROSS_COMPILE)ld
-AR      := $(CROSS_COMPILE)ar
-NM      := $(CROSS_COMPILE)nm
-OBJCOPY := $(CROSS_COMPILE)objcopy
-OBJDUMP := $(CROSS_COMPILE)objdump
+CPP     = $(CC) -E
+AS      = nasm
+CC      = $(CROSS_COMPILE)gcc
+LD      = $(CROSS_COMPILE)ld
+AR      = $(CROSS_COMPILE)ar
+NM      = $(CROSS_COMPILE)nm
+OBJCOPY = $(CROSS_COMPILE)objcopy
+OBJDUMP = $(CROSS_COMPILE)objdump
 
 export ARCH CROSS_COMPILE AS CC CPP LD AR NM OBJCOPY OBJDUMP
 
@@ -88,7 +89,7 @@ build := -f $(srcroot)/scripts/Makefile.build obj
 
 export build
 
-KBUILD_LDS := $(srctree)/arch/$(ARCH)/kernel/linker.ld
+KBUILD_LDS := $(OBJ_DIR)/arch/$(ARCH)/kernel/linker.lds
 
 export KBUILD_LDS
 
@@ -119,71 +120,41 @@ KBUILD_LDFLAGS += -m elf_i386 --no-warn-rwx-segments
 
 export KBUILD_CFLAGS KBUILD_ASFLAGS KBUILD_LDFLAGS KINCLUDE
 
-# core-y := block/ core/ drivers/ fs/ init/ init/ lib/ memory/
-#
-# Main Directories
-# dirs := $(foreach dir, $(core-y), $(srcroot)/$(dir))
-# 
-# # built-in.o targets
-# builtins := $(foreach dir, $(core-y), $(OBJ_DIR)/$(dir)built-in.o)
-# 
-# all: $(BIN_DIR)/kernel.elf
-# 
-# $(BUILD_DIRS):
-# 	$(Q)mkdir -p $@
-# 
-# $(dirs): $(BUILD_DIRS)
-# 	$(Q)$(MAKE) $(build)=$@
-# 
-# $(builtins): $(dirs)
-# 
-# $(BIN_DIR)/kernel.elf: $(builtins)
-# #	$(Q)$(LD) -T $(KBUILD_LDS) -o $@ $^
-# 	@echo "$^ > $@"
-# 
+# --------- Rules ---------------
 
-isoimage := $(BUILD_DIR)/isoimage
-
-core-y := core/ block/ fs/ memory/ drivers/
+#core-y := core/ block/ fs/ memory/ drivers/
+core-y := core/ memory/ drivers/
 lib-y := lib/
 arch-y := arch/$(ARCH)/
 
 all-y := $(core-y) $(lib-y) $(arch-y)
 
 dirs := $(foreach dir, $(all-y), $(srcroot)/$(dir))
-builtins := $(foreach dir, $(all-y), $(OBJ_DIR)/$(dir)built-in.o)
+core-builtins := $(foreach dir, $(all-y), $(OBJ_DIR)/$(dir)built-in.o)
 
-all: $(isoimage)
+export core-builtins
+
+all: bzImage
 
 $(BUILD_DIRS):
 	$(Q)mkdir -p $@
 
-$(builtins): $(dirs)
-
-$(dirs): $(BUILD_DIRS)
+$(dirs): chksyscalls $(BUILD_DIRS)
 	$(Q)$(MAKE) $(build)=$@
 
-# ---- ELF Files (Symbols) ----
-$(BIN_DIR)/kernel.elf: $(builtins) | $(BIN_DIR)
-	@echo "  LD         $@"
-	@mkdir -p $(dir $@)
-	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $@ $^
+bzImage: $(dirs)
 
-$(BIN_DIR)/kernel.bin: $(BIN_DIR)/kernel.elf | $(BIN_DIR)
-	@echo "  OBJCOPY    $@"
-	$(Q)$(OBJCOPY) -O binary $< $@
+isoimage:
+	@echo "not supported yet"
 
-$(isoimage): $(BIN_DIR)/kernel.bin $(BIN_DIR)/setup.bin
-	@echo "Creating os image in $@"
-	dd if=/dev/zero of=$@ bs=512 count=65536
-	$(TOOLS_DIR)/boot/legacy/install $@
-	$(TOOLS_DIR)/fs/fat/main.py init
+cdrom:
+	@echo "not supported yet"
 
-run: $(isoimage)
-	qemu-system-i386 -serial stdio -drive format=raw,file=$<
-
-debug: $(isoimage)
-	qemu-system-i386 -serial stdio -drive format=raw,file=$< -s -S &
+chksyscalls:
+	@echo "  CALL       $(srcroot)/scripts/chksyscalls.sh"
+	$(srcroot)/scripts/chksyscalls.sh \
+		$(srctree)/arch/$(ARCH)/entry/syscalls/syscall_32.tbl \
+		$(srctree)/arch/$(ARCH)/entry/syscalls/syscalltbl.h
 
 clean:
 	@echo "  CLEAN    $(BUILD_DIR)"

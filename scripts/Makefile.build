@@ -54,6 +54,14 @@ $(OBJ_DIR)/$(obj)%.lds: $(src)%.lds.S
 	@mkdir -p $(dir $@)
 	$(Q)$(CPP) $(KINCLUDE) -P -U$(ARCH) -o $@ $<
 
+$(OBJ_DIR)/$(obj)%c_s.o: $(src)%.S
+	@echo "  CPP        $<"
+	@mkdir -p $(dir $@)
+	$(Q)$(CPP) $(KINCLUDE) -D__ASSEMBLY__ -P -o $(OBJ_DIR)/$(obj)$*.S $<
+
+	@echo "  AS         $<"
+	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $(OBJ_DIR)/$(obj)$*.S
+
 subdir-obj := $(foreach dir, $(subdir-y), $(obj)$(dir)built-in.o)
 obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
 
