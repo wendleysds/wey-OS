@@ -3,35 +3,35 @@ OUTPUT_ARCH(i386)
 ENTRY(main)
 
 SECTIONS{
-	. = 0x1000;
-
-	.entry ALIGN(256) : AT(ADDR(.entry)) {
-		*(.text.entry*) *(.rodata.entry*) *(.data.entry*) *(.bss.entry*) *(COMMON)
+	. = 0;
+	.pad : {
+		. = 0x20;
+	} = 0xFFFFFFFF
+	
+	.header : {
+		*(.header*)
 	}
 
 	.text : ALIGN(256){
-		*(.text)
-	}
-
-	.asm : ALIGN(256){
-		*(.asm)
+		*(.text*)
 	}
 
 	.rodata : ALIGN(256){
-		*(.rodata)
+		*(.rodata*)
 	}
 
 	.data : ALIGN(256){
-		*(.data)
+		*(.data*)
+	}
+
+	.setup : {
+		setup_size = ALIGN(ABSOLUTE(.), 4096);
+		setup_sectors = ABSOLUTE(setup_size / 512);
 	}
 
 	.bss : ALIGN(256){
 		*(COMMON)
-		*(.bss)
+		*(.bss*)
 	}
-
-	bin_end = .;
-	. = ALIGN(4096);
-	end_align = .;
 }
 

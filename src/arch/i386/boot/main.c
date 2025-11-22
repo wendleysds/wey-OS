@@ -2,12 +2,13 @@
 #include <def/compile.h>
 #include <stdint.h>
 
+struct boot_header* header __section(".header");
+
 /*
  * Main module for the real-mode kernel code
  */
 
 // TODO: Implement missing
-__section(".text.entry")
 void main(){
 
 	// Check CPU
@@ -16,6 +17,6 @@ void main(){
 
 	setup_video();
 
-	go_to_protect_mode();
+	while(1) asm volatile ("hlt");
 }
 

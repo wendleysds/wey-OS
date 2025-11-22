@@ -1,6 +1,8 @@
 #ifndef _BOOT_H
 #define _BOOT_H
 
+#include <uapi/headers.h>
+#include <def/compile.h>
 #include <stdint.h>
 
 #define SEG(ptr) (uint16_t)(((uint32_t)(ptr) >> 4) & 0xFFFF)
@@ -66,6 +68,8 @@ static inline uint16_t gs(void){
 	asm volatile("movw %%gs,%0" : "=rm" (seg));
 	return seg;
 }
+
+extern struct boot_header* header __section(".header");
 
 void initregs(struct biosregs *reg);
 void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
