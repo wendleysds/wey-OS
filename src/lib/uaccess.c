@@ -1,6 +1,7 @@
 #include <wey/uaccess.h>
 #include <wey/panic.h>
 #include <wey/sched.h>
+#include <wey/mm_types.h>
 #include <wey/mmu.h>
 #include <def/status.h>
 #include <def/config.h>

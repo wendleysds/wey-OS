@@ -1,5 +1,4 @@
-obj-y += kernel.o ldrivers.o main.o
-obj-y += process.o pid.o 
+obj-y += kernel.o panic.o
 obj-y += rings.o rings.asm.o
 
-subdir-y += sched/
+#subdir-y += sched/
