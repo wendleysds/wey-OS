@@ -41,25 +41,68 @@ void printf(const char* restrict fmt, ...)
 		if (*ptr == '%')
 		{
 			ptr++;
+			if(*ptr == 'l' && *(ptr + 1) == 'l'){
+				ptr += 2;
+				if (!*ptr)
+					break;
+
+				unsigned long long val = va_arg(args, unsigned long long);
+				unsigned long high = (unsigned long)(val >> 32);
+				unsigned long low = (unsigned long)(val & 0xFFFFFFFF);
+
+				switch (*ptr)
+				{
+				case 'd':
+				case 'i':
+				case 'u':
+					for(uint8_t i = 0 ; i < 2; i++){
+						itoa_base(i == 0 ? high : low, buffer, 10, *ptr == 'u');
+						for (char *s = buffer; *s; s++){
+							platform_putchar(*s);
+						}
+					}
+					break;
+				case 'p':
+				case 'x':
+				case 'X':
+					for(uint8_t i = 0 ; i < 2; i++){
+						itoa_base(i == 0 ? high : low, buffer, 16, 0);
+						for (char *s = buffer; *s; s++){
+							platform_putchar(*ptr == 'x' ? TO_LOWER(*s) : *s);
+						}
+					}
+					break;
+				default:
+					platform_putchar('%');
+					platform_putchar('l');
+					platform_putchar('l');
+					platform_putchar(*ptr);
+					break;
+				}
+
+				continue;
+			}
+
 			switch (*ptr)
 			{
 			case 'c':
-				platform_putchar(va_arg(args, int));
+				platform_putchar(va_arg(args, long));
 				break;
 			case 's':
 				for (char *s = va_arg(args, char *); *s; s++)
 					platform_putchar(*s);
 				break;
+			case 'i':
 			case 'u':
 			case 'd':
-				itoa_base(va_arg(args, int), buffer, 10, *ptr == 'u');
+				itoa_base(va_arg(args, signed long), buffer, 10, *ptr == 'u');
 				for (char *s = buffer; *s; s++)
 					platform_putchar(*s);
 				break;
 			case 'p':
 			case 'x':
 			case 'X':
-				itoa_base(va_arg(args, int), buffer, 16, 0);
+				itoa_base(va_arg(args, unsigned long), buffer, 16, 0);
 				for (char *s = buffer; *s; s++)
 					platform_putchar(*ptr == 'x' ? TO_LOWER(*s) : *s);
 				break;
