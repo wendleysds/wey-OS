@@ -6,6 +6,10 @@
 #include <utils.h>
 #include "bios.h"
 
+#define SMAP 0x534d4150 /* ASCII "SMAP" */
+
+uint8_t mainDriverNum = 0;
+
 void platform_putchar(char c){
 	struct biosregs r;
 	initregs(&r);
@@ -17,16 +21,14 @@ void platform_putchar(char c){
 }
 
 int platform_init(){
-	uint8_t drivenum = 0;
 	asm volatile (
 		"movb %%dl, %0"
-		: "=rm"(drivenum)
+		: "=rm"(mainDriverNum)
 	);
 
 	return SUCCESS;
 }
 
-#define SMAP 0x534d4150 /* ASCII "SMAP" */
 int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *count){
 	*count = 0;
 
@@ -44,7 +46,7 @@ int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *c
 		intcall(0x15, &ireg, &oreg);
 		ireg.ebx = oreg.ebx;
 
-		if (oreg.eflags & (((1UL)) << (0)))
+		if (oreg.eflags & X86_EFLAGS_CF)
 			break;
 
 		if (oreg.eax != SMAP) {

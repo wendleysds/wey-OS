@@ -44,8 +44,8 @@ struct GPTHeader{
 } __packed;
 
 struct disk_op {
-	int (*read)(struct disk* disk, uint32_t lba, void* buffer, uint8_t seccount);
-	int (*write)(struct disk* disk, uint32_t lba, const void* buffer, uint8_t seccount);
+	int (*read)(struct disk* disk, uint64_t lba, void* buffer, uint16_t seccount);
+	int (*write)(struct disk* disk, uint64_t lba, const void* buffer, uint16_t seccount);
 } __packed;
 
 struct disk {
@@ -53,19 +53,16 @@ struct disk {
 
 	void* private;
 
-	struct GPTHeader* gpt_header;
-
-	union {
-		struct MBRPartitionEntry* mbr_partitions;
-		struct GPTPartitionEntry* gpt_partitions;
-	};
+	struct MBRPartitionEntry* mbr_partitions;
+	
+	struct GPTHeader gpt_header;
+	struct GPTPartitionEntry* gpt_partitions;
 	
 	struct disk_op* ops;
 } __packed;
 
 extern struct disk* main_disk;
 
-void disk_register(struct disk* disk);
-void disk_unregister(struct disk* disk);
+int disk_parse_partitions(struct disk* disk);
 
 #endif
