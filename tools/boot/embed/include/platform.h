@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <file.h>
 #include <mem.h>
-j
+
 int platform_init();
 int platform_disk_init();
 
