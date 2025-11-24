@@ -43,24 +43,34 @@ _start:
 	mov dx, word [stage1SecPerLba]
 
 .load_stage2:
-	mov ax, [si]
-	imul ax, 2
-	add ax, [stage1lba]
+	; lba = [stage1lba + word [si] * 2]
+	mov di, word [si]
+	shl di, 1 ; di = index * sizeof(word)
+
+	add di, stage1lba
+	mov ax, [di] ; ax = lba
+	
 
 	call disk_read
 	jc .err_read
 
 	inc word [si]
 
+	push dx
+
 	mov ax, 0x200
-	imul ax, dx
+	mul dx
+
 	add bx, ax
+
+	pop dx
 
 	cmp word [si], 6
 	jl .load_stage2
 
+.done:
 	mov dx, [drvNum]
-	jmp 0x1000
+	jmp 0x0000:0x1000
 
 .err_read:
 	call error
@@ -123,7 +133,7 @@ error:
 	jmp .die
 
 
-stage1lba: dw 2048, 0, 0, 0, 0, 0
+stage1lba: dw 2048, 2056, 0, 0, 0, 0
 stage1SecPerLba: db 8
 
 times 0x1BE-($ - $$) db 0
