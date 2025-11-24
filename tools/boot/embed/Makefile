@@ -25,8 +25,7 @@ BUILD_DIRS := $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR)
 # Flags
 
 KINCLUDES := -I../../../src/include
-
-INCLUDE = -Iinclude
+INCLUDE := -Iinclude -I$(SRC_DIR)/$(TARGET_PLATFORM)/include
 
 CFLAGS := -ffreestanding -nostdlib -m16 -march=i386 -nostartfiles \
         $(KINCLUDES) $(INCLUDE)
@@ -38,6 +37,12 @@ CFLAGS += -Wall -Werror -std=gnu11 \
 
 CFLAGS += -falign-jumps -falign-functions -falign-loops \
           -falign-labels -fstrength-reduce -finline-functions
+
+ifeq ($(TARGET_PLATFORM), bios)
+    CFLAGS += -D_BIOS
+else ifeq ($(TARGET_PLATFORM), uefi)
+    CFLAGS += -D_UEFI
+endif
 
 ASFLAGS := -f elf32
 

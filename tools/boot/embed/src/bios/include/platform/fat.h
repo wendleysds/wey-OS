@@ -2,6 +2,7 @@
 #define _FAT_H
 
 #include <def/compile.h>
+#include <disk.h>
 #include <stdint.h>
 
 #define EOF 0xFFFFFFF8
@@ -58,5 +59,10 @@ struct FATHeaders{
 	struct FATHeader boot;
 	struct FAT32HeaderExtended fat32;
 };
+
+typedef struct {
+	struct FATHeaders headers;
+	struct disk* disk;
+} fat_info_t;
 
 #endif
