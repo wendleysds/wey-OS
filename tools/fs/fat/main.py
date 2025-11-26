@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 from fat import FATFS
+import commands as cmd
 import sys
 
 def help():
-	print(f"Usage: {sys.argv[0]} <option> <args/flags> <SRC> <DST>")
+	print(f"Usage: {sys.argv[0]} <DEVICE> <option> <args/flags> <SRC> <DST>")
 
 	print("\tinit: format and initialize the FAT FS")
 
@@ -31,8 +34,8 @@ def help():
 	print("\tstat: show file FAT Entry metadata")
 	print("\tstatfs: show FAT metadata")
 
-	print("\tcp   : copy the file from <path1>(src) to <path2>(dst)")
-	print("\t\t-ex: copy a external file in <path1>(local) to <path2>(img fs)")
+	print("\tcp   : copy the file from <SRC> to <DST>")
+	print("\t\t-ex: copy from your fs from <SRC> to the fat <DST>")
 
 
 def main() -> int:
@@ -44,19 +47,48 @@ def main() -> int:
 		help()
 		return
 	
+	dev = None
 	op = None
 	args = []
 	src = None
 	dst = None
 
-	argv = sys.argv[1:]
-	if argv:
-		op = argv[0]
-		rest = argv[1:]
-	else:
-		rest = []
+	dev = sys.argv[1]
+	op = sys.argv[2].lower()
+	if len(sys.argv) >= 3:
+		for arg in sys.argv[3:]:
+			if src is None:
+				if arg.startswith(("/", "./")):
+					src = arg
+					continue
+			if dst is None:
+				if arg.startswith(("/", "./")):
+					dst = arg
+					continue
+			args.append(arg.lower())
+
+	operations = {
+		"creat": cmd.creat,
+		"mkdir": cmd.mkdir,
+		"rm": cmd.rm,
+		"ls": cmd.ls,
+		"read": cmd.read,
+		"cp": cmd.cp,
+		"statfs": cmd.statfs,
+		"stat": cmd.stat
+	}
+
+	if op == 'init':
+		FATFS.format_file(None, dev)
+		return 0
+
+	if op not in operations:
+		print(f"Invalid option! try {sys.argv[0]} --help")
+		return 1
 	
-	return 0
+	fat = FATFS(dev)
+	
+	return operations[op](fat, args, src, dst)
 
 if __name__ == "__main__":
 	exit(main())

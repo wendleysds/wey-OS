@@ -174,6 +174,14 @@ class FAT:
 	firstDataSector: int
 	clusterSize: int
 
+	def __init__(self, header_boot, dev, table, totalClusters, firstDataSector, clusterSize):
+		self.header_boot = header_boot
+		self.dev = dev
+		self.table = table
+		self.totalClusters = totalClusters
+		self.firstDataSector = firstDataSector
+		self.clusterSize = clusterSize
+
 	def update(): raise NotImplementedError
 	def next_cluster(self, current: int) -> int: raise NotImplementedError
 	def free_cluster(self) -> int: raise NotImplementedError
@@ -184,6 +192,11 @@ class FAT:
 class FAT32(FAT):
 	header_extended: FAT32ExtendedHeader
 	fsInfo: FAT32FSInfo
+
+	def __init__(self, header_boot, dev, table, totalClusters, firstDataSector, clusterSize, fsinfo, header_extended):
+		super().__init__(header_boot, dev, table, totalClusters, firstDataSector, clusterSize)
+		self.fsInfo = fsinfo
+		self.header_extended = header_extended
 
 	def update(self):
 		fatStartSector = self.header_boot.rsvdSecCnt
@@ -310,11 +323,22 @@ def fat_format_name(filename: str) -> str:
     return ''.join(out).upper()
 
 class FATFS:
+	from mbr import MBREntry
 	fat: FAT
+	mbr: MBREntry
+
+	def __sector(self, sec):
+		return (self.mbr.startLBA + sec) * self.fat.header_boot.bytesPerSec
 
 	def __init__(self, device, startClusters = 3000):
+		from mbr import MBREntry
 		f = open(device, '+rb')
 		content = f.read(512)
+		mbr = MBREntry.from_bytes(content[0x1BE:(0x1BE+16)])
+
+		f.seek(mbr.startLBA * 512)
+		content = f.read(512)
+
 		hBoot = FATBootHeader.from_bytes(content[0:36])
 		hExtend = FAT32ExtendedHeader.from_bytes(content[36:90])
 
@@ -325,11 +349,12 @@ class FATFS:
 		fatTotalClusters = fatSize * hBoot.bytesPerSec / 4
 		firstDataSector = fatStartSector + (hBoot.numFATs * fatSize)
 
-		f.seek(fatStartSector * hBoot.bytesPerSec, 0)
-		table = array.array("I")
+		f.seek((mbr.startLBA + fatStartSector) * hBoot.bytesPerSec)
+		table = array("I")
+
 		table.frombytes(f.read(fatBytes))
 
-		f.seek(hExtend.FSInfo * hBoot.bytesPerSec, 0)
+		f.seek((mbr.startLBA + hExtend.FSInfo) * hBoot.bytesPerSec)
 		content = f.read(512)
 
 		fsInfo = FAT32FSInfo.from_bytes(content)
@@ -344,6 +369,7 @@ class FATFS:
 			if fsInfo.nextFreeCluster == 0xFFFFFFFF:
 				fsInfo.nextFreeCluster = int(startClusters)
 
+		self.mbr = mbr
 		self.fat = FAT32(
 			hBoot,
 			f,
@@ -351,8 +377,8 @@ class FATFS:
 			int(fatTotalClusters),
 			int(firstDataSector),
 			int(hBoot.bytesPerSec * hBoot.secPerClus),
+			fsInfo,
 			hExtend,
-			fsInfo
 		)
 
 	def __cluster_to_lba(self, cluster: int):
@@ -366,7 +392,7 @@ class FATFS:
 
 		cluster = dirCluster
 		lba = self.__cluster_to_lba(cluster)
-		f.seek(lba * fat.header_boot.bytesPerSec)
+		f.seek(self.__sector(lba))
 		for _ in range(int(fat.clusterSize / 32)):
 			data = f.read(32)
 			entry = FATDirectoryEntry.from_bytes(data)
@@ -405,7 +431,7 @@ class FATFS:
 		while True:
 			cluster = dirCluster
 			lba = self.__cluster_to_lba(cluster)
-			f.seek(lba * fat.header_boot.bytesPerSec)
+			f.seek(self.__sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
 				entry = FATDirectoryEntry.from_bytes(data)
@@ -416,7 +442,7 @@ class FATFS:
 				if entry.name[0] != 0x0 and entry.name[0] != 0xE5:
 					continue
 
-				cluster = self.fat.next_free_cluster()
+				cluster = self.fat.free_cluster()
 				fat.table[cluster] = EOF
 
 				entry.name = name.encode()
@@ -431,7 +457,7 @@ class FATFS:
 
 				if attr & 0x10:
 					lba = self.__cluster_to_lba(cluster)
-					f.seek(lba * fat.header_boot.bytesPerSec)
+					f.seek(self.__sector(lba))
 					dot = entry
 
 					dot.name = '.          '.encode()
@@ -456,7 +482,7 @@ class FATFS:
 		while True:
 			cluster = dirCluster
 			lba = self.__cluster_to_lba(cluster)
-			f.seek(lba * fat.header_boot.bytesPerSec)
+			f.seek(self.__sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
 				entry = FATDirectoryEntry.from_bytes(data)
@@ -485,51 +511,115 @@ class FATFS:
 			if cluster >= EOF:
 				return -1
 
-	def format_file(self, img_path, createFsInfo: bool = False):
-		f = self.fat.dev
-		content = f.read(512)
-		hboot = FATBootHeader.from_bytes(content[0:36])
-		hextended = FAT32ExtendedHeader.from_bytes(content[36:90])
+	def format_file(self, device_path, createFsInfo: bool = True):
+		with open(device_path, 'r+b') as f:
+			from mbr import MBREntry
+			import math
 
-		fatStartSector = hboot.rsvdSecCnt
-		fatSize = hextended.FATSz32
-		fatBytes = fatSize * hboot.bytesPerSec
+			sec0 = f.read(512)
+			mbr = MBREntry.from_bytes(sec0[0x1BE:(0x1BE+16)])
 
-		table = bytearray(fatBytes)
-
-		table[0:4]  = b'\xF8\xFF\xFF\x0F'  # cluster 0
-		table[4:8]  = b'\xFF\xFF\xFF\x0F'  # cluster 1
-		table[8:12] = b'\xFF\xFF\xFF\x0F'  # cluster 2 (root)
-
-		def _SEC(sector):
-			return sector * hboot.bytesPerSec
-
-		f.seek(_SEC(fatStartSector))
-		f.write(table)
-
-		f.seek(_SEC(fatStartSector + fatSize))
-		f.write(table)
-
-		if hextended.BkBootSec != 0:
-			f.seek(0)
-			secbuffer = f.read(512)
-
-			f.seek(_SEC(hextended.BkBootSec))
-			f.write(secbuffer)
-
-		if createFsInfo:
-			fsinfo = FAT32FSInfo(
-				leadSignature=0x41615252,
-				reserved1=b"\x00" * 480,
-				structSignature=0x61417272,
-				freeClusterCount=0xFFFFFFFF,
-				nextFreeCluster=0xFFFFFFFF,
-				reserved2=b"\x00" * 12,
-				trailSignature=0xAA550000
+			# calc totsec32
+			hboot = FATBootHeader(
+				jmpBoot=b'\xEB\x58\x90', # jmp short + nop
+				OEMName=b'MSWIN4.1',
+				bytesPerSec=512,
+				secPerClus=8,
+				rsvdSecCnt=32,
+				numFATs=2,
+				rootEntCnt=0,
+				totSec16=0,
+				mediaType=0xF8,
+				FATSz16=0,
+				secPerTrk=63,
+				numHeads=16,
+				hiddSec=mbr.startLBA,
+				totSec32= mbr.sizeInLBA
 			)
 
-			f.seek(_SEC(hextended.FSInfo))
-			f.write(fsinfo.to_bytes())
+			hextended = FAT32ExtendedHeader(
+				FATSz32=0,
+				extFlags=0,
+				FSVer=0,
+				rootClus=2,
+				FSInfo=1,
+				BkBootSec=6,
+				reserved=b'\x00' * 12,
+				drvNum=0x80,
+				reserved1=0,
+				bootSig=0x29,
+				volID=0xCAFE,
+				volLab=b'WEY-OS VOL ',
+				filSysType=b'FAT32   '
+			)
+
+			# RootDirSectors = ((BPB_RootEntCnt * 32) + (BPB_BytsPerSec – 1)) / BPB_BytsPerSec;
+			# TmpVal1 = DskSize – (BPB_ResvdSecCnt + RootDirSectors);
+			# TmpVal2 = (256 * BPB_SecPerClus) + BPB_NumFATs;
+			# If(FATType == FAT32)
+			# TmpVal2 = TmpVal2 / 2;
+			# FATSz = (TMPVal1 + (TmpVal2 – 1)) / TmpVal2;
+
+			# If(FATType == FAT32) {
+				# BPB_FATSz16 = 0;
+				# BPB_FATSz32 = FATSz;
+			# } else {
+				# BPB_FATSz16 = LOWORD(FATSz);
+				# /* there is no BPB_FATSz32 in a FAT16 BPB */
+			# }
+
+			tmpVal1 = mbr.sizeInLBA - hboot.rsvdSecCnt
+			tmpVal2 = (256 * hboot.secPerClus) + hboot.numFATs
+			FATSz = (tmpVal1 + (tmpVal2 - 1)) // tmpVal2
+
+			hextended.FATSz32 = FATSz
+
+			fatStartSector = hboot.rsvdSecCnt
+			fatSize = hextended.FATSz32
+			fatBytes = fatSize * hboot.bytesPerSec
+
+			table = bytearray(fatBytes)
+
+			table[0:4]  = b'\xF8\xFF\xFF\x0F'  # cluster 0
+			table[4:8]  = b'\xFF\xFF\xFF\x0F'  # cluster 1
+			table[8:12] = b'\xFF\xFF\xFF\x0F'  # cluster 2 (root)
+
+			def _SEC(sector):
+				return (sector + mbr.startLBA) * hboot.bytesPerSec
+			
+			f.seek(_SEC(0))
+			boot_sector = bytearray(512)
+			boot_sector[0:90] = hboot.to_bytes() + hextended.to_bytes()
+			boot_sector[510:512] = b'\x55\xAA'
+
+			f.write(boot_sector)
+
+			f.seek(_SEC(fatStartSector))
+			f.write(table)
+
+			f.seek(_SEC(fatStartSector + fatSize))
+			f.write(table)
+
+			if hextended.BkBootSec != 0:
+				f.seek(_SEC(0))
+				secbuffer = f.read(512)
+
+				f.seek(_SEC(hextended.BkBootSec))
+				f.write(secbuffer)
+
+			if createFsInfo:
+				fsinfo = FAT32FSInfo(
+					leadSignature=0x41615252,
+					reserved1=b"\x00" * 480,
+					structSignature=0x61417272,
+					freeClusterCount=0xFFFFFFFF,
+					nextFreeCluster=0xFFFFFFFF,
+					reserved2=b"\x00" * 12,
+					trailSignature=0xAA550000
+				)
+
+				f.seek(_SEC(hextended.FSInfo))
+				f.write(fsinfo.to_bytes())
 
 	def walk(self, path: str) -> FATDirectoryEntry | None:
 		itens = path.split("/")
@@ -579,7 +669,7 @@ class FATFS:
 
 		f = self.fat.dev
 
-		f.seek(lba * fat.header_boot.bytesPerSec)
+		f.seek(self.__sector(lba))
 		for _ in range(int(fat.clusterSize / entrySize)):
 			data = f.read(entrySize)
 			if not data:
@@ -587,7 +677,7 @@ class FATFS:
 
 			currentEntry = FATDirectoryEntry.from_bytes(data)
 			if currentEntry.name.decode() == entry.name.decode():
-				return lba * fat.header_boot.bytesPerSec + (entryIndex * entrySize)
+				return self.__sector(lba) + (entryIndex * entrySize)
 
 			entryIndex += 1
 
