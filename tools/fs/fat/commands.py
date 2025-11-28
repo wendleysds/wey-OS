@@ -9,18 +9,20 @@ ATTRIBUTES = {
 }
 
 def cluster_to_lba(fat: FATFS, cluster: int) -> int:
-    return fat.firstDataSector + ((cluster - 2) * fat.headers.boot.secPerClus)
+    return fat.fat.firstDataSector + ((cluster - 2) * fat.fat.header_boot.secPerClus)
 
 def get_cluster_entry(entry: FATDirectoryEntry) -> int:
     return (entry.fstClusHI << 16) | entry.fstClusLO
 
-def creat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
+
+def _create_entry(fat: FATFS, src: str, args: list[str], entry_type: int) -> int:
 	tokens = src.rstrip('/').split('/')
-	name = tokens[len(tokens)-1]
+	name = tokens[-1]
 	dirs = src[:-len('/' + name)]
 
 	entry = fat.walk('/' if dirs == '' else dirs)
 	if not entry:
+		print("No such file or directory")
 		return 1
 
 	cluster = get_cluster_entry(entry)
@@ -29,7 +31,7 @@ def creat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 	for arg in args:
 		attrs |= ATTRIBUTES[arg]
 
-	r = fat.create(cluster, name, attr.ARCHIVE | attrs)
+	r = fat.create(cluster, name, entry_type | attrs)
 	if r == -2:
 		print("File exists")
 		return 1
@@ -40,9 +42,43 @@ def creat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 
 	return 0
 
+def creat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
+	return _create_entry(fat, src, args, attr.ARCHIVE)
 
-def mkdir(args: list[str], src: str, dst: str) -> int: pass
-def rm(fat: FATFS, args: list[str], src: str, dst: str) -> int: pass
+def mkdir(fat: FATFS, args: list[str], src: str, dst: str) -> int:
+	return _create_entry(fat, src, args, attr.DIRECTORY)
+
+def rm(fat: FATFS, args: list[str], src: str, dst: str) -> int:
+	tokens = src.rstrip('/').split('/')
+	name = tokens[len(tokens)-1]
+	dirs = src[:-len('/' + name)]
+
+	if dirs == '':
+		print("Invalid file")
+		return 0
+
+	entry = fat.walk('/' if dirs == '' else dirs)
+	if not entry:
+		print("No such file or directory")
+		return 1
+
+	cluster = get_cluster_entry(entry)
+	target = fat.search(cluster, name)
+
+	if not target:
+		print("No such file or directory")
+		return 1
+
+	if target.attr & attr.DIRECTORY:
+		if len(fat.ls(get_cluster_entry(target))) - 2 != 0:
+			print("Directory not empty")
+			return 1
+
+	res = fat.remove(cluster, name)
+	if res != 0:
+		print("No such file or directory")
+		return 1
+
 
 def ls(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 	entry = fat.walk(src)
