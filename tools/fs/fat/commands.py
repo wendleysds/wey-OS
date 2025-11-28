@@ -53,10 +53,6 @@ def rm(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 	name = tokens[len(tokens)-1]
 	dirs = src[:-len('/' + name)]
 
-	if dirs == '':
-		print("Invalid file")
-		return 0
-
 	entry = fat.walk('/' if dirs == '' else dirs)
 	if not entry:
 		print("No such file or directory")
