@@ -14,7 +14,6 @@ def cluster_to_lba(fat: FATFS, cluster: int) -> int:
 def get_cluster_entry(entry: FATDirectoryEntry) -> int:
     return (entry.fstClusHI << 16) | entry.fstClusLO
 
-
 def _create_entry(fat: FATFS, src: str, args: list[str], entry_type: int) -> int:
 	tokens = src.rstrip('/').split('/')
 	name = tokens[-1]
@@ -105,12 +104,26 @@ def stat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 	if not entry:
 		print("No such file or directory")
 		return 1
-
+	
 	cluster = get_cluster_entry(entry)
+	
+	if('-c' in args):
+		cluster_chain = []
+		cur = cluster
+		while 0x2 <= cur < 0x0FFFFFF8:
+			cluster_chain.append(cur)
+			next = fat.fat.next_cluster(cur)
+			cur = next
+		
+		print(" -> ".join(map(str, cluster_chain)) + " -> [EOF]")
+		return 0
+	
 	lba = cluster_to_lba(fat, cluster)
 	off = (fat.fat.mbr.startLBA + lba) * fat.fat.header_boot.bytesPerSec
 	print(entry)
 	print(f"data LBA     :  {lba} - {off}:{hex(off)}")
+
+	return 0
 
 def statfs(fat: FATFS, args: list[str], src: str, dst: str) -> int: pass
 def cp(fat: FATFS, args: list[str], src: str, dst: str) -> int: pass

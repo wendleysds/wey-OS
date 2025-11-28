@@ -32,6 +32,8 @@ def help():
 	print("\t\t-b: read the content in hex")
 
 	print("\tstat: show file FAT Entry metadata")
+	print("\t\t-c: seek into the file")
+	
 	print("\tstatfs: show FAT metadata")
 
 	print("\tcp   : copy the file from <SRC> to <DST>")
