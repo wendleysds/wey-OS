@@ -137,6 +137,35 @@ class FATDirectoryEntry:
 			self.fileSize
 		)
 	
+	def __str__(self):
+		print(f'name         :  {self.name.decode()}')
+		print(f'attr         :  ', end='')
+
+		if self.attr & READY_ONLY:
+			print("RONLY | ", end='')
+		if self.attr & HIDDEN:
+			print("Hidden | ", end='')
+		if self.attr & SYSTEM:
+			print("System | ", end='')
+		if self.attr & VOLUME:
+			print("Volume | ", end='')
+		if self.attr & DIRECTORY:
+			print("Directory")
+		if self.attr & ARCHIVE:
+			print("Archive")
+
+		print(f'NTRes        :  {self.NTRes}')
+		print(f'crtTimeTenth :  {self.crtTimeTenth}')
+		print(f'crtTime      :  {self.crtTime}')
+		print(f'crtDate      :  {self.crtDate}')
+		print(f'lstAccDate   :  {self.lstAccDate}')
+		print(f'fstClusHI    :  {self.fstClusHI}')
+		print(f'wrtTime      :  {self.wrtTime}')
+		print(f'wrtDate      :  {self.wrtDate}')
+		print(f'fstClusLO    :  {self.fstClusLO}')
+		print(f'fileSize     :  {self.fileSize}', end='')
+		return ''
+	
 @dataclass
 class FAT32FSInfo:
 	leadSignature: int
@@ -167,16 +196,22 @@ class FAT32FSInfo:
 		)
 	
 class FAT:
+	from mbr import MBREntry
 	header_boot: FATBootHeader
+	mbr: MBREntry
 	dev: BufferedRandom
 	table: array
 	totalClusters: int
 	firstDataSector: int
 	clusterSize: int
 
-	def __init__(self, header_boot, dev, table, totalClusters, firstDataSector, clusterSize):
+	def lba_to_sector(self, lba):
+		return (self.mbr.startLBA + lba) * self.header_boot.bytesPerSec
+
+	def __init__(self, header_boot, dev, mbr, table, totalClusters, firstDataSector, clusterSize):
 		self.header_boot = header_boot
 		self.dev = dev
+		self.mbr = mbr
 		self.table = table
 		self.totalClusters = totalClusters
 		self.firstDataSector = firstDataSector
@@ -193,23 +228,22 @@ class FAT32(FAT):
 	header_extended: FAT32ExtendedHeader
 	fsInfo: FAT32FSInfo
 
-	def __init__(self, header_boot, dev, table, totalClusters, firstDataSector, clusterSize, fsinfo, header_extended):
-		super().__init__(header_boot, dev, table, totalClusters, firstDataSector, clusterSize)
+	def __init__(self, header_boot, dev, mbr, table, totalClusters, firstDataSector, clusterSize, fsinfo, header_extended):
+		super().__init__(header_boot, dev, mbr, table, totalClusters, firstDataSector, clusterSize)
 		self.fsInfo = fsinfo
 		self.header_extended = header_extended
 
 	def update(self):
 		fatStartSector = self.header_boot.rsvdSecCnt
-		sectorSize = self.header_boot.bytesPerSec
 		f = self.dev
 		
 		if self.fsInfo.freeClusterCount != -1 and self.fsInfo.nextFreeCluster != -1:
-			f.seek(int(self.header_extended.FSInfo * sectorSize))
+			f.seek(self.lba_to_sector(self.header_extended.FSInfo))
 			f.write(self.fsInfo.to_bytes())
 
 		fatStartSector = self.header_boot.rsvdSecCnt
 
-		f.seek(int(fatStartSector * sectorSize), 0)
+		f.seek(self.lba_to_sector(fatStartSector))
 		f.write(struct.pack("<" + "I" * len(self.table), *self.table))
 
 	def next_cluster(self, current: int) -> int:
@@ -323,12 +357,7 @@ def fat_format_name(filename: str) -> str:
     return ''.join(out).upper()
 
 class FATFS:
-	from mbr import MBREntry
 	fat: FAT
-	mbr: MBREntry
-
-	def __sector(self, sec):
-		return (self.mbr.startLBA + sec) * self.fat.header_boot.bytesPerSec
 
 	def __init__(self, device, startClusters = 3000):
 		from mbr import MBREntry
@@ -369,10 +398,10 @@ class FATFS:
 			if fsInfo.nextFreeCluster == 0xFFFFFFFF:
 				fsInfo.nextFreeCluster = int(startClusters)
 
-		self.mbr = mbr
 		self.fat = FAT32(
 			hBoot,
 			f,
+			mbr,
 			table,
 			int(fatTotalClusters),
 			int(firstDataSector),
@@ -392,7 +421,7 @@ class FATFS:
 
 		cluster = dirCluster
 		lba = self.__cluster_to_lba(cluster)
-		f.seek(self.__sector(lba))
+		f.seek(self.fat.lba_to_sector(lba))
 		for _ in range(int(fat.clusterSize / 32)):
 			data = f.read(32)
 			entry = FATDirectoryEntry.from_bytes(data)
@@ -431,7 +460,7 @@ class FATFS:
 		while True:
 			cluster = dirCluster
 			lba = self.__cluster_to_lba(cluster)
-			f.seek(self.__sector(lba))
+			f.seek(self.fat.lba_to_sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
 				entry = FATDirectoryEntry.from_bytes(data)
@@ -457,7 +486,7 @@ class FATFS:
 
 				if attr & 0x10:
 					lba = self.__cluster_to_lba(cluster)
-					f.seek(self.__sector(lba))
+					f.seek(self.fat.lba_to_sector(lba))
 					dot = entry
 
 					dot.name = '.          '.encode()
@@ -482,7 +511,7 @@ class FATFS:
 		while True:
 			cluster = dirCluster
 			lba = self.__cluster_to_lba(cluster)
-			f.seek(self.__sector(lba))
+			f.seek(self.fat.lba_to_sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
 				entry = FATDirectoryEntry.from_bytes(data)
@@ -669,7 +698,7 @@ class FATFS:
 
 		f = self.fat.dev
 
-		f.seek(self.__sector(lba))
+		f.seek(self.fat.lba_to_sector(lba))
 		for _ in range(int(fat.clusterSize / entrySize)):
 			data = f.read(entrySize)
 			if not data:
@@ -677,7 +706,7 @@ class FATFS:
 
 			currentEntry = FATDirectoryEntry.from_bytes(data)
 			if currentEntry.name.decode() == entry.name.decode():
-				return self.__sector(lba) + (entryIndex * entrySize)
+				return self.fat.lba_to_sector(lba) + (entryIndex * entrySize)
 
 			entryIndex += 1
 
