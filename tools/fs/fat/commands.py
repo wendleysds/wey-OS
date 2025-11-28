@@ -126,4 +126,74 @@ def stat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 	return 0
 
 def statfs(fat: FATFS, args: list[str], src: str, dst: str) -> int: pass
-def cp(fat: FATFS, args: list[str], src: str, dst: str) -> int: pass
+
+def cp(fat: FATFS, args: list[str], src: str, dst: str) -> int:
+	import os
+	is_external = '-ex' in args
+
+	if is_external:
+		if not os.path.isfile(src):
+			print("No such file or directory")
+			return 1
+	else:
+		if not fat.walk(src):
+			print("No such file or directory")
+			return 1
+
+	# dest is a folder        ./ext/foo.txt -> /home or /home/ (search and replace or create)
+	# dest is a existent file ./ext/foo.txt -> /home/bar.txt (rewrite/replace)
+
+	# create the destination if it does not exist
+	dest_exists = fat.walk(dst)
+	if not dest_exists:
+		dirs = dst.removesuffix('/' + os.path.basename(dst))
+		dir_entry = fat.walk(dirs if dirs != '' else '/')
+
+		fat.create(get_cluster_entry(dir_entry), os.path.basename(dst), attr.ARCHIVE)
+
+	# create the file if it does not exist
+	if dest_exists and dest_exists.attr & attr.DIRECTORY:
+		target_exists = fat.search(get_cluster_entry(dest_exists), os.path.basename(src))
+
+		# create if not exists
+		if not target_exists:
+			fat.create(get_cluster_entry(dest_exists), os.path.basename(src), attr.ARCHIVE)
+
+		dst = os.path.join(dst, os.path.basename(src))
+
+	if is_external:
+		with open(src, '+rb') as f:
+			fd = fat.open(dst)
+
+			if not fd:
+				print("No such file or directory")
+				return 1
+
+			if fd.entry.fileSize > 0:
+				fat.fat.free_chain(fd.firstCluster)
+				fat.fat.table[fd.firstCluster] = 0x0FFFFFF8
+				fd.entry.fileSize = 0
+
+			data = f.read(fat.fat.clusterSize)
+			while data:
+				fat.write(fd, data, len(data))
+				data = f.read(fat.fat.clusterSize)
+	else:
+		srcFd = fat.open(src)
+		dstFd = fat.open(dst)
+
+		if not srcFd or not dstFd:
+			print("No such file or directory")
+			return 1
+		
+		if dstFd.entry.fileSize > 0:
+			fat.fat.free_chain(dstFd.firstCluster)
+			fat.fat.table[dstFd.firstCluster] = 0x0FFFFFF8
+			dstFd.entry.fileSize = 0
+
+		data = fat.read(srcFd, fat.fat.clusterSize)
+		while data:
+			fat.write(dstFd, data, len(data))
+			data = fat.read(srcFd, fat.fat.clusterSize)
+
+	return 0
