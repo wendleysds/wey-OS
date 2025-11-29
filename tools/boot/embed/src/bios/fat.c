@@ -17,6 +17,51 @@
 #define ILLEGAL_CHARS "\"*+,./:;<=>?[\\]|"
 #define ILLEGAL_CHARS_REPLACE '_'
 
+#define FILE_POOL_SIZE 4
+
+struct fd{
+	uint32_t startCluster;
+	uint32_t currentCluster;
+	fat_info_t* fat;
+};
+
+static struct fd* fd_pool = NULL;
+static struct file* files_pool = NULL;
+static uint8_t pool_used[FILE_POOL_SIZE];
+
+static void file_pool_init(){
+	if (files_pool) return;
+	files_pool = (struct file*)malloc(sizeof(struct file) * FILE_POOL_SIZE);
+	if (files_pool) {
+		memset(files_pool, 0, sizeof(struct file) * FILE_POOL_SIZE);
+	}
+
+	fd_pool = (struct fd*)malloc(sizeof(struct fd) * FILE_POOL_SIZE);
+	if (fd_pool) {
+		memset(fd_pool, 0, sizeof(struct fd) * FILE_POOL_SIZE);
+	}
+
+	memset(pool_used, 0, sizeof(pool_used));
+}
+
+static struct file* file_get(){
+	if (!files_pool) file_pool_init();
+	if (!files_pool) return NULL;
+
+	for (uint8_t i = 0; i < FILE_POOL_SIZE; ++i){
+		if (!pool_used[i]){
+			pool_used[i] = 1;
+			struct file* f = &files_pool[i];
+			memset(f, 0, sizeof(*f));
+			f->private = &fd_pool[i];
+			memset(&fd_pool[i], 0, sizeof(struct fd));
+			return f;
+		}
+	}
+
+	return NULL;
+}
+
 static int8_t _valid_fat_sector(const uint8_t* sector0){
 	if (sector0[0] != 0xEB && sector0[0] != 0xE9) {
 		return 0;
