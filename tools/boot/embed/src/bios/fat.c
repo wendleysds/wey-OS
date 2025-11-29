@@ -238,11 +238,31 @@ static const struct file_operations ops = {
 };
 
 struct file* platform_open_file(fat_info_t* fat_info, const char* path){
-	struct file* file = NULL;
+	struct file* file = file_get();
 	
 	if(!file){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(NOT_FOUND); // pull empty
 	}
+	
+	char buffer[128];
+	strcpy(buffer, path);
+
+	char* token = strtok(buffer, "/");
+
+	uint32_t dirCluster = fat_info->headers.fat32.rootClus;
+
+	do{
+		dirCluster = fat_get_file_cluster(fat_info, token, dirCluster, &file->size);
+		if(dirCluster >= EOF){
+			file_ret(file);
+			return ERR_PTR(FILE_NOT_FOUND);
+		}
+	} while ((token = strtok(NULL, "/")));
+
+	struct fd* fd = (struct fd*)file->private;
+
+	fd->startCluster = fd->currentCluster = dirCluster;
+	fd->fat = fat_info;
 
 	file->ops = &ops;
 	return file;
