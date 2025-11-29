@@ -412,7 +412,7 @@ class FATFS:
 			hExtend,
 		)
 
-	def __cluster_to_lba(self, cluster: int):
+	def cluster_to_lba(self, cluster: int):
 		fat = self.fat
 		return fat.firstDataSector + ((cluster - 2) * fat.header_boot.secPerClus)
 
@@ -422,7 +422,7 @@ class FATFS:
 		f = self.fat.dev
 
 		cluster = dirCluster
-		lba = self.__cluster_to_lba(cluster)
+		lba = self.cluster_to_lba(cluster)
 		f.seek(self.fat.lba_to_sector(lba))
 		for _ in range(int(fat.clusterSize / 32)):
 			data = f.read(32)
@@ -461,7 +461,7 @@ class FATFS:
 		f = self.fat.dev
 		while True:
 			cluster = dirCluster
-			lba = self.__cluster_to_lba(cluster)
+			lba = self.cluster_to_lba(cluster)
 			f.seek(self.fat.lba_to_sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
@@ -487,7 +487,7 @@ class FATFS:
 				f.write(entry.to_bytes())
 
 				if attr & 0x10:
-					lba = self.__cluster_to_lba(cluster)
+					lba = self.cluster_to_lba(cluster)
 					f.seek(self.fat.lba_to_sector(lba))
 					dot = entry
 
@@ -512,7 +512,7 @@ class FATFS:
 		f = self.fat.dev
 		while True:
 			cluster = dirCluster
-			lba = self.__cluster_to_lba(cluster)
+			lba = self.cluster_to_lba(cluster)
 			f.seek(self.fat.lba_to_sector(lba))
 			for _ in range(int(fat.clusterSize / 32)):
 				data = f.read(32)
@@ -695,7 +695,7 @@ class FATFS:
 
 	def __entry_lba(self, dirCluster: int, entry: FATDirectoryEntry) -> int:
 		fat = self.fat
-		lba = self.__cluster_to_lba(dirCluster)
+		lba = self.cluster_to_lba(dirCluster)
 		entrySize = 32
 		entryIndex = 0
 
@@ -761,7 +761,7 @@ class FATFS:
 
 	def read(self, fd: FATFD, count: int) -> bytes:
 		cursor = fd.cursor
-		lba = self.__cluster_to_lba(fd.currentCluster)
+		lba = self.cluster_to_lba(fd.currentCluster)
 
 		remaining = count
 		totalReaded = 0
@@ -802,7 +802,7 @@ class FATFS:
 		
 	def write(self, fd: FATFD, buffer: str | bytes, count: int) -> int:
 		cursor = fd.cursor
-		lba = self.__cluster_to_lba(fd.currentCluster)
+		lba = self.cluster_to_lba(fd.currentCluster)
 
 		remaining = count
 		totalWritten = 0
@@ -837,7 +837,7 @@ class FATFS:
 					clusterOffset = cursor % self.fat.clusterSize
 					bytesLeftInCluster = self.fat.clusterSize - clusterOffset
 
-					lba = self.__cluster_to_lba(nextCluster)
+					lba = self.cluster_to_lba(nextCluster)
 					f.seek(_SEC(lba) + clusterOffset)
 
 		fd.cursor = cursor

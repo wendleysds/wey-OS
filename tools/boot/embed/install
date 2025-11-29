@@ -76,12 +76,18 @@ def main():
 		while 0x2 <= cur < 0x0FFFFFF8:
 			cluster_chain.append(cur)
 			cur = fat.fat.next_cluster(cur)
-
-		while len(cluster_chain) < 6:
-			cluster_chain.append(0)
 		
 		# Write stage2 info
-		stage2_info = STAGE2_INFO(cluster_chain[:6], fat.fat.header_boot.secPerClus)
+		lbas = []
+		for clus in cluster_chain:
+			lbas.append(fat.cluster_to_lba(clus))
+
+		if len(lbas) < 6:
+			lbas.extend([0] * (6 - len(lbas)))
+		else:
+			lbas = lbas[:6]
+
+		stage2_info = STAGE2_INFO(lbas, fat.fat.header_boot.secPerClus)
 		dev_f.seek(0x1B0)
 		dev_f.write(stage2_info.to_bytes())
 	
