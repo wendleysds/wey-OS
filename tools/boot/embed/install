@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+import os, sys, struct
+from dataclasses import dataclass
+
+@dataclass
+class STAGE2_INFO:
+	lbas: list[int]
+	secPerLBA: int
+
+	STRUCT_FORMAT = "<6HB"
+
+	@classmethod
+	def from_bytes(cls, data: bytes) -> "STAGE2_INFO":
+			unpacked = struct.unpack(cls.STRUCT_FORMAT, data[:struct.calcsize(cls.STRUCT_FORMAT)])
+			lbas = list(unpacked[:6])
+			sec_per_lba = unpacked[6]
+			return cls(lbas=lbas, secPerLBA=sec_per_lba)
+
+	def to_bytes(self) -> bytes:
+		return struct.pack(self.STRUCT_FORMAT, *(self.lbas + [self.secPerLBA]))
+
+
+def help():
+	print(f"Usage: {sys.argv[0]} <device>")
+
+def main():
+	# Ensure the file is built
+	os.system(f"make {os.path.dirname(__file__)}")
+
+	stage1_path = f'{os.path.dirname(__file__)}/build/bin/stage1.bin'
+	stage2_path = f'{os.path.dirname(__file__)}/build/bin/stage2.bin'
+	
+	with open(stage1_path, '+rb') as stage1_f, \
+		 open(stage2_path, '+rb') as stage2_f, \
+		 open(sys.argv[1], '+rb') as dev_f:
+		
+		dev_f.seek(0)
+		dev_f.write(stage1_f.read(0x200))
+		
+		import lib.fat as FAT
+
+		FAT.FATFS.format_file(None, dev_f)
+		fat = FAT.FATFS(dev_f, 1000)
+
+		common_attr = FAT.SYSTEM | FAT.READY_ONLY
+		
+		# Create boot folder
+		fat.create(2, 'boot', FAT.DIRECTORY | common_attr)
+		boot_folder = fat.walk('/boot')
+		
+		# Create and write stage2.bin
+		fat.create(boot_folder.fstClusLO, 'nova.sys', 
+			FAT.ARCHIVE | FAT.HIDDEN | common_attr)
+		
+		fd = fat.open('/boot/nova.sys')
+		if not fd:
+			print("No such file or directory")
+			return 1
+		
+		# Clear existing data
+		if fd.entry.fileSize > 0:
+			fat.fat.free_chain(fd.firstCluster)
+			fat.fat.table[fd.firstCluster] = 0x0FFFFFF8
+			fd.entry.fileSize = 0
+		
+		# Write stage2 data
+		while True:
+			data = stage2_f.read(fat.fat.clusterSize)
+			if not data:
+				break
+			fat.write(fd, data, len(data))
+		
+		# Build cluster chain
+		cluster_chain = []
+		cur = (fd.entry.fstClusHI << 16) | fd.entry.fstClusLO
+		while 0x2 <= cur < 0x0FFFFFF8:
+			cluster_chain.append(cur)
+			cur = fat.fat.next_cluster(cur)
+
+		while len(cluster_chain) < 6:
+			cluster_chain.append(0)
+		
+		# Write stage2 info
+		stage2_info = STAGE2_INFO(cluster_chain[:6], fat.fat.header_boot.secPerClus)
+		dev_f.seek(0x1B0)
+		dev_f.write(stage2_info.to_bytes())
+	
+	return 0
+
+if __name__ == "__main__":
+    exit(main())

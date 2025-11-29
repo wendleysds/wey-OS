@@ -75,24 +75,30 @@ endif
 C_OBJS   = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(C_FILES))
 ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(ASM_FILES))
 
+IMG = $(BUILD_DIR)/img
+
 # Compile rules
 
-all: $(BUILD_DIRS) $(STAGE1_BIN) $(STAGE2_BIN)
-	dd if=/dev/zero of=$(BUILD_DIR)/img bs=1MB count=4
-	dd if=$(STAGE1_BIN) of=$(BUILD_DIR)/img conv=notrunc
-	dd if=$(STAGE2_BIN) of=$(BUILD_DIR)/img seek=2048 conv=notrunc
+
+all: $(BUILD_DIRS) $(IMG) $(STAGE1_BIN) $(STAGE2_BIN)
+	
 
 $(BUILD_DIRS):
 	@mkdir $@
 
+$(IMG):
+	dd if=/dev/zero of=$@ bs=1MB count=32
+
 $(STAGE1_BIN): $(STAGE1_FILE)
 	$(AS) -f bin -o $@ $<
+	dd if=$@ of=$(IMG) conv=notrunc
 
 $(STAGE2_ELF): $(C_OBJS) $(ASM_OBJS)
 	$(LD) $(LDFLAGS) -T $(LD_FILE) -o $@ $^
 
 $(STAGE2_BIN): $(STAGE2_ELF)
 	$(OBJCOPY) -O binary $< $@
+	dd if=$@ of=$(IMG) seek=2048 conv=notrunc
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
@@ -103,10 +109,10 @@ $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm
 	$(AS) $(ASFLAGS) -o $@ $< 
 
 r: all
-	qemu-system-i386 -drive format=raw,file=$(BUILD_DIR)/img
+	qemu-system-i386 -drive format=raw,file=$(IMG)
 
 d: all
-	qemu-system-i386 -drive format=raw,file=$(BUILD_DIR)/img -s -S &
+	qemu-system-i386 -drive format=raw,file=$(IMG) -s -S &
 
 clean:
 	rm -rf $(BUILD_DIR)
