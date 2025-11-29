@@ -11,6 +11,12 @@
 
 // Read-Only and utils fat32 driver
 
+#define MAX_BASENAME 8
+#define MAX_EXTENSION 3
+#define DIR_ENTRY_SIZE 11
+#define ILLEGAL_CHARS "\"*+,./:;<=>?[\\]|"
+#define ILLEGAL_CHARS_REPLACE '_'
+
 static int8_t _valid_fat_sector(const uint8_t* sector0){
 	if (sector0[0] != 0xEB && sector0[0] != 0xE9) {
 		return 0;
@@ -29,6 +35,53 @@ static int8_t _valid_fat_sector(const uint8_t* sector0){
 	}
 
 	return valid_oem;
+}
+
+static inline int _toupper(int c){
+	if(c >= 'a' && c <= 'z'){
+		c -= 32;
+	}
+
+	return c;
+}
+
+static inline char _convert_char(char c){
+	if(c < 0x20 || strchr(ILLEGAL_CHARS, c)){
+		return ILLEGAL_CHARS_REPLACE;
+	}
+
+	return _toupper((unsigned char)c);
+}
+
+static inline void _rtrim(char *str){
+	int len = strlen(str);
+	while(len > 0 && str[len - 1] == ' '){
+		str[--len] = '\0';
+	}
+}
+
+static void fat_name_generate_short(const char *name, char *out){
+	char base[MAX_BASENAME + 1] = {0};
+	char ext[MAX_EXTENSION + 1] = {0};
+	const char *dot = strrchr(name, '.');
+
+	if(dot && dot != name){
+		for(int i = 0; i < MAX_EXTENSION && dot[1 + i] != '\0'; i++){
+			ext[i] = _convert_char(dot[1 + i]);
+		}
+	}
+
+	int i = 0, j = 0;
+	for(i = 0; name[i] != '\0' && name + i != dot && j < MAX_BASENAME; i++){
+		base[j++] = _convert_char(name[i]);
+	}
+
+	base[j] = '\0';
+	_rtrim(base);
+
+	memset(out, ' ', DIR_ENTRY_SIZE);
+	memcpy(out, base, strlen(base));
+	memcpy(out + 8, ext, strlen(ext));
 }
 
 static uint32_t next_cluster(fat_info_t* fat, uint32_t cluster){
@@ -55,14 +108,18 @@ static uint32_t cluster_to_lba(fat_info_t* fat, uint32_t cluster){
 	return lba;
 }
 
-static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint32_t dirCluster){
+static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint32_t dirCluster, uint32_t* fsize){
 	uint32_t clusterSize = fat->headers.boot.bytesPerSec * fat->headers.boot.secPerClus;
 
-	char buffer[clusterSize];
+	char buffer[512];
 	uint32_t currentCluster = dirCluster;
+
+	char formated_name[12];
+    memset(formated_name, 0x0, sizeof(formated_name));
+    fat_name_generate_short(filename, formated_name);
 	
 	do{
-		uint32_t lba = cluster_to_lba(fat, currentCluster);
+		uint32_t lba = cluster_to_lba(fat, currentCluster) + fat->disk->mbr_partitions[0].lbaFirstSector;
 		if(IS_STAT_ERR(fat->disk->ops->read(fat->disk, lba, buffer, 1))){
 			return EOF;
 		}
@@ -82,7 +139,8 @@ static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint
 				continue;
 			}
 
-			if(memcmp(entry->name, filename, 11) == 0){
+			if(memcmp(entry->name, formated_name, 11) == 0){
+				if(fsize) *fsize = entry->fileSize;
 				return ((entry->fstClusHI << 16) | entry->fstClusLO);
 			}
 		}
@@ -118,21 +176,18 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 	return 0x0;
 }
 
-static int _write(struct file *file, const void *buffer, uint64_t count){
-	return NOT_SUPPORTED;
-}
 
 static int _lseek(struct file *file, uint64_t offset, uint8_t whence){
 	return 0x0;
 }
 
 static int _close(struct file *file){
-	return 0x0;
+	file_ret(file);
+	return 0;
 }
 
 static const struct file_operations ops = {
 	.read = _read,
-	.write = _write,
 	.lseek = _lseek,
 	.close = _close
 };
