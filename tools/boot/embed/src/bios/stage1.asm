@@ -132,6 +132,7 @@ error:
 	hlt
 	jmp .die
 
+times 0x1B0 - ($ - $$) db 0
 
 stage1lba: dw 2048, 2056, 0, 0, 0, 0
 stage1SecPerLba: db 8
@@ -145,7 +146,7 @@ partition1_start_chs db 0, 2, 0
 partition1_type db 0x0C ; FAT32 LBA
 partition1_end_chs db 0xFF, 0xFF, 0xFF
 partition1_start_lba dd 2048
-partition1_size_lba dd 0x00001000 ; 8 MiB
+partition1_size_lba dd 0x0010000 ; 32 MiB
 
 ; ----
 

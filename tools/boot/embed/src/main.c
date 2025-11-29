@@ -31,6 +31,8 @@ void main(){
 		platform_die();
 	}
 
+	printf("=== NoVaLoader v0.1 ===\n");
+
 	struct e820_entry entries[32];
 	uint32_t counter = 0;
 	status = platform_get_memory_map(entries, ARRAY_SIZE(entries), &counter);
