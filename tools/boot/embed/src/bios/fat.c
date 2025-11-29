@@ -218,7 +218,72 @@ fat_info_t* platform_parse_fat(struct disk* disk){
 }
 
 static int _read(struct file *file, void *buffer, uint64_t count){
-	return 0x0;
+	if(!file || !buffer || count == 0){
+		return INVALID_ARG;
+	}
+
+	struct fd* fd = (struct fd*)file->private;
+	fat_info_t* fat = fd->fat;
+
+	uint32_t totalReaded = 0;
+
+	if(!fat) return INVALID_ARG;
+
+	if (file->pos >= file->size) {
+		return END_OF_FILE;
+	}
+
+	uint32_t cursor = file->pos;
+	uint32_t remaining = (uint32_t)count;
+
+	/* clamp remaining to file size */
+	if (remaining > file->size - cursor) {
+		remaining = file->size - cursor;
+		if (remaining == 0) return END_OF_FILE;
+	}
+
+	uint32_t clusterSize = fat->headers.boot.bytesPerSec * fat->headers.boot.secPerClus;
+	uint32_t cluster = fd->currentCluster;
+
+	/* offset inside the first cluster to read from */
+	uint32_t offInCluster = cursor % clusterSize;
+	uint32_t bytesLeftInCluster = clusterSize - offInCluster;
+
+	uint8_t clusterBuf[clusterSize];
+	memset(clusterBuf, 0x0, clusterSize);
+
+	while (remaining > 0) {
+		uint32_t lba = cluster_to_lba(fat, cluster);
+		if (IS_STAT_ERR(fat->disk->ops->read(fat->disk, lba, clusterBuf, fat->headers.boot.secPerClus))) {
+			return READ_FAIL;
+		}
+
+		uint32_t toCopy = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
+		memcpy((uint8_t*)buffer + totalReaded, clusterBuf + offInCluster, toCopy);
+
+		totalReaded += toCopy;
+		remaining -= toCopy;
+		cursor += toCopy;
+
+		/* after first iteration, subsequent reads start at cluster offset 0 */
+		offInCluster = 0;
+		bytesLeftInCluster = clusterSize;
+
+		if (remaining > 0) {
+			cluster = next_cluster(fat, cluster);
+			if (cluster >= EOF) {
+				/* reached end of cluster chain prematurely */
+				file->pos = file->size;
+				return totalReaded;
+			}
+		}
+	}
+
+	/* update current cluster and file position */
+	fd->currentCluster = cluster;
+	file->pos = cursor;
+
+	return totalReaded;
 }
 
 
