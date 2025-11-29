@@ -3,10 +3,10 @@
 # genhdimage.sh
 # Usage: genhdimage.sh [BZIMAGE] [HDIMAGE]
 # If BZIMAGE is not provided this will try to find a file named "bzImage" under the current tree.
-# Default HDIMAGE is ./build/hdimage.img (32 MiB)
+# Default HDIMAGE is ./build/hdimage (32 MiB)
 
 BZIMAGE="${1:-}"
-HDIMAGE="${2:-./build/hdimage.img}"
+HDIMAGE="${2:-./build/hdimage}"
 TMPBOOT="$(mktemp --tmpdir boot.cfg.XXXXXX)"
 
 cleanup() {
@@ -15,7 +15,7 @@ cleanup() {
 trap cleanup EXIT
 
 FAT_PY="tools/fs/fat/main.py"
-BOOR_PY="tools/boot/embed/install"
+NoVa_PY="tools/boot/embed/install"
 
 # locate bzImage if not given
 if [[ -z "$BZIMAGE" ]]; then
@@ -31,6 +31,14 @@ if [[ ! -f "$BZIMAGE" ]]; then
 	exit 1
 fi
 
+# ensure relative paths are explicit (prefix with ./) for arguments and tool paths
+for var in BZIMAGE HDIMAGE FAT_PY NoVa_PY; do
+	val="${!var}"
+	if [[ -n "$val" && "$val" != /* && "$val" != ./* && "$val" != ../* ]]; then
+		declare -g "$var=./$val"
+	fi
+done
+
 echo "Using bzImage: $BZIMAGE"
 echo "Creating HD image: $HDIMAGE (32 MiB)"
 
@@ -38,7 +46,7 @@ echo "Creating HD image: $HDIMAGE (32 MiB)"
 dd if=/dev/zero of="$HDIMAGE" bs=1M count=32 status=none
 
 # install bootloader
-python3 "$BOOR_PY" "$HDIMAGE"
+python3 "$NoVa_PY" "$HDIMAGE"
 
 # create temporary boot.cfg content
 echo "TARGET=/boot/kernel" > "$TMPBOOT"
