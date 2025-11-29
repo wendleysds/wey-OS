@@ -54,6 +54,8 @@ void main(){
 		platform_die();
 	}
 
+	printf("\n");
+
 	status = platform_disk_init();
 	
 	if(IS_STAT_ERR(status)){
@@ -66,6 +68,40 @@ void main(){
 		printf("Failed to parse disk partitions! %d\n", status);
 		platform_die();
 	}
+
+	printf("\nParsing FAT...\n");
+
+	fat_info_t* fat = platform_parse_fat(main_disk);
+	if(IS_ERR(fat)){
+		printf("Failed to parse FAT! %d\n", PTR_ERR(fat));
+		platform_die();
+	}
+
+	printf("Vol Name: %s\nBootSig: %x\n", fat->headers.boot.OEMName, fat->headers.fat32.bootSig);
+	printf("Vol Labe: %s\nvolID: %x\n", fat->headers.fat32.volLab, fat->headers.fat32.volID);
+
+	const char* path1 = "/boot/boot.cfg";
+	const char* path2 = "/boot.cfg";
+
+	struct file* config_file = NULL;
+
+	printf("\nSearching config in %s\n", path1);
+	config_file = platform_open_file(fat, path1);
+	if(!IS_ERR(config_file)) goto found;
+
+	printf("Searching config in %s\n", path2);
+	config_file = platform_open_file(fat, path2);
+	if(!IS_ERR(config_file)) goto found;
+
+	printf("Config file not found!");
+	platform_die();
+
+found:
+	printf("Found, parsing...\n");
+
+	char buffer[512];
+	config_file->ops->read(config_file, buffer, 32);
+	printf(buffer);
 
 	__hlt;
 }
