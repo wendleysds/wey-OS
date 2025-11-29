@@ -288,7 +288,47 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 
 
 static int _lseek(struct file *file, uint64_t offset, uint8_t whence){
-	return 0x0;
+	if(!file){
+		return INVALID_ARG;
+	}
+
+	struct fd* fd = (struct fd*)file->private;
+	uint32_t filesize = file->size;
+
+	uint32_t target;
+	switch(whence){
+		case SEEK_SET:
+			target = offset;	
+			break;
+		case SEEK_CUR:
+			target = file->pos + offset;
+			break;
+		case SEEK_END:
+			target = filesize + offset;
+			break;
+		default:
+			return INVALID_ARG;
+	}
+
+	if(target > filesize){
+		return OVERFLOW;
+	}
+
+	uint32_t clusterSize = fd->fat->headers.boot.bytesPerSec * fd->fat->headers.boot.secPerClus;
+	uint32_t clusterOffset = target / clusterSize;
+
+	uint32_t cluster = fd->startCluster;
+	for(uint32_t i = 0; i < clusterOffset; i++){
+		cluster = next_cluster(fd->fat, cluster);
+		if(cluster >= EOF) {
+			return END_OF_FILE; // Reached end of file
+		}
+	}
+
+	fd->currentCluster = cluster;
+	file->pos = target;
+
+	return filesize - target;
 }
 
 static int _close(struct file *file){
