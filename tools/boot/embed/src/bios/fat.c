@@ -62,6 +62,14 @@ static struct file* file_get(){
 	return NULL;
 }
 
+static void file_ret(struct file* f){
+	if (!files_pool || !f) return;
+	ptrdiff_t idx = f - files_pool;
+	if (idx < 0 || (uint32_t)idx >= FILE_POOL_SIZE) return;
+	pool_used[idx] = 0;
+	memset(&files_pool[idx], 0, sizeof(struct file));
+}
+
 static int8_t _valid_fat_sector(const uint8_t* sector0){
 	if (sector0[0] != 0xEB && sector0[0] != 0xE9) {
 		return 0;
