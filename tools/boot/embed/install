@@ -25,7 +25,7 @@ def help():
 
 def main():
 	# Ensure the file is built
-	os.system(f"make {os.path.dirname(__file__)}")
+	os.system(f"make -C {os.path.dirname(__file__)}")
 
 	stage1_path = f'{os.path.dirname(__file__)}/build/bin/stage1.bin'
 	stage2_path = f'{os.path.dirname(__file__)}/build/bin/stage2.bin'
