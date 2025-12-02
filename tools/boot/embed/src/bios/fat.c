@@ -295,7 +295,7 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 }
 
 
-static int _lseek(struct file *file, uint64_t offset, uint8_t whence){
+static int _lseek(struct file *file, off_t offset, uint8_t whence){
 	if(!file){
 		return INVALID_ARG;
 	}

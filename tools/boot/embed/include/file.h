@@ -6,9 +6,11 @@
 
 struct file;
 
+typedef int32_t off_t;
+
 struct file_operations {
     int (*read)(struct file *file, void *buffer, uint64_t count);
-    int (*lseek)(struct file *file, uint64_t offset, uint8_t whence);
+    int (*lseek)(struct file *file, off_t offset, uint8_t whence);
     int (*close)(struct file *file);
 };
 
