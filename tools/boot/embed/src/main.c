@@ -4,11 +4,29 @@
 #include <disk.h>
 #include <heap.h>
 #include <loader.h>
+#include <string.h>
+
+#define MAX_CONFIG_SIZE 4096
 
 #define HEAP_LOW_ADDR 0x8000
 #define HEAP_HIGH_ADDR 0x1000000
 
 #define HEAP_SIZE  0x4000
+
+#define IS_BLANK(c) ((c)==' ' || (c)=='\t' || (c)=='\n' || (c)=='\r')
+
+typedef struct entry{
+	char* label;
+	char* target;
+	char* initrd;
+	struct entry* next;
+} entry_t;
+
+typedef struct {
+	entry_t* entries;
+	uint16_t count;
+	entry_t* def;
+} config_t;
 
 static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint32_t start, uint32_t end){
 	for(uint32_t i = 0; i < count; i++){
@@ -25,11 +43,17 @@ static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint3
 	return 0;
 }
 
+void _die(){
+	printf("Press any key to continue...");
+	platform_getchar();
+	platform_die();
+}
+
 void main(){
 	int status = platform_init();
 	if (IS_STAT_ERR(status)){
 		printf("Failer to init platform! %d\n", status);
-		platform_die();
+		_die();
 	}
 
 	printf("=== NoVaLoader v0.1 ===\n");
@@ -40,7 +64,7 @@ void main(){
 
 	if (IS_STAT_ERR(status)){
 		printf("Failed to get memory map! %d\n", status);
-		platform_die();
+		_die();
 	}
 
 	printf("Memory Map Entries: %d\n", counter);
@@ -52,7 +76,7 @@ void main(){
 		printf("Heap initialized at 0x%x - 0x%x\n", HEAP_HIGH_ADDR, HEAP_HIGH_ADDR + HEAP_SIZE);
 	}else{
 		printf("No usable RAM area found for heap!\n");
-		platform_die();
+		_die();
 	}
 
 	printf("\n");
@@ -61,13 +85,13 @@ void main(){
 	
 	if(IS_STAT_ERR(status)){
 		printf("Failed to init disk! %d\n", status);
-		platform_die();
+		_die();
 	}
 
 	status = disk_parse_partitions(main_disk);
 	if(IS_STAT_ERR(status)){
 		printf("Failed to parse disk partitions! %d\n", status);
-		platform_die();
+		_die();
 	}
 
 	printf("\nParsing FAT...\n");
@@ -75,7 +99,7 @@ void main(){
 	fat_info_t* fat = platform_parse_fat(main_disk);
 	if(IS_ERR(fat)){
 		printf("Failed to parse FAT! %d\n", PTR_ERR(fat));
-		platform_die();
+		_die();
 	}
 
 	printf("Vol Name: %s\nBootSig: %x\n", fat->headers.boot.OEMName, fat->headers.fat32.bootSig);
@@ -86,241 +110,166 @@ void main(){
 
 	struct file* config_file = NULL;
 
-	printf("\nSearching config in %s\n", path1);
+	printf("\nSearching config in %s ", path1);
 	config_file = platform_open_file(fat, path1);
 	if(!IS_ERR(config_file)) goto found;
 
-	printf("Searching config in %s\n", path2);
+	printf("\nSearching config in %s ", path2);
 	config_file = platform_open_file(fat, path2);
 	if(!IS_ERR(config_file)) goto found;
 
-	printf("Config file not found!");
-	platform_die();
+	printf("\nConfig file not found!\n");
+	_die();
 
 found:
-	printf("Found, parsing...\n");
+	printf("| OK\n");
 
 	/*
-	Config file format:
-	KEY=value
-	ex:
+	Config file format ex:
 
-	/*
-	Config file format:
-	KEY=value
-	ex:
+	DEFAULT WeyOs # default boot entry after timeout
 
-	TARGET=/boot/kernel
-	INITRD=/boot/ramfs.img
+	# My OS
+	LABEL WeyOs
+		TARGET=/boot/kernel
+		INITRD=/boot/ramfs.img
+
+	# other entry
+	LABEL linux
+		TARGET=/boot/vmlinux # kernel
+		INITRD=/boot/initramfs.cpuio
+
 	*/
 
-	char *config_buf = NULL;
-	uint32_t cfg_size = config_file->size;
-	config_buf = malloc(cfg_size + 1);
-	if(!config_buf){
+	char* buffer = NULL;
+	uint16_t buffer_size = 0;
+
+	if(config_file->size > MAX_CONFIG_SIZE){
+		printf("Config file too large! parsing only %d bytes", MAX_CONFIG_SIZE);
+		buffer_size = MAX_CONFIG_SIZE;
+	}else{
+		buffer_size = config_file->size;
+	}
+
+	buffer = malloc(buffer_size);
+	if(!buffer){
 		printf("Failed to allocate memory for config\n");
-		platform_die();
+		_die();
 	}
 
-	uint32_t read_total = 0;
-	while(read_total < cfg_size){
-		int r = config_file->ops->read(config_file, config_buf + read_total, cfg_size - read_total);
-		if(r < 0){
-			printf("Error reading config file: %d\n", r);
-			free(config_buf);
-			platform_die();
-		}
-		if(r == 0) break;
-		read_total += r;
+	// Read the whole file to memory
+	uint32_t readed = config_file->ops->read(config_file, buffer, buffer_size);
+	if(IS_STAT_ERR(readed)){
+		printf("Error reading cfg file! %d", readed);
+		_die();
 	}
-	config_buf[read_total] = '\0';
 
-	char *target_path = NULL;
-	char *initrd_path = NULL;
+	config_file->ops->close(config_file);
+	config_file = NULL;
 
-	char *line = config_buf;
-	char *end = config_buf + read_total;
+	config_t config;
+	memset(&config, 0x0, sizeof(config));
 
-	while(line < end){
-		char *nl = strchr(line, '\n');
-		char *line_end = nl ? nl : end;
-		/* trim trailing CR/LF and spaces */
-		while(line_end > line && (*(line_end-1) == '\r' || *(line_end-1) == ' ' || *(line_end-1) == '\t')){
-			*(--line_end) = '\0';
+	char* p = buffer;
+	char* end = buffer + buffer_size;
+	entry_t* current = NULL;
+
+	while(p < end){
+		// Jump space and empty lines
+		while(p < end && IS_BLANK(*p)) p++;
+		if(p >= end) break;
+
+		char* line = p;
+
+		while(p < end && *p != '\n' && *p != '\r') p++;
+
+		char* line_end = p;
+		*line_end = '\0'; // End the line
+		p++;
+
+		// Handle comments
+		for(char* p = line; *p; p++){
+			if(*p == '#'){
+				*p = '\0';
+				return;
+			}
 		}
-		/* skip empty lines or comments */
-		if(line_end == line || *line == '#'){
-			line = nl ? (nl + 1) : end;
+
+		// If line was empty after removing comment, ignore :D
+		for(char* t=line; *t; t++){
+			if(!IS_BLANK(*t)) goto process_line;
+		}
+
+		continue;
+
+process_line:
+
+		if(strncmp(line, "DEFAULT", 7) == 0){
+			char* val = line + 7;
+			while(IS_BLANK(*val)) val++;
+			config.def = (entry_t*)val; // tmp
 			continue;
 		}
 
-		/* find '=' */
-		char *eq = NULL;
-		for(char *p = line; p < line_end; ++p){
-			if(*p == '='){ eq = p; break; }
-		}
-		if(!eq){
-			line = nl ? (nl + 1) : end;
+		// LABEL
+		if(strncmp(line, "LABEL", 5) == 0){
+			char* val = line + 5;
+			while(IS_BLANK(*val)) val++;
+
+			current = malloc(sizeof(entry_t));
+			if(config.entries == NULL){
+				config.entries = current;
+			}else{
+				current->next = config.entries;
+				config.entries = current;
+			}
+
+			current->label = val;
+			config.count++;
+
 			continue;
 		}
 
-		*eq = '\0';
-		char *key = line;
-		char *val = eq + 1;
-
-		/* trim leading spaces on key */
-		while(*key == ' ' || *key == '\t') key++;
-		/* trim trailing spaces on key */
-		char *kend = eq - 1;
-		while(kend > key && (*kend == ' ' || *kend == '\t')){ *kend = '\0'; kend--; }
-
-		/* trim leading spaces on val */
-		while(*val == ' ' || *val == '\t') val++;
-		/* trim trailing spaces on val */
-		char *vend = line_end - 1;
-		while(vend > val && (*vend == ' ' || *vend == '\t')){ *vend = '\0'; vend--; }
-
-		if(strcmp(key, "TARGET") == 0){
-			if(target_path) free(target_path);
-			target_path = strdup(val);
-		} else if(strcmp(key, "INITRD") == 0){
-			if(initrd_path) free(initrd_path);
-			initrd_path = strdup(val);
-		}
-
-		line = nl ? (nl + 1) : end;
-	}
-
-	/* close config file */
-	if(config_file->ops && config_file->ops->close) config_file->ops->close(config_file);
-
-	if(!target_path){
-		printf("No TARGET specified in config\n");
-		free(config_buf);
-		platform_die();
-	}
-
-	printf("Target: %s\n", target_path);
-	if(initrd_path) printf("Initrd: %s\n", initrd_path);
-
-	/* open kernel file and pass to loader */
-	struct file *kernel_file = platform_open_file(fat, target_path);
-	if(IS_ERR(kernel_file)){
-		printf("Failed to open kernel file %s\n", target_path);
-		free(config_buf);
-		platform_die();
-	}
-
-	weyos_loader(kernel_file);
-
-	/* cleanup */
-	if(kernel_file->ops && kernel_file->ops->close) kernel_file->ops->close(kernel_file);
-	free(config_buf);
-	if(target_path) free(target_path);
-	if(initrd_path) free(initrd_path);
-
-	//-----------------------------------
-
-	/* Read entire config file into a buffer */
-	uint32_t fsize = config_file->size;
-	char *buf = malloc(fsize + 1);
-	if (!buf) {
-		printf("Out of memory while reading config\n");
-		platform_die();
-	}
-
-	ssize_t got = file_read(config_file, buf, fsize);
-	if (got < 0) {
-		printf("Failed to read config file: %d\n", (int)got);
-		platform_die();
-	}
-	
-	buf[got] = '\0';
-
-	/* Parse lines KEY=value */
-	char *target = NULL;
-	char *initrd = NULL;
-
-	char *saveptr = NULL;
-	char *line = strtok_r(buf, "\r\n", &saveptr);
-	while (line) {
-		/* trim leading whitespace */
-		while (*line == ' ' || *line == '\t') line++;
-		if (*line == '\0' || *line == '#') {
-			line = strtok_r(NULL, "\r\n", &saveptr);
+		// TARGET=
+		if(current && strncmp(line, "TARGET=", 7) == 0){
+			current->target = line + 7;
+			while(IS_BLANK(*current->target)) current->target++;
 			continue;
 		}
 
-		char *eq = strchr(line, '=');
-		if (!eq) {
-			line = strtok_r(NULL, "\r\n", &saveptr);
+		// INITRD=
+		if(current && strncmp(line, "INITRD=", 7) == 0){
+			current->initrd = line + 7;
+			while(IS_BLANK(*current->initrd)) current->initrd++;
 			continue;
 		}
-		*eq = '\0';
-		char *key = line;
-		char *val = eq + 1;
-
-		/* trim trailing whitespace from key */
-		char *kend = key + strlen(key) - 1;
-		while (kend >= key && (*kend == ' ' || *kend == '\t')) {
-			*kend = '\0';
-			kend--;
-		}
-
-		/* trim leading and trailing whitespace from val */
-		while (*val == ' ' || *val == '\t') val++;
-		char *vend = val + strlen(val) - 1;
-		while (vend >= val && (*vend == ' ' || *vend == '\t')) {
-			*vend = '\0';
-			vend--;
-		}
-
-		if (strcmp(key, "TARGET") == 0) {
-			target = malloc(strlen(val) + 1);
-			if (target) strcpy(target, val);
-		} else if (strcmp(key, "INITRD") == 0) {
-			initrd = malloc(strlen(val) + 1);
-			if (initrd) strcpy(initrd, val);
-		}
-
-		line = strtok_r(NULL, "\r\n", &saveptr);
 	}
 
-	free(buf);
+	// Resolve default
+	if(config.def && (uintptr_t)config.def > 0xFFF){
+		entry_t* cur = config.entries;
 
-	if (!target) {
-		printf("Config missing TARGET entry\n");
-		platform_die();
+		do{
+			// config.def points to label text
+			if(strcmp(cur->label, (char*)config.def) == 0){
+				config.def = cur;
+				break;
+			}
+		}while((cur = cur->next));
+
+	}else if(config.count > 0){
+		config.def = config.entries; // fallback
 	}
 
-	printf("Config -> TARGET=%s INITRD=%s\n", target, initrd ? initrd : "(none)");
+	printf("Parsed %d entries.\n\n", config.count);
 
-	/* Open kernel file */
-	struct file* kernel_file = platform_open_file(fat, target);
-	if (IS_ERR(kernel_file)) {
-		printf("Failed to open kernel '%s' (%d)\n", target, PTR_ERR(kernel_file));
-		platform_die();
-	}
+	entry_t* cur = config.entries;
 
-	/* Open initrd if specified */
-	struct file* initrd_file = NULL;
-	if (initrd) {
-		initrd_file = platform_open_file(fat, initrd);
-		if (IS_ERR(initrd_file)) {
-			printf("Failed to open initrd '%s' (%d)\n", initrd, PTR_ERR(initrd_file));
-			platform_die();
-		}
-	}
-
-	/* Free temporary strings */
-	free(target);
-	if (initrd) free(initrd);
-
-	/* Hand off to loader */
-	weyos_loader(kernel_file);
-
-	/* If loader returns, halt */
-	platform_die();
+	do{
+		printf("label: %s\n", cur->label);
+		printf("    target: %s\n", cur->target);
+		printf("    initrd: %s\n\n", cur->initrd ? cur->initrd : "NULL");
+	}while((cur = cur->next));
 
 	__hlt;
 }

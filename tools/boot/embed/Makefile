@@ -75,30 +75,24 @@ endif
 C_OBJS   = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(C_FILES))
 ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(ASM_FILES))
 
-IMG = $(BUILD_DIR)/img
-
 # Compile rules
 
 
-all: $(BUILD_DIRS) $(IMG) $(STAGE1_BIN) $(STAGE2_BIN)
+all: $(BUILD_DIRS) $(STAGE1_BIN) $(STAGE2_BIN)
 	
 
 $(BUILD_DIRS):
 	@mkdir $@
 
-$(IMG):
-	dd if=/dev/zero of=$@ bs=1MB count=32
 
 $(STAGE1_BIN): $(STAGE1_FILE)
 	$(AS) -f bin -o $@ $<
-	dd if=$@ of=$(IMG) conv=notrunc
 
 $(STAGE2_ELF): $(C_OBJS) $(ASM_OBJS)
 	$(LD) $(LDFLAGS) -T $(LD_FILE) -o $@ $^
 
 $(STAGE2_BIN): $(STAGE2_ELF)
 	$(OBJCOPY) -O binary $< $@
-	dd if=$@ of=$(IMG) seek=2048 conv=notrunc
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
