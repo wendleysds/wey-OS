@@ -20,11 +20,29 @@ void platform_putchar(char c){
 	intcall(0x10, &r, 0x0);
 }
 
+void keyboard_init(){
+	struct biosregs ireg;
+	initregs(&ireg);
+
+	ireg.ax = 0x0305;
+	intcall(0x16, &ireg, 0x0);
+}
+
+int platform_getchar(){
+	struct biosregs ireg, oreg;
+	initregs(&ireg);
+	intcall(0x16, &ireg, &oreg);
+
+	return oreg.al;
+}
+
 int platform_init(){
 	asm volatile (
 		"movb %%dl, %0"
 		: "=rm"(mainDriverNum)
 	);
+
+	keyboard_init();
 
 	return SUCCESS;
 }

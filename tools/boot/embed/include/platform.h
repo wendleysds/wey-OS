@@ -11,6 +11,8 @@ int platform_init();
 int platform_disk_init();
 
 void platform_putchar(char c);
+int platform_getchar();
+
 int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *count);
 
 void __no_return platform_die();
