@@ -44,8 +44,9 @@ static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint3
 }
 
 void _die(){
-	printf("Press any key to continue...");
-	platform_getchar();
+	const int timeout = 10;
+	printf("Press any key to continue... or wait %d seconds", timeout);
+	platform_timeout(timeout);
 	platform_die();
 }
 

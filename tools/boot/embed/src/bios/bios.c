@@ -20,20 +20,60 @@ void platform_putchar(char c){
 	intcall(0x10, &r, 0x0);
 }
 
-void keyboard_init(){
-	struct biosregs ireg;
-	initregs(&ireg);
-
-	ireg.ax = 0x0305;
-	intcall(0x16, &ireg, 0x0);
-}
-
 int platform_getchar(){
 	struct biosregs ireg, oreg;
 	initregs(&ireg);
 	intcall(0x16, &ireg, &oreg);
 
 	return oreg.al;
+}
+
+static uint8_t gettime(void){
+	struct biosregs ireg, oreg;
+
+	initregs(&ireg);
+	ireg.ah = 0x02;
+	intcall(0x1a, &ireg, &oreg);
+
+	return oreg.dh;
+}
+
+static int kbd_pending(void){
+	struct biosregs ireg, oreg;
+
+	initregs(&ireg);
+	ireg.ah = 0x01;
+	intcall(0x16, &ireg, &oreg);
+
+	return !(oreg.eflags & X86_EFLAGS_ZF);
+}
+
+int platform_timeout(int secs){
+	int start, current;
+
+	start = gettime();
+
+	while (secs) {
+		if (kbd_pending()){
+			return platform_getchar();
+		}
+
+		current = gettime();
+		if (start != current) {
+			secs--;
+			start = current;
+		}
+	}
+
+	return 0;
+}
+
+static void keyboard_init(){
+	struct biosregs ireg;
+	initregs(&ireg);
+
+	ireg.ax = 0x0305;
+	intcall(0x16, &ireg, 0x0);
 }
 
 int platform_init(){

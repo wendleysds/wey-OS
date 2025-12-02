@@ -10,6 +10,7 @@
 int platform_init();
 int platform_disk_init();
 
+int platform_timeout(int secs);
 void platform_putchar(char c);
 int platform_getchar();
 
