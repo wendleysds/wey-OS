@@ -14,6 +14,13 @@ int platform_timeout(int secs);
 void platform_putchar(char c);
 int platform_getchar();
 
+void platform_init_video();
+void platform_putchar(char c);
+void platform_clear_screen();
+void platform_set_cursor(uint8_t x, uint8_t y);
+void platform_get_cursor(uint8_t* x, uint8_t* y);
+void platform_get_resolution(uint8_t* x, uint8_t* y);
+
 int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *count);
 
 void __no_return platform_die();

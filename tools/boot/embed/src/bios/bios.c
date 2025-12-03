@@ -10,16 +10,6 @@
 
 uint8_t mainDriverNum = 0;
 
-void platform_putchar(char c){
-	struct biosregs r;
-	initregs(&r);
-	r.bx = 0x0007;
-	r.cx = 0x0001;
-	r.ah = 0x0E;
-	r.al = c;
-	intcall(0x10, &r, 0x0);
-}
-
 int platform_getchar(){
 	struct biosregs ireg, oreg;
 	initregs(&ireg);

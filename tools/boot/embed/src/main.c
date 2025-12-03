@@ -12,6 +12,7 @@
 #define HEAP_HIGH_ADDR 0x1000000
 
 #define HEAP_SIZE  0x4000
+#define DEFAULT_TIMEOUT 30
 
 #define IS_BLANK(c) ((c)==' ' || (c)=='\t' || (c)=='\n' || (c)=='\r')
 
@@ -26,6 +27,7 @@ typedef struct {
 	entry_t* entries;
 	uint16_t count;
 	entry_t* def;
+	int16_t timeoutSecs;
 } config_t;
 
 static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint32_t start, uint32_t end){
@@ -44,9 +46,8 @@ static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint3
 }
 
 void _die(){
-	const int timeout = 10;
-	printf("Press any key to continue... or wait %d seconds", timeout);
-	platform_timeout(timeout);
+	printf("Press any key to continue...\n");
+	platform_timeout(DEFAULT_TIMEOUT);
 	platform_die();
 }
 
@@ -56,6 +57,10 @@ void main(){
 		printf("Failer to init platform! %d\n", status);
 		_die();
 	}
+
+	platform_init_video();
+
+	platform_clear_screen();
 
 	printf("=== NoVaLoader v0.1 ===\n");
 
@@ -115,9 +120,13 @@ void main(){
 	config_file = platform_open_file(fat, path1);
 	if(!IS_ERR(config_file)) goto found;
 
-	printf("\nSearching config in %s ", path2);
+	printf("| NO\n");
+
+	printf("Searching config in %s ", path2);
 	config_file = platform_open_file(fat, path2);
 	if(!IS_ERR(config_file)) goto found;
+
+	printf("| NO\n");
 
 	printf("\nConfig file not found!\n");
 	_die();
@@ -127,6 +136,8 @@ found:
 
 	/*
 	Config file format ex:
+
+	TIMEOUT 30 # time to select entry
 
 	DEFAULT WeyOs # default boot entry after timeout
 
@@ -170,6 +181,8 @@ found:
 
 	config_t config;
 	memset(&config, 0x0, sizeof(config));
+
+	config.timeoutSecs = DEFAULT_TIMEOUT;
 
 	char* p = buffer;
 	char* end = buffer + buffer_size;
@@ -271,6 +284,146 @@ process_line:
 		printf("    target: %s\n", cur->target);
 		printf("    initrd: %s\n\n", cur->initrd ? cur->initrd : "NULL");
 	}while((cur = cur->next));
+
+	// Make bootmenu
+
+	uint8_t width, heigth;
+	platform_get_resolution(&width, &heigth);
+	platform_clear_screen();
+
+	const uint8_t centerX = width / 2;
+	const uint8_t centerY = heigth / 2;
+
+	// Insane math(and magic numbers) to center everything
+	// magic number == margin
+
+	// end
+	/*
+
+	======== NoVaLoader =======
+
+	         1. WeyOs *
+		     2. Linux
+
+	===========================
+
+	*/
+
+	const char* header = "======== NoVaLoader =======";
+	const char* footer = "===========================";
+
+	const uint8_t foo_hea_center_x = centerX - (strlen(footer) / 2) - 1;
+
+	const uint8_t header_center_y = centerY - (config.count / 2) - 2;
+	const uint8_t footer_center_y = centerY + (config.count / 2) + (config.count > 1 ? 1 : 2);
+
+	platform_set_cursor(foo_hea_center_x, header_center_y);
+	printf(header);
+	
+	platform_set_cursor(foo_hea_center_x, footer_center_y);
+	printf(footer);
+
+	uint8_t yStart = centerY - (config.count / 2);
+
+	int i = 0;
+	int selected_index = 0;
+
+	struct cords{
+		uint8_t x, y;
+	} bestSpotForSelect[config.count];
+
+	cur = config.entries;
+	do {
+		// strlen("%d." + " " + LABEL);
+		const uint8_t textSize = 2 + 1 + strlen(cur->label);
+		const uint8_t middle = centerX - (textSize / 2);
+
+		platform_set_cursor(middle, yStart);
+		printf("%d. %s", i+1, cur->label);
+
+		bestSpotForSelect[i].x = centerX + (textSize / 2) + 1;
+		bestSpotForSelect[i].y = yStart;
+
+		if(cur == config.def){
+			platform_set_cursor(bestSpotForSelect[i].x, bestSpotForSelect[i].y);
+			printf("*");
+			selected_index = i;
+		}
+
+		yStart++;
+		i++;
+	}while((cur = cur->next));
+
+	// help text
+	const char* keys = "w: up, s: down, enter: select";
+	const uint8_t keys_center_x = centerX - (strlen(keys) / 2) - 1;
+	const uint8_t keys_center_y = footer_center_y + 1;
+	platform_set_cursor(keys_center_x, keys_center_y);
+	printf(keys);
+
+	
+	const int KEY_ENTER = 0xD;
+	const int KEY_UP    = 0x73;
+	const int KEY_DOWN  = 0x77;
+
+	int16_t timeout = config.timeoutSecs;
+	const uint8_t timeout_x = centerX;
+	const uint8_t timeout_y = keys_center_y + 2;
+
+	while(timeout >= 0){
+		int k = platform_timeout(1);
+
+		if(k == KEY_ENTER){
+			break;
+		}
+
+		if(k == KEY_UP){
+			// move down in the list
+			if(selected_index + 1 < config.count){
+				// erase previous marker
+				platform_set_cursor(
+					bestSpotForSelect[selected_index].x,
+					bestSpotForSelect[selected_index].y
+				);
+				printf(" ");
+
+				selected_index++;
+
+				platform_set_cursor(
+					bestSpotForSelect[selected_index].x,
+					bestSpotForSelect[selected_index].y
+				);
+				printf("*");
+			}
+		}else if(k == KEY_DOWN){
+			// move up in the list
+			if(selected_index - 1 >= 0){
+				platform_set_cursor(
+					bestSpotForSelect[selected_index].x,
+					bestSpotForSelect[selected_index].y
+				);
+				printf(" ");
+
+				selected_index--;
+
+				platform_set_cursor(
+					bestSpotForSelect[selected_index].x,
+					bestSpotForSelect[selected_index].y
+				);
+				printf("*");
+			}
+		}else if(k == 0){
+			platform_set_cursor(timeout_x, timeout_y);
+			if(timeout < 10) printf(" ");
+			printf("%d", timeout);
+			timeout--;
+		}
+	}
+	
+
+	for(i = 0, cur = config.entries; i != selected_index && (cur = cur->next); i++);
+
+	printf("\nselected: %s", cur->label);
 
 	__hlt;
 }

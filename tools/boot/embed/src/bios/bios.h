@@ -8,6 +8,10 @@
 #define OFF(ptr) (uint16_t)((uint32_t)(ptr) & 0xF)
 #define FAR_PTR(seg, off) ((void*)(((uint32_t)(seg) << 4) + (off)))
 
+#ifndef NULL
+#define NULL ((void*)0x0)
+#endif
+
 #define __hlt while(1) asm volatile("hlt")
 
 struct biosregs {
