@@ -18,5 +18,6 @@
 #define X86_EFLAGS_ZF (1UL << 6)
 
 void printf(const char* restrict fmt, ...);
+int atoi(const char *str);
 
 #endif

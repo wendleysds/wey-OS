@@ -102,11 +102,5 @@ $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm
 	@mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) -o $@ $< 
 
-r: all
-	qemu-system-i386 -drive format=raw,file=$(IMG)
-
-d: all
-	qemu-system-i386 -drive format=raw,file=$(IMG) -s -S &
-
 clean:
 	rm -rf $(BUILD_DIR)

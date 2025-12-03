@@ -218,6 +218,15 @@ found:
 
 process_line:
 
+		// TIMEOUT
+		if(strncmp(line, "TIMEOUT", 7) == 0){
+			char* val = line + 7;
+			while(IS_BLANK(*val)) val++;
+			config.timeoutSecs = atoi(val);
+			continue;
+		}
+
+		// DEFAULT
 		if(strncmp(line, "DEFAULT", 7) == 0){
 			char* val = line + 7;
 			while(IS_BLANK(*val)) val++;
