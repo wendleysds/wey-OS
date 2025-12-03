@@ -324,7 +324,7 @@ process_line:
 	const uint8_t foo_hea_center_x = centerX - (strlen(footer) / 2) - 1;
 
 	const uint8_t header_center_y = centerY - (config.count / 2) - 2;
-	const uint8_t footer_center_y = centerY + (config.count / 2) + (config.count > 1 ? 1 : 2);
+	const uint8_t footer_center_y = header_center_y + config.count + 3;
 
 	platform_set_cursor(foo_hea_center_x, header_center_y);
 	printf(header);
@@ -370,7 +370,6 @@ process_line:
 	platform_set_cursor(keys_center_x, keys_center_y);
 	printf(keys);
 
-	
 	const int KEY_ENTER = 0xD;
 	const int KEY_UP    = 0x73;
 	const int KEY_DOWN  = 0x77;
@@ -423,7 +422,7 @@ process_line:
 			}
 		}else if(k == 0){
 			platform_set_cursor(timeout_x, timeout_y);
-			if(timeout < 10) printf(" ");
+			if(timeout < 10) printf("0");
 			printf("%d", timeout);
 			timeout--;
 		}
