@@ -431,7 +431,45 @@ process_line:
 
 	for(i = 0, cur = config.entries; i != selected_index && (cur = cur->next); i++);
 
-	printf("\nselected: %s", cur->label);
+	platform_clear_screen();
+	printf("Selected: %s\n\n", cur->label);
+	printf("Loading %s ...\n", cur->target);
+
+	struct file* kernel_file = platform_open_file(fat, cur->target);
+	if(IS_ERR(kernel_file)){
+		printf("Failed to open %s!\n", cur->target);
+		_die();
+	}
+
+	void* entry_point = NULL;
+
+	status = weyos_loader(kernel_file, &entry_point, NULL);
+	if(!IS_STAT_ERR(status)) goto ok;
+
+	/*
+	status = weyos_loader(kernel_file, &entry_point);
+	if(!IS_STAT_ERR(status)) goto ok;
+	*/
+
+err_load:
+	printf("Failed to load! %d\n", status);
+	_die();
+
+ok:
+	if(cur->initrd){
+		struct file* initrd_file = platform_open_file(fat, cur->initrd);
+		if(IS_ERR(initrd_file)){
+			status = PTR_ERR(initrd_file);
+			goto err_load;
+		}
+
+		// TODO: implement load
+
+		initrd_file->ops->close(initrd_file);
+	}
+
+
+	// TODO: jmp entry point
 
 	__hlt;
 }
