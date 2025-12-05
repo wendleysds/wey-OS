@@ -49,8 +49,6 @@ dd if=/dev/zero of="$HDIMAGE" bs=1M count=32 status=none
 python3 "$NoVa_PY" "$HDIMAGE"
 
 # create temporary boot.cfg content
-echo "TIMEOUT 10" >> "$TMPBOOT"
-echo "TARGET WeyOs" >> "$TMPBOOT"
 echo "LABEL WeyOs" >> "$TMPBOOT"
 echo "TARGET=/boot/kernel" >> "$TMPBOOT"
 

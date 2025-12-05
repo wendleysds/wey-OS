@@ -371,8 +371,8 @@ process_line:
 	printf(keys);
 
 	const int KEY_ENTER = 0xD;
-	const int KEY_UP    = 0x73;
-	const int KEY_DOWN  = 0x77;
+	const int KEY_UP    = 0x77;
+	const int KEY_DOWN  = 0x73;
 
 	int16_t timeout = config.timeoutSecs;
 	const uint8_t timeout_x = centerX;
@@ -385,7 +385,7 @@ process_line:
 			break;
 		}
 
-		if(k == KEY_UP){
+		if(k == KEY_DOWN){
 			// move down in the list
 			if(selected_index + 1 < config.count){
 				// erase previous marker
@@ -403,7 +403,7 @@ process_line:
 				);
 				printf("*");
 			}
-		}else if(k == KEY_DOWN){
+		}else if(k == KEY_UP){
 			// move up in the list
 			if(selected_index - 1 >= 0){
 				platform_set_cursor(
