@@ -4,7 +4,6 @@
 #include <def/compile.h>
 #include <wey/videoinfo.h>
 #include <stdint.h>
-#include <asm/bootparam.h>
 
 #define E820_MAX_ENTRIES 32
 
