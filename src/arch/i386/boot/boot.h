@@ -69,7 +69,7 @@ static inline uint16_t gs(void){
 	return seg;
 }
 
-extern struct boot_header* header __section(".header");
+extern struct setup_header* hdr;
 
 void initregs(struct biosregs *reg);
 void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);

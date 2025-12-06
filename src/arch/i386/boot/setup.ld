@@ -5,7 +5,7 @@ ENTRY(main)
 SECTIONS{
 	. = 0;
 	.pad : {
-		. = 0x20;
+		. = 0x38;
 	} = 0xFFFFFFFF
 	
 	.header : {
