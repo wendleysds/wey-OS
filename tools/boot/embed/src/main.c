@@ -1,4 +1,5 @@
 #include <utils.h>
+#include <mem.h>
 #include <platform.h>
 #include <def/err.h>
 #include <disk.h>
@@ -16,19 +17,15 @@
 
 #define IS_BLANK(c) ((c)==' ' || (c)=='\t' || (c)=='\n' || (c)=='\r')
 
-typedef struct entry{
-	char* label;
-	char* target;
-	char* initrd;
-	struct entry* next;
-} entry_t;
-
 typedef struct {
 	entry_t* entries;
 	uint16_t count;
 	entry_t* def;
 	int16_t timeoutSecs;
 } config_t;
+
+extern __no_return __regparm(2) void jump_segment(uint16_t seg, uint16_t entry_point);
+extern __no_return __regparm(1) void jump_pm(uint32_t entry_point);
 
 static uint8_t usable_ram_area(struct e820_entry* entries, uint32_t count, uint32_t start, uint32_t end){
 	for(uint32_t i = 0; i < count; i++){
@@ -62,7 +59,7 @@ void main(){
 
 	platform_clear_screen();
 
-	printf("=== NoVaLoader v0.1 ===\n");
+	printf("=== NoVaLoader v0.5 ===\n");
 
 	struct e820_entry entries[32];
 	uint32_t counter = 0;
@@ -427,49 +424,36 @@ process_line:
 			timeout--;
 		}
 	}
-	
 
 	for(i = 0, cur = config.entries; i != selected_index && (cur = cur->next); i++);
 
 	platform_clear_screen();
-	printf("Selected: %s\n\n", cur->label);
+	printf("Selected: %s\n", cur->label);
 	printf("Loading %s ...\n", cur->target);
 
-	struct file* kernel_file = platform_open_file(fat, cur->target);
-	if(IS_ERR(kernel_file)){
-		printf("Failed to open %s!\n", cur->target);
-		_die();
-	}
+	struct load_info_struct load_info;
 
-	void* entry_point = NULL;
-
-	status = weyos_loader(kernel_file, &entry_point, NULL);
+	status = weyos_loader(cur, fat, &load_info);
 	if(!IS_STAT_ERR(status)) goto ok;
 
-	/*
-	status = weyos_loader(kernel_file, &entry_point);
-	if(!IS_STAT_ERR(status)) goto ok;
-	*/
-
-err_load:
 	printf("Failed to load! %d\n", status);
 	_die();
 
 ok:
-	if(cur->initrd){
-		struct file* initrd_file = platform_open_file(fat, cur->initrd);
-		if(IS_ERR(initrd_file)){
-			status = PTR_ERR(initrd_file);
-			goto err_load;
-		}
 
-		// TODO: implement load
-
-		initrd_file->ops->close(initrd_file);
+	if(load_info.flags & SET_SEGMENTS){
+		jump_segment(load_info.code_segment, (uint16_t)load_info.entry_point);
+		__builtin_unreachable();
 	}
 
+	if(load_info.flags & CODE_32){
+		// TODO: entry pm and jump entry point
+		printf("Not supported!\n");
+		platform_die();
+	}
 
-	// TODO: jmp entry point
+	printf("Bruh\n");
+	platform_die();
 
-	__hlt;
+	__builtin_unreachable();
 }

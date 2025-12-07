@@ -1,3 +1,6 @@
+#ifndef _FILE_H
+#define _FILE_H
+
 #include <stdint.h>
 
 #define SEEK_SET 0
@@ -22,3 +25,5 @@ struct file {
 
 	void* private;
 };
+
+#endif

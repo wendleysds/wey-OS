@@ -5,6 +5,7 @@
 #include <string.h>
 #include <utils.h>
 #include "bios.h"
+#include <mem.h>
 
 #define SMAP 0x534d4150 /* ASCII "SMAP" */
 

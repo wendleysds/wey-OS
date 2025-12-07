@@ -144,7 +144,12 @@ static uint32_t next_cluster(fat_info_t* fat, uint32_t cluster){
 	uint32_t entOffset = fatOffset % fat->headers.boot.bytesPerSec;
 
 	uint8_t sector[512];
-	if(IS_STAT_ERR(fat->disk->ops->read(fat->disk, fatSecNum, sector, 1))){
+	if(IS_STAT_ERR(fat->disk->ops->read(
+			fat->disk, 
+			fatSecNum + fat->disk->mbr_partitions[0].lbaFirstSector, 
+			sector, 
+			1
+		))){
 		return EOF;
 	}
 

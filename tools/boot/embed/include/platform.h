@@ -5,7 +5,8 @@
 #include <def/compile.h>
 #include <stdint.h>
 #include <file.h>
-#include <mem.h>
+
+struct e820_entry;
 
 int platform_init();
 int platform_disk_init();
