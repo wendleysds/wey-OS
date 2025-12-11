@@ -13,6 +13,7 @@
 
 struct video_info
 {
+	uint16_t mode;
 	uint8_t type;
 
 	uint16_t width;
@@ -31,8 +32,17 @@ struct video_info
 	uint16_t reserved_mask;
 	uint16_t reserved_position;
 
+	uint8_t orig_x;
+	uint8_t orig_y;
+
+	uint16_t pages;
+	
+	uint16_t vesapm_seg;
+	uint16_t vesapm_off;
+	
 	uint8_t direct_color_attributes;
 	uint16_t attributes;
+	uint16_t capabilities;
 } __attribute__ ((packed));
 
 #endif

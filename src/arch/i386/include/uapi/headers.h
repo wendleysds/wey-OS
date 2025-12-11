@@ -44,7 +44,7 @@ struct setup_header{
 
 struct boot_header{
 	struct video_info video_info;     // 0x0
-	uint8_t pad1[(16 - (sizeof(struct video_info) % 16)) % 16]; // Align 16 bytes
+	uint8_t pad1[(16 - (sizeof(struct video_info) % 16)) % 16]; // 0x2F
 	uint64_t acpi_rsdp_addr;          // 0x30
 	struct setup_header setup_header; // 0x38
 	struct efi_info efi_info;         // 0x48
