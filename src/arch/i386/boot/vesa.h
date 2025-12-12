@@ -51,22 +51,6 @@ struct VbeInfoMode {
 	uint8_t reserved1[206];
 } __attribute__ ((packed));
 
-struct VideoStruct{
-	uint16_t mode;
-
-	uint16_t width;
-	uint16_t height;
-	uint16_t pitch;
-	uint8_t bpp;
-
-	uint32_t framebuffer_physical;	
-	uint32_t framebuffer_virtual; // Setted in Protect Mode (BITS 32)
-
-	//flags
-	uint8_t isGraphical;
-	uint8_t isVesa;
-} __attribute__ ((packed));
-
 void setup_video();
 
 #endif
