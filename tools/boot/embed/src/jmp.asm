@@ -6,6 +6,8 @@ global jump_pm
 
 ; void (seg: uint16, entry_point: uint16)
 jump_segment:
+	mov fs, ax
+	mov gs, ax
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -14,6 +16,7 @@ jump_segment:
 	push ax
 	push dx
 
+	cli
 	retf
 
 ; void (entry_point uint32)

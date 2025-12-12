@@ -37,6 +37,12 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 
 	file->ops->lseek(file, 0x0, 0);
 
+	memset(
+		(void*)(SETUP_LOAD_ADDR + (setup_header.setup_sectors + 1) * 512), 
+		0x0, 
+		(64 - (setup_header.setup_sectors  + 1)) * 512
+	);
+
 	while((bytes_readed = file->ops->read(file, buffer, sizeof(buffer))) != END_OF_FILE){
 		if(IS_STAT_ERR(bytes_readed)){
 			return bytes_readed;
@@ -67,21 +73,12 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 		memcpy((void*)load_address, buffer, bytes_readed);
 		load_address += bytes_readed;
 	}
-
-	setup_header.ext_loader_type = 0xCF;
-	setup_header.ext_loader_ver = 0x05;
+	
+	file->ops->close(file);
 
 	if(entry->initrd){
 		// TODO: load initrd
 	}
-
-	memcpy(
-		(void*)(SETUP_LOAD_ADDR + 0x38), 
-		&setup_header, 
-		sizeof(struct setup_header)
-	);
-
-	file->ops->close(file);
 
 	info_buffer->entry = entry;
 	info_buffer->entry_point = setup_header.code16_start;
