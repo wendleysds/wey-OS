@@ -78,12 +78,20 @@ static inline uint16_t gs(void){
 extern struct setup_header hdr;
 extern struct boot_header boot_header;
 
+// BIOS
 void initregs(struct biosregs *reg);
 void __regparm(3) intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 
+// Setup
 void setup_video();
 void detect_memory();
 
+// Keyboard
+int kbd_getchar();
+void kbd_flush();
+int kdb_read(char* restrict buffer, int length);
+
+// stdio
 void putchar(int c);
 void puts(const char* restrict s);
 int vsprintf(char* restrict buf, const char* restrict fmt, va_list args);
