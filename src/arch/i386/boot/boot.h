@@ -84,6 +84,10 @@ void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg)
 void setup_video();
 void detect_memory();
 
+void putchar(int c);
+void puts(const char* restrict s);
+int vsprintf(char* restrict buf, const char* restrict fmt, va_list args);
+int sprintf(char* restrict buf, const char* restrict fmt, ...);
 int printf(const char* restrict fmt, ...);
 
 #endif
