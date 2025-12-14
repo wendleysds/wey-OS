@@ -31,8 +31,8 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 	
 	char buffer[4096];
 
-	uint16_t bytes_readed = 0;
-	uint32_t readed = 0;
+	uint64_t bytes_readed = 0;
+	uint64_t readed = 0;
 	uint64_t load_address = SETUP_LOAD_ADDR;
 
 	file->ops->lseek(file, 0x0, 0);

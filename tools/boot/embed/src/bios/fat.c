@@ -274,22 +274,22 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 		uint32_t toCopy = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
 		memcpy((uint8_t*)buffer + totalReaded, clusterBuf + offInCluster, toCopy);
 
-		totalReaded += toCopy;
-		remaining -= toCopy;
-		cursor += toCopy;
+        cursor += toCopy;
+        totalReaded += toCopy;
+        remaining -= toCopy;
+        bytesLeftInCluster -= toCopy;
 
-		/* after first iteration, subsequent reads start at cluster offset 0 */
-		offInCluster = 0;
-		bytesLeftInCluster = clusterSize;
-
-		if (remaining > 0) {
-			cluster = next_cluster(fat, cluster);
-			if (cluster >= EOF) {
-				/* reached end of cluster chain prematurely */
+		if(cursor % clusterSize == 0){
+            cluster = next_cluster(fat, cluster);
+            if(cluster >= EOF){
 				file->pos = file->size;
 				return totalReaded;
-			}
-		}
+            }
+
+            fd->currentCluster = cluster;
+            offInCluster = cursor % clusterSize;
+            bytesLeftInCluster = clusterSize - offInCluster;
+        }
 	}
 
 	/* update current cluster and file position */
