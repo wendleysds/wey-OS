@@ -79,7 +79,7 @@ extern struct setup_header hdr;
 extern struct boot_header boot_header;
 
 void initregs(struct biosregs *reg);
-void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
+void __regparm(3) intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 
 void setup_video();
 void detect_memory();

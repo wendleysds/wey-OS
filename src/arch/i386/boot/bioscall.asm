@@ -4,10 +4,6 @@ global intcall
 
 ; void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 intcall:
-	mov al, [esp +4]  ; int_no
-	mov dx, [esp +8]  ; ireg
-	mov cx, [esp +12] ; oreg
-
 	cmp al, byte [int_no]
 	je .do
 	mov [int_no], al
