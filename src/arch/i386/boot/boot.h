@@ -1,12 +1,18 @@
 #ifndef _BOOT_H
 #define _BOOT_H
 
+#include <asm/cpuflags.h>
 #include <uapi/headers.h>
 #include <def/compile.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <stdarg.h>
 
 #define SEG(ptr) (uint16_t)(((uint32_t)(ptr) >> 4) & 0xFFFF)
 #define OFF(ptr) (uint16_t)((uint32_t)(ptr) & 0xF)
+#define FAR_PTR(seg, off) ((void*)(((uint32_t)(seg) << 4) + (off)))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
 #define memset(d,c,l) __builtin_memset(d,c,l)
 #define memcpy(d,s,l) __builtin_memcpy(d,s,l)
 
@@ -69,15 +75,15 @@ static inline uint16_t gs(void){
 	return seg;
 }
 
-extern struct setup_header* hdr;
+extern struct setup_header hdr;
+extern struct boot_header boot_header;
 
 void initregs(struct biosregs *reg);
 void intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 
 void setup_video();
+void detect_memory();
 
-void printf(const char* restrict fmt, ...);
-
-void go_to_protect_mode();
+int printf(const char* restrict fmt, ...);
 
 #endif

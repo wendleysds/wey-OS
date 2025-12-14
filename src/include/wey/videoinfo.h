@@ -42,7 +42,7 @@ struct video_info
 	
 	uint8_t direct_color_attributes;
 	uint16_t attributes;
-	uint16_t capabilities;
+	uint32_t capabilities;
 } __attribute__ ((packed));
 
 #endif
