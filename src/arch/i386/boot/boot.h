@@ -91,6 +91,9 @@ int kbd_getchar();
 void kbd_flush();
 int kdb_read(char* restrict buffer, int length);
 
+// A20
+int enable_a20();
+
 // stdio
 void putchar(int c);
 void puts(const char* restrict s);

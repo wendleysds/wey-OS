@@ -1,4 +1,5 @@
 obj-y += main.o printf.o regs.o string.o video.o memory.o 
+obj-y += a20.o
 obj-y += bioscall.asm.o
 obj-y += headerc_s.o
 

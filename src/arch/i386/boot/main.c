@@ -17,7 +17,18 @@ void main(){
 	detect_memory();
 
 	setup_video();
+
+	enable_a20();
+
+	// mask all interrupts
+
+	// setup idt
+
+	// setup gdt
+
+	// go to pm mode 
 	
+	printf("OK");
 	while(1) asm volatile ("hlt");
 }
 
