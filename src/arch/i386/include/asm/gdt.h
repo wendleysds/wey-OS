@@ -64,6 +64,9 @@
 
 #define GDT_FLAGS_DEFAULT (GDT_FLAG_GRANULARITY | GDT_FLAG_32BIT)
 
+#define GDT_KERNEL_CODE  (1 << 3)  // index 1
+#define GDT_KERNEL_DATA  (2 << 3)  // index 2
+
 #define GDT_ENTRY(_base, _limit, _access, _flags) (struct gdt_entry){ \
     .limit_low = (_limit) & 0xFFFF, \
     .base_low  = (_base) & 0xFFFF, \
@@ -75,7 +78,7 @@
 
 struct gdt_descriptor{
 	uint16_t size;
-	unsigned long addr;
+	uint32_t addr;
 } __attribute__((packed));
 
 struct gdt_entry {
@@ -88,12 +91,7 @@ struct gdt_entry {
 } __attribute__((packed));
 
 static inline void gdt_load(struct gdt_descriptor* gdt_descriptor){
-	__asm__ volatile (
-		"lgdt (%0)"
-		:
-		: "r"(gdt_descriptor)
-		: "memory"
-	);
+	__asm__ volatile ("lgdt (%0)" :: "r"(gdt_descriptor) : "memory");
 }
 
 #endif

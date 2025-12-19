@@ -12,15 +12,21 @@ SECTIONS{
 		*(.header*)
 	}
 
-	.text : ALIGN(256){
+	.text : {
 		*(.text*)
 	}
 
-	.rodata : ALIGN(256){
+	.text32 : {
+		*(.text32)
+	}
+
+	. = ALIGN(16);
+	.rodata : {
 		*(.rodata*)
 	}
 
-	.data : ALIGN(256){
+	. = ALIGN(16);
+	.data  : {
 		*(.data*)
 	}
 
@@ -29,7 +35,8 @@ SECTIONS{
 		setup_sectors = ABSOLUTE(setup_size / 512);
 	}
 
-	.bss : ALIGN(256){
+	. = ALIGN(16);
+	.bss : {
 		*(COMMON)
 		*(.bss*)
 	}

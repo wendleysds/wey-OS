@@ -191,8 +191,16 @@ void main(){
 		"mov %0, %%esp\n\t"
 		"mov %%esp, %%ebp\n\t"
 		:
-		: "r"(0x9000)
+		: "r"(0x90000)
 	);
+
+	volatile char* mem = (volatile char*)0xB8000;
+	mem[0] = 'O';
+	mem[1] = 0x0f;
+	mem[2] = 'K';
+	mem[3] = 0x0f; 
+
+	_hlt
 
 	_MALLOC_INIT(_TEMP_PAGE_DIRECTORY_ADDRESS);
 

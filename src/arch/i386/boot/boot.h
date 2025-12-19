@@ -101,4 +101,7 @@ int vsprintf(char* restrict buf, const char* restrict fmt, va_list args);
 int sprintf(char* restrict buf, const char* restrict fmt, ...);
 int printf(const char* restrict fmt, ...);
 
+// pm
+void __no_return __regparm(3) go_to_protect_mode(uint32_t entry_point, uint32_t boot_header);
+
 #endif
