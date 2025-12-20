@@ -7,8 +7,10 @@
 #define USER_CODE_SEGMENT 0x1b
 #define USER_DATA_SEGMENT 0x23
 
+#ifndef __ASSEMBLY__
 extern unsigned long __kernel_phys_start;
 extern unsigned long __kernel_high_start;
+#endif
 
 #define KERNEL_PHYS_BASE ((unsigned long)&__kernel_phys_start)
 #define KERNEL_VIRT_BASE ((unsigned long)&__kernel_high_start)
@@ -19,17 +21,17 @@ extern unsigned long __kernel_high_start;
 
 /* Memory */
 
-/* Memory Layout
+/* Heap Memory Layout
 
 	-------
 	|     | heap bitmap(meta data) <- HEAP_PHYS
 	|     | heap start <- HEAP_PHYS + bitmap size = (HEAP_SIZE_BYTES / HEAP_BLOCK_SIZE)
 	|     | heap end <- heap star + HEAP_SIZE_BYTES
 	-------
-*/
+/*/
 
-#define KiB(x) (x * 1024u)
-#define MiB(x) (x * KiB(1024u))
+#define KiB(x) (x * 1024)
+#define MiB(x) (x * KiB(1024))
 
 #define _TEMP_PAGE_DIRECTORY_ADDRESS 0x02000000
 
@@ -60,8 +62,9 @@ extern unsigned long __kernel_high_start;
 #define KERNEL_STACK_VIRT_TOP 0xC1000000
 #define KERNEL_STACK_VIRT_BOTTOM (KERNEL_STACK_VIRT_TOP - KERNEL_STACK_SIZE)
 
-/* I/O */
-#define KERNEL_FB_VIRT_BASE 0xD0000000
+#define EARLY_STACK_SIZE KiB(4)
+#define EARY_STACK_ADDR_BOTTOM 0x90000
+#define EARY_STACK_ADDR (EARY_STACK_ADDR_BOTTOM - EARLY_STACK_SIZE)
 
 /*Files and File System*/
 #define PATH_MAX 128

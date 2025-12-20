@@ -1,8 +1,7 @@
 [BITS 16]
 
 #include <asm/cpuflags.h>
-#define GDT_KERNEL_CODE  (1 << 3)
-#define GDT_KERNEL_DATA  (2 << 3)
+#include <asm/gdt.h>
 
 global go_to_protect_mode
 

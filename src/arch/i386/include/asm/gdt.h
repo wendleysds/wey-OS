@@ -1,8 +1,6 @@
 #ifndef _GDT_H
 #define _GDT_H
 
-#include <stdint.h>
-
 // Attributes (Access byte)
 #define GDT_ACCESS_PRESENT     (1 << 7)
 #define GDT_ACCESS_RING(r)     ((r & 0x3) << 5)
@@ -67,6 +65,9 @@
 #define GDT_KERNEL_CODE  (1 << 3)  // index 1
 #define GDT_KERNEL_DATA  (2 << 3)  // index 2
 
+#ifndef __ASSEMBLY__
+#include <stdint.h>
+
 #define GDT_ENTRY(_base, _limit, _access, _flags) (struct gdt_entry){ \
     .limit_low = (_limit) & 0xFFFF, \
     .base_low  = (_base) & 0xFFFF, \
@@ -93,5 +94,6 @@ struct gdt_entry {
 static inline void gdt_load(struct gdt_descriptor* gdt_descriptor){
 	__asm__ volatile ("lgdt (%0)" :: "r"(gdt_descriptor) : "memory");
 }
+#endif
 
 #endif

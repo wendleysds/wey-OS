@@ -6,6 +6,32 @@
 
 pgd_t* _kernel_pgd = NULL;
 
+static mem_flags_t pflags_to_mflags(int pflags){
+	mem_flags_t f = 0;
+
+	if(pflags & _PAGE_P)
+		f |= MEM_READ;
+	if(pflags & _PAGE_RW)
+		f |= MEM_WRITE;
+	if(pflags & _PAGE_US)
+		f |= MEM_USER;
+
+	return f;
+}
+
+static int mflags_to_pflags(mem_flags_t mflags){
+	int f = 0;
+
+	if(mflags & MEM_READ)
+		f |= _PAGE_P;
+	if(mflags & MEM_WRITE)
+		f |= _PAGE_RW;
+	if(mflags & MEM_USER)
+		f |= _PAGE_US;
+	
+	return f;
+}
+
 int mmu_init(){
 	_kernel_pgd = pgd_alloc();
 	if(!_kernel_pgd){
@@ -26,8 +52,8 @@ int mmu_init(){
 
 	res = mmu_munmap(
 		NULL, 
-		(void*)0x8000, 
-		((size_t)&__boot_end - 0x8000)
+		(void*)0, 
+		((size_t)&__boot_end)
 	);
 
 	if(IS_STAT_ERR(res)){
@@ -66,8 +92,9 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 		}
 	}
 
+	int pflags = mflags_to_pflags(mem_flags);
 	for(unsigned int i = 0; i < count; i++){
-		int status = pgd_map(paddr, vaddr, mem_flags);
+		int status = pgd_map(vaddr, paddr, pflags);
 		if(status != SUCCESS){
 			vaddr = (uintptr_t)virtaddr;
 			for(unsigned int j = 0; j < i; j++){
@@ -94,7 +121,7 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 }
 
 int mmu_munmap(struct mm_struct* mm, void* virtaddr, int size){
-	if(!virtaddr || size <= 0){
+	if(size <= 0){
 		return INVALID_ARG;
 	}
 
@@ -156,12 +183,15 @@ int mmu_set_flags(struct mm_struct* mm, void* virtaddr, int size, mem_flags_t fl
 		old_flags = pte_get_flags(vaddr);
 	}
 
+	int pflags = mflags_to_pflags(flags);
+	int p_oflags = mflags_to_pflags(old_flags);
+
 	for(unsigned int i = 0; i < count; i++){
-		int status = pte_update_flags(vaddr, flags);
+		int status = pte_update_flags(vaddr, pflags);
 		if(status != SUCCESS){
 			vaddr = (uintptr_t)virtaddr;
 			for(unsigned int j = 0; j < i; j++){
-				if(pte_update_flags(vaddr, old_flags) != SUCCESS)
+				if(pte_update_flags(vaddr, p_oflags) != SUCCESS)
 					warning("mmu_set_flags(): failed to rollback flags!\n");
 
 				vaddr += PTE_PAGE_SIZE;
