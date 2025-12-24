@@ -1,6 +1,10 @@
 #ifndef _STRING_H
 #define _STRING_H
 
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
 void* memset(void*, int, unsigned long);
 void* memcpy(void* dest, const void* src, unsigned long length);
 int memcmp(const void *s1, const void *s2, int count);
