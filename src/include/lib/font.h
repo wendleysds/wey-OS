@@ -3,12 +3,10 @@
 
 #include <stdint.h>
 
-struct FontInfo{
-	uint8_t width;
-	uint8_t heigth;
-	const unsigned char* ptr;
+struct font_info{
+	uint16_t width;
+	uint16_t heigth;
+	void* data;
 }__attribute__((packed));
-
-extern unsigned char font8x16[][16];
 
 #endif
