@@ -95,16 +95,6 @@ pgd_t* __boot mk_early_pgtbl_32(){
 		pgd_flags
 	);
 
-	// Map Heap
-	uint32_t heap_table_size = HEAP_TABLE_PHYS_END - HEAP_TABLE_PHYS_BASE;
-	mmap(
-		pgd,
-		(void*)HEAP_VIRT,
-		(void*)HEAP_PHYS,
-		PAGE_COUNT(heap_table_size + HEAP_SIZE_BYTES),
-		pgd_flags
-	);
-
 	// Map stack
 	mmap(
 		pgd,

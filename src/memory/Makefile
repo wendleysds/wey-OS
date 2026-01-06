@@ -1,2 +1,1 @@
-obj-y += mmu.o vma.o
-subdir-y += heap/
+obj-y += mmu.o vma.o slab.o page.o kheap.o
