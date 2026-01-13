@@ -77,7 +77,7 @@ srctree := $(srcroot)/src
 export srctree
 
 # Output directory
-BUILD_DIR := $(srcroot)/build
+BUILD_DIR ?= $(srcroot)/build
 OBJ_DIR := $(BUILD_DIR)/objs
 BIN_DIR := $(BUILD_DIR)/bin
 TOOLS_DIR := $(srcroot)/tools

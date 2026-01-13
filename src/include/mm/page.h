@@ -14,10 +14,12 @@ struct e820_entry;
 struct list_head;
 
 struct page {
-	void* addr;
-	int flags;
-	short refcount;
-	struct slab* slab;
+	uint8_t flags;
+	uint16_t refcount;
+	union {
+		void* private;
+		struct slab* slab;
+	};
 };
 
 struct page_metadata {
@@ -29,11 +31,15 @@ struct page_metadata {
 	size_t pages_length; /* Pages array size */
 };
 
-struct page_metadata* page_init(struct e820_entry* table);
+struct page_metadata* page_init(struct e820_entry* table, size_t table_length);
 struct page* page_alloc(size_t page_count, uint8_t flags);
 struct page* page_alloc_zeroed(size_t page_count, uint8_t flags);
 int page_free(struct page* page);
-struct page* addr_to_page(uintptr_t addr);
-uintptr_t page_to_addr(struct page* page);
+
+struct page* phys_to_page(uintptr_t phys_addr);
+uintptr_t page_to_phys(struct page* page);
+
+struct page* virt_to_page(void* virt_addr);
+uintptr_t page_to_virt(struct page* page);
 
 #endif

@@ -35,18 +35,15 @@ extern __kernel_high_start
 extern __kernel_high_end
 #endif
 
-#ifndef __ASSEMBLY__
-#define KERNEL_PHYS_BASE  ((unsigned long)&__kernel_phys_base)
-#define KERNEL_VIRT_BASE  ((unsigned long)&__kernel_high_base)
+#define PAGE_OFFSET      0xC0000000
+#define KERNEL_PHYS_BASE 0x00100000
 
+#ifndef __ASSEMBLY__
 #define KERNEL_PHYS_START ((unsigned long)&__kernel_phys_start)
 #define KERNEL_PHYS_END   ((unsigned long)&__kernel_phys_end)
-#define KERNEL_VIRT_START ((unsigned long)&__kernel_high_start)
-#define KERNEL_VIRT_END   ((unsigned long)&__kernel_high_end)
+#define KERNEL_VIRT_START ((unsigned long)&__kernel_high_start + KERNEL_PHYS_BASE)
+#define KERNEL_VIRT_END   ((unsigned long)&__kernel_high_end   + KERNEL_PHYS_BASE)
 #else
-#define KERNEL_PHYS_BASE  [__kernel_phys_base]
-#define KERNEL_VIRT_BASE  [__kernel_high_base]
-
 #define KERNEL_PHYS_START [__kernel_phys_start]
 #define KERNEL_PHYS_END   [__kernel_phys_end]
 #define KERNEL_VIRT_START [__kernel_high_start]
