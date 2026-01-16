@@ -8,6 +8,8 @@ DATA_SEG equ gdt_data - gdt_start
 
 extern i386_start_kernel
 extern mk_early_pgtbl_32
+extern early_alloc_init_boot
+extern early_alloc_boot
 
 extern __kernel_bss_start
 extern __kernel_bss_end
@@ -27,8 +29,12 @@ __start_32:
 	; zero bss
 	cld
 	xor eax, eax
+
 	mov edi, [__kernel_bss_start]
+	sub edi, PAGE_OFFSET
 	mov ecx, [__kernel_bss_end]
+	sub ecx, PAGE_OFFSET
+
 	sub ecx, edi
 	shr ecx, 2
 	rep stosw
@@ -38,14 +44,22 @@ __start_32:
 
 	jmp CODE_SEG:l1
 l1:
-
+	call early_alloc_init_boot
+	
 	mov dword [boot_hdr_ptr], esi
 	call mk_early_pgtbl_32
 	call load_directory
 
+	mov eax, KiB(8)
+	push eax
+	call early_alloc_boot
+	add eax, KiB(8)
+	add eax, PAGE_OFFSET
+	push eax
+
 	call enable_paging
 
-	mov esp, KERNEL_STACK_VIRT_TOP
+	pop esp
 	mov ebp, esp
 
 	mov dword eax, [boot_hdr_ptr]

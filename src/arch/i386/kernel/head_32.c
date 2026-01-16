@@ -1,7 +1,9 @@
 #include <asm/paging.h>
+#include <asm/page.h>
 #include <def/compile.h>
 #include <def/config.h>
 #include <def/init.h>
+#include <mm/earlyalloc.h>
 #include <uapi/headers.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -10,9 +12,6 @@
 #define __boot __section(".text.boot")
 
 #define PAGE_COUNT(size) (((size) + PTE_PAGE_SIZE - 1) / PTE_PAGE_SIZE)
-
-static size_t allocAddr __section(".bss.boot");
-static size_t allocOff __section(".bss.boot");
 
 extern __no_return void kmain();
 
@@ -38,15 +37,6 @@ static void* __boot memcpy(void* dest, const void* src, unsigned long length){
 	return d;
 }
 
-static void* __boot malloc(size_t size){
-	uintptr_t ret = allocAddr + allocOff;
-	size = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
-	allocOff += size;
-
-	memset((void*)ret, 0x0, size);
-	return (void*)ret;
-}
-
 static void __boot mmap(pgd_t* pgd, void* virtualAddr, void* physicalAddr, uint16_t page_count, uint8_t flags){
 	for(uint16_t i = 0; i < page_count; i++){
 		uintptr_t virt = (uintptr_t)virtualAddr;
@@ -55,7 +45,7 @@ static void __boot mmap(pgd_t* pgd, void* virtualAddr, void* physicalAddr, uint1
 
 		pte_t* pte = NULL;
 		if(!(pgd[dirIndex] & _PAGE_P)){
-			pte = (pte_t*)malloc(sizeof(pte_t) * PTE_MAX_ENTRIES);
+			pte = (pte_t*)early_alloc_boot(sizeof(pte_t) * PTE_MAX_ENTRIES);
 			pgd[dirIndex] = (pgd_t)pte | (_PAGE_P | _PAGE_RW);
 		}else{
 			pte = (pte_t*)(pgd[dirIndex] & PAGE_MASK);
@@ -69,8 +59,7 @@ static void __boot mmap(pgd_t* pgd, void* virtualAddr, void* physicalAddr, uint1
 }
 
 pgd_t* __boot mk_early_pgtbl_32(){
-	allocAddr = _TEMP_PAGE_DIRECTORY_ADDRESS; allocOff = 0;
-	pgd_t* pgd = (pgd_t*)malloc(sizeof(pgd_t) * PTE_MAX_ENTRIES);
+	pgd_t* pgd = (pgd_t*)early_alloc_boot(sizeof(pgd_t) * PTE_MAX_ENTRIES);
 	int pgd_flags = (_PAGE_P | _PAGE_RW);
 
 	// Map indentity 0x0 - __boot_end
@@ -95,12 +84,12 @@ pgd_t* __boot mk_early_pgtbl_32(){
 		pgd_flags
 	);
 
-	// Map stack
+	// Map early alloc area
 	mmap(
 		pgd,
-		(void*)KERNEL_STACK_VIRT_BOTTOM,
-		(void*)KERNEL_STACK_PHYS_BOTTOM,
-		PAGE_COUNT(KERNEL_STACK_SIZE),
+		(void*)KERNEL_EARLY_START,
+		(void*)__pa(KERNEL_EARLY_START),
+		PAGE_COUNT(RESERVED_SIZE),
 		pgd_flags
 	);
 
