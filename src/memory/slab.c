@@ -28,7 +28,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 	if(!page)
 		return NULL;
 
-	uintptr_t addr = page_to_addr(page);
+	uintptr_t addr = page_to_virt(page);
 	
 	struct slab* slab = (struct slab*)addr;
 	slab->page = page;
@@ -100,7 +100,7 @@ void slab_free(void* ptr){
 	if (!ptr)
 		return;
 
-	struct page* page = addr_to_page((uintptr_t)ptr);
+	struct page* page = virt_to_page((uintptr_t)ptr);
 	struct slab* slab = page->slab;
 
 	if (!slab){

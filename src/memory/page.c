@@ -3,9 +3,11 @@
 #include <def/err.h>
 #include <lib/list.h>
 #include <lib/string.h>
+#include <asm/page.h>
 #include <asm/paging.h>
 #include <uapi/headers.h>
 #include <mm/page.h>
+#include <mm/earlyalloc.h>
 
 #define _FPAGE_FREE     0x00
 #define _FPAGE_ALLOCADE 0x01
@@ -20,28 +22,6 @@
 static struct page_metadata metadata;
 static size_t last_free_idx_hint;
 
-static uintptr_t bump_current __initdata;
-static uintptr_t bump_end __initdata;
-
-// Bump/Buddy/Arena alloc to reserve memory for pages array
-static void bump_alloc_init(uintptr_t start_addr, uintptr_t end_addr){
-	bump_current = start_addr;
-	bump_end = end_addr;
-}
-
-static void* bumb_alloc(size_t size){
-	if (size == 0) return NULL;
-
-	size = ALIGN(size, sizeof(void*));
-
-	if (bump_current + size > bump_end) return NULL;
-
-	void* addr = (void*)bump_current;
-	bump_current += size;
-
-	return addr;
-}
-
 static inline uintptr_t align_up(uintptr_t val){
     return (val + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 }
@@ -54,80 +34,78 @@ static inline uint8_t ptr_aligned(uintptr_t ptr){
 	return (ptr & (PTE_PAGE_SIZE - 1)) == 0;
 }
 
-struct page* addr_to_page(uintptr_t addr){
-	if(addr < metadata.start_addr || addr > metadata.end_addr)
-		return NULL;
-
-	size_t idx = (addr - metadata.start_addr) / PTE_PAGE_SIZE;
-	return &metadata.pages[idx];
-}
-
 static inline size_t page_idx(struct page* page){
 	return ((uintptr_t)page - (uintptr_t)metadata.pages) / sizeof(struct page);
 }
 
-uintptr_t page_to_addr(struct page* page){
+struct page* phys_to_page(uintptr_t phys_addr){
+	if(phys_addr < metadata.start_addr || phys_addr >= metadata.end_addr)
+		return NULL;
+
+	size_t idx = (phys_addr - metadata.start_addr) / PTE_PAGE_SIZE;
+	return &metadata.pages[idx];
+}
+
+uintptr_t page_to_phys(struct page* page){
 	return metadata.start_addr + (page_idx(page) * PTE_PAGE_SIZE);
 }
 
-struct page_metadata* __init page_init(struct e820_entry* table){
-	size_t page_size_bytes = ALIGN(PAGE_SIZE_BYTES, PTE_PAGE_SIZE);
-	size_t total_pages_mem = (page_size_bytes / PTE_PAGE_SIZE) + 1;
-	size_t total_pages_arr = ALIGN(sizeof(struct page) * total_pages_mem, PTE_PAGE_SIZE) / PTE_PAGE_SIZE;
+struct page* virt_to_page(uintptr_t virt_addr){
+	uintptr_t phys_addr = __pa(virt_addr);
+	return phys_to_page(phys_addr);
+}
 
-	uintptr_t _virt = PAGE_VIRT_ADDR;
-	uintptr_t _phys = PAGE_PHYS_ADDR;
+uintptr_t page_to_virt(struct page* page){
+	uintptr_t phys_addr = page_to_phys(page);
+	return __va(phys_addr);
+}
 
-	for(uint32_t i = 0; i < total_pages_mem + total_pages_arr; i++){
-		pgd_map(_virt, _phys, _PAGE_P | _PAGE_RW);
-		_virt += PTE_PAGE_SIZE;
-		_phys += PTE_PAGE_SIZE;
-	}
+struct page_metadata* __init page_init(struct e820_entry* table, size_t table_length){
+	struct e820_entry* region = NULL;
 
-	bump_alloc_init(PAGE_VIRT_ADDR, PAGE_VIRT_ADDR + page_size_bytes);
-	metadata.pages = bumb_alloc(sizeof(struct page) * total_pages_mem);
+	uintptr_t page_phys_start = __pa(KERNEL_HEAP_START);
+	page_phys_start = align_up(page_phys_start);
 
-	uintptr_t startReserved = align_up(bump_current);
-	uintptr_t endReserved = align_down(startReserved + page_size_bytes);
-
-	size_t num_pages = (endReserved - startReserved) / PTE_PAGE_SIZE;
-
-	uint8_t found_region = 0;
-	for (int i = 0; table[i].length != 0; i++) {
-		if (table[i].type != 1){
+	for (size_t i = 0; i < table_length; i++) {
+		if (table[i].type != 1) 
 			continue;
-		}
 
 		uintptr_t region_start = align_up(table[i].base_addr);
-		uintptr_t region_end   = align_down(table[i].base_addr + table[i].length);
+		uintptr_t region_end   = align_down(region_start + table[i].length);
 
-		if (region_end <= startReserved || region_start >= endReserved)
+		if (region_end <= page_phys_start) 
 			continue;
 
-		found_region = 1;
-
-		if (region_start < startReserved)
-			region_start = startReserved;
-
-		if (region_end > endReserved)
-			region_end = endReserved;
-
-		for (size_t idx = 0; idx < num_pages; idx++) {
-			//uintptr_t addr = region_start + idx * PTE_PAGE_SIZE;
-
-			metadata.pages[idx].flags    = _FPAGE_FREE;
-			metadata.pages[idx].refcount = 0;
-			metadata.allocated_pages++;
-		}
+		region = &table[i];
+		break;
 	}
 
-	if(!found_region){
-		return NULL;
+	if(!region)
+		return ERR_PTR(NOT_FOUND);
+
+	uintptr_t phys_start = page_phys_start;
+	uintptr_t phys_end   = align_down(region->base_addr + region->length);
+
+	if (phys_end <= phys_start)
+		return ERR_PTR(NO_MEMORY);
+
+	size_t total_pages = (phys_end - phys_start) / PTE_PAGE_SIZE;
+
+	metadata.pages = (void*)__va(early_alloc(sizeof(struct page) * total_pages));
+	if(!metadata.pages){
+		return ERR_PTR(NO_MEMORY);
 	}
 
-	metadata.start_addr = startReserved;
-	metadata.end_addr = endReserved;
-	metadata.pages_length = num_pages;
+	for(size_t i = 0; i < total_pages; i++){
+		struct page* page = &metadata.pages[i];
+		page->flags = _FPAGE_FREE;
+		page->refcount = 0;
+		page->slab = NULL;
+	}
+
+	metadata.start_addr = phys_start;
+	metadata.end_addr = phys_start + total_pages * PTE_PAGE_SIZE;
+	metadata.pages_length = total_pages;
 	metadata.allocated_pages = 0;
 
 	last_free_idx_hint = 0;
@@ -180,8 +158,6 @@ try_again:
 
 	for(size_t i = 0; i < page_count; i++){
 		page = &metadata.pages[i + start_idx];
-		memset(page, 0x0, sizeof(struct page));
-
 		page->flags &= ~PAGE_FLAG_ALLOC_MASK;
 		page->flags |= (flags & PAGE_FLAG_TYPE_MASK);
 		page->flags |= _FPAGE_ALLOCADE;
@@ -205,7 +181,7 @@ try_again:
 struct page* page_alloc_zeroed(size_t page_count, uint8_t flags){
 	struct page* page = page_alloc(page_count, flags);
 	if(page){
-		uintptr_t addr = page_to_addr(page);
+		uintptr_t addr = page_to_virt(page);
 		memset((void*)addr, 0, page_count * PTE_PAGE_SIZE);
 	}
 
@@ -221,6 +197,9 @@ int page_free(struct page* page){
 
 	if(!(page->flags & _FPAGE_FIRST))
 		return INVALID_ARG;
+
+	if(((uintptr_t)page & (sizeof(struct page) - 1)) != 0)
+		return BAD_ALIGNMENT;
 
 	size_t idx = page_idx(page);
 	size_t free_count = 0;

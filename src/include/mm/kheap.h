@@ -4,20 +4,12 @@
 #include <stddef.h>
 #include <lib/string.h>
 
-int init_kheap();
 void* kmalloc(size_t size);
 void* kcalloc(size_t nmemb, size_t size);
-void* krealloc(void *ptr, size_t newSize);
 void kfree(void* ptr);
-int kfree_phys(void* ptr);
 
 static inline void* kzalloc(size_t size) {
-	void* ptr = kmalloc(size);
-	if (ptr) {
-		memset(ptr, 0x0, size);
-	}
-
-	return ptr;
+	return kcalloc(1, size);
 }
 
 #endif

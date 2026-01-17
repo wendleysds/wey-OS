@@ -39,7 +39,7 @@ int page_free(struct page* page);
 struct page* phys_to_page(uintptr_t phys_addr);
 uintptr_t page_to_phys(struct page* page);
 
-struct page* virt_to_page(void* virt_addr);
+struct page* virt_to_page(uintptr_t virt_addr);
 uintptr_t page_to_virt(struct page* page);
 
 #endif

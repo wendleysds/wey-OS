@@ -70,7 +70,7 @@ void pgd_free(pgd_t* pgd){
 
 	for (int i = 0; i < PGD_MAX_PTE; i++) {
 		if (pgd[i] & _PAGE_P) {
-			kfree_phys((void*)(pgd[i] & PAGE_MASK));
+			//kfree_phys((void*)(pgd[i] & PAGE_MASK));
 		}
 	}
 
@@ -130,7 +130,7 @@ int pgd_unmap(uintptr_t virtaddr){
 		}
 	}
 
-	kfree_phys((void*)(pde[dir_idx] & PAGE_MASK));
+	//kfree_phys((void*)(pde[dir_idx] & PAGE_MASK));
 	pde[dir_idx] = 0;
 
 	invlpg((void*)(dir_idx << 22));
@@ -210,7 +210,7 @@ int pgd_dup_current(pgd_t* dest, uint8_t copy_kernel_area){
 			continue;
 		}
 
-		if (i >= (KERNEL_VIRT_BASE >> 22) && !copy_kernel_area) {
+		if (i >= (PAGE_OFFSET >> 22) && !copy_kernel_area) {
 			dest[i] = src[i];
 			continue;
 		}
@@ -221,7 +221,7 @@ int pgd_dup_current(pgd_t* dest, uint8_t copy_kernel_area){
 			if (!dest_pt) {
 				for(int j = 0; j < i; j++){
 					if(dest[j] & _PAGE_P){
-						kfree_phys((void*)(dest[j] & PAGE_MASK));
+						//kfree_phys((void*)(dest[j] & PAGE_MASK));
 					}
 				}
 
@@ -247,14 +247,14 @@ void pgd_copy(pgd_t* dest, pgd_t* src){
 }
 
 void pgd_copy_kernel(pgd_t* kernel_pgd, pgd_t* dest){
-	for (int i = (KERNEL_VIRT_BASE >> 22); i < PGD_MAX_PTE; i++) {
+	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_PTE; i++) {
 		if(i == SELF_PDE_INDEX) continue;
 		dest[i] = kernel_pgd[i];
 	}
 }
 
 void pgd_remove_kernel(pgd_t* dest){
-	for (int i = (KERNEL_VIRT_BASE >> 22); i < PGD_MAX_PTE; i++) {
+	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_PTE; i++) {
 		if(i == SELF_PDE_INDEX) continue;
 		dest[i] = 0;
 	}

@@ -15,7 +15,7 @@ void* kmalloc(size_t size){
         if (!page)
             return NULL;
 
-        return (void*)page_to_addr(page);
+        return (void*)page_to_virt(page);
     }
 
     void* obj = slab_alloc(size);
@@ -42,7 +42,7 @@ void kfree(void* ptr){
     if (!ptr)
         return;
 
-    struct page* page = addr_to_page((uintptr_t)ptr);
+    struct page* page = virt_to_page((uintptr_t)ptr);
     if (!page)
         return;
 
@@ -51,8 +51,4 @@ void kfree(void* ptr){
     }else{
 		page_free(page);
 	}
-}
-
-int kfree_phys(void* ptr){
-	return -1;
 }

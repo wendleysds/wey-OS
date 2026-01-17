@@ -1,6 +1,8 @@
 #ifndef _GDT_H
 #define _GDT_H
 
+#include <def/config.h>
+
 // Attributes (Access byte)
 #define GDT_ACCESS_PRESENT     (1 << 7)
 #define GDT_ACCESS_RING(r)     ((r & 0x3) << 5)
@@ -61,9 +63,6 @@
 	0x9 )      /* Type: 1001b -> TSS avalible */
 
 #define GDT_FLAGS_DEFAULT (GDT_FLAG_GRANULARITY | GDT_FLAG_32BIT)
-
-#define GDT_KERNEL_CODE  (1 << 3)  // index 1
-#define GDT_KERNEL_DATA  (2 << 3)  // index 2
 
 #ifndef __ASSEMBLY__
 #include <stdint.h>
