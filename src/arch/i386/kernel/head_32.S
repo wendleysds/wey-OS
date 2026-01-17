@@ -30,10 +30,13 @@ __start_32:
 	cld
 	xor eax, eax
 
-	mov edi, [__kernel_bss_start]
+	mov edi, __kernel_bss_start
 	sub edi, PAGE_OFFSET
-	mov ecx, [__kernel_bss_end]
+	add edi, KERNEL_PHYS_BASE
+
+	mov ecx, __kernel_bss_end
 	sub ecx, PAGE_OFFSET
+	add ecx, KERNEL_PHYS_BASE
 
 	sub ecx, edi
 	shr ecx, 2

@@ -1,4 +1,3 @@
-
 #include <asm-generic/linker.lds.h>
 #define LOAD_OFFSET KERNEL_VIRT_BASE + KERNEL_PHYS_BASE
 #define PAGE_SIZE 0x1000
@@ -75,11 +74,11 @@ SECTIONS
 
 	__kernel_phys_start = LOADADDR(.text);
 	__kernel_phys_end   = LOADADDR(.bss) + SIZEOF(.bss);
-	__kernel_phys_size  = (__kernel_phys_end - __kernel_phys_start + 0xFFF) & ~0xFFF;
+
+	__kernel_size  = (__kernel_phys_end - __kernel_phys_start + 0xFFF) & ~0xFFF;
 
 	__kernel_high_base  = KERNEL_VIRT_BASE;
+	__kernel_phys_base  = KERNEL_PHYS_BASE;
 
 	DISCARDS
 }
-
-

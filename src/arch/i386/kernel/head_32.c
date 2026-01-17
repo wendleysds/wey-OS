@@ -75,12 +75,12 @@ pgd_t* __boot mk_early_pgtbl_32(){
 	// Map high
 	extern uintptr_t __kernel_phys_start;
 	extern uintptr_t __kernel_high_start;
-	extern uintptr_t __kernel_phys_size;
+	extern uintptr_t __kernel_size;
 	mmap(
 		pgd, 
 		(void*)&__kernel_high_start,
 		(void*)&__kernel_phys_start,
-		PAGE_COUNT((size_t)&__kernel_phys_size),
+		PAGE_COUNT((size_t)&__kernel_size),
 		pgd_flags
 	);
 

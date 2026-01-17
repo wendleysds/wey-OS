@@ -10,7 +10,7 @@ section .pad
 section .header
 hdr:
 	db setup_sectors - 1          ; setup_sectors
-	dd (__kernel_phys_size / 16)  ; syssize
+	dd (__kernel_size / 16)       ; syssize
 	dw 0x0                        ; video_mode
 	db 'cAfE'                     ; sig
 	dw 0x0                        ; root_device
