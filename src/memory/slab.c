@@ -28,15 +28,23 @@ static struct slab* slab_create(struct slab_cache* cache){
 	if(!page)
 		return NULL;
 
-	uintptr_t addr = page_to_virt(page);
-	
-	struct slab* slab = (struct slab*)addr;
+	uintptr_t phys = page_to_phys(page);
+	uintptr_t virt = phys + KERNEL_HEAP_START;
+
+	if(pgd_map(virt, phys, _PAGE_P | _PAGE_RW)){
+		page_free(page);
+		return NULL;
+	}
+
+	struct slab* slab = (struct slab*)virt;
+	memset(slab, 0x0, sizeof(*slab));
+
 	slab->page = page;
 	page->slab = slab;
 
-	uintptr_t obj_start = addr + sizeof(struct slab);
+	uintptr_t obj_start = virt + sizeof(struct slab);
 	slab->start = (void*)obj_start;
-	slab->total_objects = (PTE_PAGE_SIZE - (obj_start - addr)) / 
+	slab->total_objects = (PTE_PAGE_SIZE - (obj_start - virt)) / 
 		cache->object_size;
 
 	// Initialize free list
@@ -54,6 +62,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 }
 
 static void slab_destroy(struct slab* slab){
+	pgd_unmap((uintptr_t)slab);
 	page_free(slab->page);
 }
 
@@ -101,6 +110,10 @@ void slab_free(void* ptr){
 		return;
 
 	struct page* page = virt_to_page((uintptr_t)ptr);
+	if(!(page->flags & PAGE_SLAB)){
+		return;
+	}
+
 	struct slab* slab = page->slab;
 
 	if (!slab){
