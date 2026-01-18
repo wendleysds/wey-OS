@@ -9,15 +9,15 @@
 #include <mm/page.h>
 #include <mm/earlyalloc.h>
 
-#define _FPAGE_FREE     0x00
-#define _FPAGE_ALLOCADE 0x01
-#define _FPAGE_FIRST    0x02
-#define _FPAGE_NEXT     0x04
+#define _FPAGE_FREE     0x0000
+#define _FPAGE_ALLOCADE 0x1000
+#define _FPAGE_FIRST    0x2000
+#define _FPAGE_NEXT     0x4000
 
 /* Allocation flag (free, used, next, ...)*/
-#define PAGE_FLAG_ALLOC_MASK  0x0F
+#define PAGE_FLAG_ALLOC_MASK  0xF000
 /* Page memory flag (kernel, slab, user...)*/
-#define PAGE_FLAG_TYPE_MASK 0xF0
+#define PAGE_FLAG_TYPE_MASK 0x0FFF
 
 static struct page_metadata metadata;
 static size_t last_free_idx_hint;
@@ -113,7 +113,7 @@ struct page_metadata* __init page_init(struct e820_entry* table, size_t table_le
 	return &metadata;
 }
 
-struct page* page_alloc(size_t page_count, uint8_t flags){
+struct page* page_alloc(size_t page_count, uint16_t flags){
 	size_t consecutiveFreePages = 0;
 	long start_idx = -1;
 	struct page* page = NULL;
@@ -178,7 +178,7 @@ try_again:
 	return &metadata.pages[start_idx];
 }
 
-struct page* page_alloc_zeroed(size_t page_count, uint8_t flags){
+struct page* page_alloc_zeroed(size_t page_count, uint16_t flags){
 	struct page* page = page_alloc(page_count, flags);
 	if(page){
 		uintptr_t addr = page_to_virt(page);
@@ -205,7 +205,7 @@ int page_free(struct page* page){
 	size_t free_count = 0;
 	for(size_t i = idx; i < metadata.pages_length; i++){
 		struct page* cur_page = &metadata.pages[i];
-		uint8_t flag = cur_page->flags & PAGE_FLAG_ALLOC_MASK;
+		uint16_t flag = cur_page->flags & PAGE_FLAG_ALLOC_MASK;
 
 		if(flag == _FPAGE_FREE) 
 			break;

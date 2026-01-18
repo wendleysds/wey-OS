@@ -4,17 +4,18 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define PAGE_SLAB     0x10
-#define PAGE_KERNEL   0x20
-#define PAGE_USER     0x40
-#define PAGE_RESERVED 0x80
+#define PAGE_SLAB     0x01
+#define PAGE_TABLE    0x02
+#define PAGE_KERNEL   0x04
+#define PAGE_USER     0x08
+#define PAGE_RESERVED 0x10
 
 struct slab;
 struct e820_entry;
 struct list_head;
 
 struct page {
-	uint8_t flags;
+	uint16_t flags;
 	uint16_t refcount;
 	union {
 		void* private;
@@ -32,8 +33,8 @@ struct page_metadata {
 };
 
 struct page_metadata* page_init(struct e820_entry* table, size_t table_length);
-struct page* page_alloc(size_t page_count, uint8_t flags);
-struct page* page_alloc_zeroed(size_t page_count, uint8_t flags);
+struct page* page_alloc(size_t page_count, uint16_t flags);
+struct page* page_alloc_zeroed(size_t page_count, uint16_t flags);
 int page_free(struct page* page);
 
 struct page* phys_to_page(uintptr_t phys_addr);
