@@ -93,15 +93,19 @@ extern __kernel_high_end
 #define USER_SPACE_START    0x00000000UL
 #define USER_SPACE_END      0xBFFFFFFFUL
 
+/* Virual MMIO start addr */
 #define KERNEL_MMIO_START   0xF0000000UL
 #define KERNEL_MMIO_END     0xFFFFFFFFUL
 
+/* Virual reserved early alloc start addr */
 #define KERNEL_EARLY_START  (ALIGN(KERNEL_VIRT_END, PAGE_SIZE))
 #define KERNEL_EARLY_END    (KERNEL_EARLY_START + RESERVED_SIZE - 1)
 
+/* Virual stacks start addr */
 #define KERNEL_STACKS_START  (KERNEL_EARLY_END + 1)
 #define KERNEL_STACKS_END    (KERNEL_STACKS_START + KERNEL_STACKS_SIZE - 1)
 
+/* Virual heap start addr */
 #define KERNEL_HEAP_START   (ALIGN(KERNEL_STACKS_END + 1, PAGE_SIZE))
 #define KERNEL_HEAP_END     (KERNEL_MMIO_START - 1)
 
