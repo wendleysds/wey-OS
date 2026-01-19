@@ -3,9 +3,14 @@
 #include <wey/vma.h>
 #include <wey/panic.h>
 #include <def/err.h>
+#include <def/init.h>
 #include <asm/page.h>
 
-pgd_t* _kernel_pgd = NULL;
+/**
+ * Main virtual memory management unit (MMU) kernel API
+ */
+
+static pgd_t* _kernel_pgd = NULL;
 
 static mem_flags_t pflags_to_mflags(int pflags){
 	mem_flags_t f = 0;
@@ -33,17 +38,13 @@ static int mflags_to_pflags(mem_flags_t mflags){
 	return f;
 }
 
-int mmu_init(){
+int __init mmu_init(){
 	_kernel_pgd = pgd_alloc();
 	if(!_kernel_pgd){
 		return NO_MEMORY;
 	}
 
 	int res = pgd_dup_current(_kernel_pgd, 1);
-	if(IS_ERR_VALUE(res)){
-		goto out;
-	}
-
 	if(IS_ERR_VALUE(res)){
 		goto out;
 	}
@@ -56,10 +57,9 @@ int mmu_init(){
 	extern uintptr_t __kernel_text_end;
 
 	res = mmu_set_flags(
-		NULL,
 		&__kernel_text_start,
 		(size_t)&__kernel_text_end - (size_t)&__kernel_text_start,
-		(MEM_READ | MEM_KERNEL | MEM_EXEC)
+		(MEM_READ | MEM_KERNEL)
 	);
 
 	if(IS_ERR_VALUE(res)){
@@ -70,7 +70,6 @@ int mmu_init(){
 	extern uintptr_t __kernel_rodata_end;
 
 	res = mmu_set_flags(
-		NULL,
 		&__kernel_rodata_start,
 		(size_t)&__kernel_rodata_end - (size_t)&__kernel_rodata_start,
 		(MEM_READ | MEM_KERNEL)
@@ -83,7 +82,6 @@ int mmu_init(){
 	extern uintptr_t __boot_end;
 
 	res = mmu_munmap(
-		NULL,
 		0x0,
 		(size_t)&__boot_end
 	);
@@ -92,7 +90,7 @@ out:
 	return res;
 }
 
-int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags, uint8_t map_flags){
+int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags){
 	if(!physaddr || !virtaddr || size <= 0){
 		return INVALID_ARG;
 	}
@@ -103,14 +101,6 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	unsigned int count = alignedSize / PTE_PAGE_SIZE;
 
-	struct mem_region* mem_region = NULL;
-	if(mm){
-		mem_region = vma_add(mm, physaddr, virtaddr, size, mem_flags, map_flags);
-		if(!mem_region){
-			return NO_MEMORY;
-		}
-	}
-
 	int pflags = mflags_to_pflags(mem_flags);
 	for(unsigned int i = 0; i < count; i++){
 		int status = pgd_map(vaddr, paddr, pflags);
@@ -118,15 +108,10 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 			vaddr = (uintptr_t)virtaddr;
 			for(unsigned int j = 0; j < i; j++){
 				if(pgd_unmap(vaddr) != SUCCESS){
-					warning("mmu_mmap(): failed to rollback map!\n");
+					panic("mmu_mmap(): failed to rollback map!\n");
 				}
 
 				vaddr += PTE_PAGE_SIZE;
-			}
-
-			if(mm){
-				vma_remove(mm, mem_region, virtaddr, size);
-				kfree(mem_region);
 			}
 
 			return status;
@@ -139,25 +124,12 @@ int mmu_mmap(struct mm_struct* mm, void* physaddr, void* virtaddr, int size, mem
 	return SUCCESS;
 }
 
-int mmu_munmap(struct mm_struct* mm, void* virtaddr, int size){
+int mmu_munmap(void* virtaddr, int size){
 	if(size <= 0){
 		return INVALID_ARG;
 	}
 
 	uintptr_t vaddr = (uintptr_t)virtaddr;
-
-	struct mem_region* mem_region = NULL;
-
-	if(mm){
-		mem_region = vma_lookup(mm, virtaddr);
-		if(IS_ERR(mem_region)){
-			return PTR_ERR(mem_region);
-		}
-
-		if(mem_region->size > size){
-			return OUT_OF_BOUNDS;
-		}
-	}
 
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	unsigned int count = alignedSize / PTE_PAGE_SIZE;
@@ -171,47 +143,29 @@ int mmu_munmap(struct mm_struct* mm, void* virtaddr, int size){
 		vaddr += PTE_PAGE_SIZE;
 	}
 
-	if(mm){
-		vma_remove(mm, mem_region, virtaddr, size);
-	}
-
 	return SUCCESS;
 }
 
-int mmu_set_flags(struct mm_struct* mm, void* virtaddr, int size, mem_flags_t flags){
+int mmu_set_flags(void* virtaddr, int size, mem_flags_t flags){
 	if(!virtaddr || size <= 0){
 		return INVALID_ARG;
 	}
 
 	uintptr_t vaddr = (uintptr_t)virtaddr;
-	mem_flags_t old_flags;
 
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	unsigned int count = alignedSize / PTE_PAGE_SIZE;
 
-	struct mem_region* mem_region = NULL;
-
-	if(mm){
-		mem_region = vma_lookup(mm, virtaddr);
-		if(IS_ERR(mem_region)){
-			return PTR_ERR(mem_region);
-		}
-
-		old_flags = mem_region->mem_flags;
-	}else{
-		old_flags = pte_get_flags(vaddr);
-	}
-
-	int pflags = mflags_to_pflags(flags);
-	int p_oflags = mflags_to_pflags(old_flags);
+	int target_flags = mflags_to_pflags(flags);
+	int old_flags = pte_get_flags(vaddr);
 
 	for(unsigned int i = 0; i < count; i++){
-		int status = pte_update_flags(vaddr, pflags);
+		int status = pte_update_flags(vaddr, target_flags);
 		if(status != SUCCESS){
 			vaddr = (uintptr_t)virtaddr;
 			for(unsigned int j = 0; j < i; j++){
-				if(pte_update_flags(vaddr, p_oflags) != SUCCESS)
-					warning("mmu_set_flags(): failed to rollback flags!\n");
+				if(pte_update_flags(vaddr, old_flags) != SUCCESS)
+					panic("mmu_set_flags(): failed to rollback flags!\n");
 
 				vaddr += PTE_PAGE_SIZE;
 			}
@@ -220,10 +174,6 @@ int mmu_set_flags(struct mm_struct* mm, void* virtaddr, int size, mem_flags_t fl
 		}
 
 		vaddr += PTE_PAGE_SIZE;
-	}
-
-	if(mm){
-		mem_region->mem_flags = flags;
 	}
 
 	return SUCCESS;
