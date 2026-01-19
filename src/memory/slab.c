@@ -29,7 +29,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 		return NULL;
 
 	uintptr_t phys = page_to_phys(page);
-	uintptr_t virt = phys + KERNEL_HEAP_START;
+	uintptr_t virt = page_to_virt(page);
 
 	if(pgd_map(virt, phys, _PAGE_P | _PAGE_RW)){
 		page_free(page);

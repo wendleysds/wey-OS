@@ -26,23 +26,30 @@ __no_return void kmain(){
 
 	slab_init();
 
-	//mmu_init();
-	
-	// tty_init();
-
-	char* test = slab_alloc(32);
-	test[0] = 'O';
-	test[1] = 'K';
-	
-	volatile char* mem = (volatile char*)0xB8000;
-	mem[0] = test[0];
-	mem[1] = 0xF;
-	mem[2] = test[1];
-	mem[3] = 0xF;
-
-	while(1) __asm__ volatile ("hlt");
+	pgd_map(0xD0000000, 0xB8000, _PAGE_P | _PAGE_RW);
+	volatile char* mem = (volatile char*)0xD0000000;
 
 	mmu_init();
+
+	char* test = slab_alloc(32);
+
+	if(test){
+		test[0] = 'O';
+		test[1] = 'K';
+		test[2] = 'N';
+
+		mem[0] = test[0];
+		mem[1] = 0xF;
+		mem[2] = test[1];
+		mem[3] = 0xF;
+	}else{
+		mem[0] = 'N';
+		mem[1] = 0xF;
+		mem[2] = 'O';
+		mem[3] = 0xF;
+	}
+	
+	while(1) __asm__ volatile ("hlt");
 
 	interrupts_enable();
 

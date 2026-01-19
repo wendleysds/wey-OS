@@ -15,6 +15,12 @@ void* kmalloc(size_t size){
         if (!page)
             return NULL;
 
+		pgd_map(
+			page_to_virt(page), 
+			page_to_phys(page), 
+			(_PAGE_P | _PAGE_RW)
+		);
+
         return (void*)page_to_virt(page);
     }
 

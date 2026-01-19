@@ -1,6 +1,7 @@
 #include <wey/panic.h>
 #include <mm/page.h>
 #include <asm/paging.h>
+#include <asm/page.h>
 #include <lib/string.h>
 #include <def/err.h>
 #include <def/config.h>
@@ -24,14 +25,15 @@
 // *PDE_VADDR(d) == PGD_VADDR[d]
 #define PDE_VADDR(d) ((unsigned long*)(0xFFFFF000 + ((d) << 2))) 
 
-pgd_t* _current_pgd = NULL;
-
 int pgd_load(pgd_t* pgd){
 	if(!pgd){
 		return NULL_PTR;
 	}
 
-	if(_current_pgd == pgd){
+	pgd_t* pgd_cur = pgd_current();
+	pgd_cur = (pgd_t*)__va(pgd_cur);
+
+	if(pgd_cur == pgd){
 		return SUCCESS;
 	}
 
@@ -46,25 +48,40 @@ int pgd_load(pgd_t* pgd){
 		: "memory"
 	);
 
-	_current_pgd = pgd;
-	
 	return SUCCESS;
+}
+
+static int pgd_direct_map_page(struct page* page, int flags){
+	return pgd_map(page_to_virt(page),page_to_phys(page), flags);
+}
+
+static int pgd_direct_unmap_page(struct page* page){
+	return pgd_unmap(page_to_virt(page));
 }
 
 pgd_t* pgd_alloc(){
 	struct page* pgd_page = page_alloc(1, PAGE_KERNEL | PAGE_TABLE);
 	pgd_t* pgd = NULL;
 
-	if(pgd_page){
-		pgd = (pgd_t*)page_to_virt(pgd_page);
-		pgd[SELF_PDE_INDEX] = (pgd_t)page_to_phys(pgd_page) | _PAGE_P | _PAGE_RW;
+	if(!pgd_page){
+		return NULL;
 	}
+
+	if(pgd_direct_map_page(pgd_page, (_PAGE_P | _PAGE_RW)) != SUCCESS){
+		return NULL;
+	}
+
+	pgd = (pgd_t*)page_to_virt(pgd_page);
+	pgd[SELF_PDE_INDEX] = (pgd_t)page_to_phys(pgd_page) | _PAGE_P | _PAGE_RW;
 
 	return pgd;
 }
 
 void pgd_free(pgd_t* pgd){
-	if(pgd == _current_pgd){
+	pgd_t* pgd_cur = pgd_current();
+	pgd_cur = (pgd_t*)__va(pgd_cur);
+
+	if(pgd_cur == pgd){
 		panic("pgd_free(): Trying to free current directory!");
 	}
 
@@ -157,9 +174,15 @@ int pgd_unmap(uintptr_t virtaddr){
 			return SUCCESS;
 		}
 	}
-	
-	int status = page_free(p);
+
+	int status = pgd_direct_unmap_page(p);
 	if(IS_ERR_VALUE(status)){
+		return status;
+	}
+
+	status = page_free(p);
+	if(IS_ERR_VALUE(status)){
+		pgd_direct_map_page(p, pde[dir_idx] & FLAGS_MASK);
 		return status;
 	}
 
@@ -262,6 +285,7 @@ int pgd_dup_current(pgd_t* pgd, uint8_t copy_kernel_area){
 			}
 			
 			pte_t* dest_pt = (pte_t*)page_to_virt(p);
+			pgd_direct_map_page(p, src[i] & FLAGS_MASK);
 
 			for (int j = 0; j < PTE_MAX_ENTRIES; j++) {
 				dest_pt[j] = src_pt[j];

@@ -3,6 +3,7 @@
 #include <wey/vma.h>
 #include <wey/panic.h>
 #include <def/err.h>
+#include <asm/page.h>
 
 pgd_t* _kernel_pgd = NULL;
 
@@ -39,25 +40,30 @@ int mmu_init(){
 	}
 
 	int res = pgd_dup_current(_kernel_pgd, 1);
-	if(IS_STAT_ERR(res)){
-		panic("mmu_init(): pgd dup failed! %d", res);
+	if(IS_ERR_VALUE(res)){
+		goto out;
 	}
 
-	res = pgd_load(_kernel_pgd);
-	if(IS_STAT_ERR(res)){
-		panic("mmu_init(): pgd kernel load failed! %d", res);
+	if(IS_ERR_VALUE(res)){
+		goto out;
 	}
 
-	extern uintptr_t __boot_end;
+	if(IS_ERR_VALUE(res = pgd_load(_kernel_pgd))){
+		goto out;
+	}
 
-	res = mmu_munmap(
-		NULL, 
-		(void*)0, 
-		((size_t)&__boot_end)
+	extern uintptr_t __kernel_text_start;
+	extern uintptr_t __kernel_text_end;
+
+	res = mmu_set_flags(
+		NULL,
+		&__kernel_text_start,
+		(size_t)&__kernel_text_end - (size_t)&__kernel_text_start,
+		(MEM_READ | MEM_KERNEL | MEM_EXEC)
 	);
 
-	if(IS_STAT_ERR(res)){
-		panic("mmu_init(): Failed to unmap boot area! %d", res);
+	if(IS_ERR_VALUE(res)){
+		goto out;
 	}
 
 	extern uintptr_t __kernel_rodata_start;
@@ -70,6 +76,19 @@ int mmu_init(){
 		(MEM_READ | MEM_KERNEL)
 	);
 
+	if(IS_ERR_VALUE(res)){
+		goto out;
+	}
+
+	extern uintptr_t __boot_end;
+
+	res = mmu_munmap(
+		NULL,
+		0x0,
+		(size_t)&__boot_end
+	);
+
+out:
 	return res;
 }
 

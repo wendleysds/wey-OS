@@ -20,12 +20,16 @@
 typedef unsigned long pte_t;
 typedef unsigned long pgd_t;
 
-extern pgd_t* _current_pgd;
-
 struct page;
 
 static inline void invlpg(void* virtaddr){
 	__asm__ volatile("invlpg (%0)" : : "r"(virtaddr) : "memory");
+}
+
+static inline pgd_t* pgd_current(){
+	pgd_t* ret;
+	__asm__ volatile ("mov %%cr3, %0" : "=rm" (ret));
+	return ret;
 }
 
 int pgd_load(pgd_t* pgd);
