@@ -118,6 +118,28 @@ no_vbe_mode:
 	vi->mode = vga_mode;
 	vi->type = is_vga_text_mode(vga_mode) ? VIDEO_TYPE_EGAM : VIDEO_TYPE_VGAC;
 
+	// check ega
+	initregs(&ireg);
+	ireg.ax = 0x1200;
+	ireg.bl = 0x10;
+	intcall(0x10, &ireg, &oreg);
+
+	vi->ega_bx = oreg.bx;
+
+	if (oreg.bl != 0x10) {
+		ireg.ax = 0x1A00;
+		intcall(0x10, &ireg, &oreg);
+
+		if (oreg.al == 0x1A) {
+			vi->type = VIDEO_TYPE_VGAC;
+			vi->isVGA = 1;
+		} else {
+			vi->type = VIDEO_TYPE_EGAM;
+		}
+	} else {
+		vi->type = VIDEO_TYPE_CGA;
+	}
+
 	struct vga_mode* mode = _get_mode(vga_mode);
 	if(mode){
 		vi->width = mode->width;

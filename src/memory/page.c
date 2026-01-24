@@ -91,7 +91,7 @@ struct page_metadata* __init page_init(struct e820_entry* table, size_t table_le
 
 	size_t total_pages = (phys_end - phys_start) / PTE_PAGE_SIZE;
 
-	metadata.pages = (void*)__va(early_alloc(sizeof(struct page) * total_pages));
+	metadata.pages = (void*)early_alloc(sizeof(struct page) * total_pages);
 	if(!metadata.pages){
 		return ERR_PTR(NO_MEMORY);
 	}

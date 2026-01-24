@@ -1,4 +1,4 @@
-obj-y += kernel/ entry/ mm/
+obj-y += kernel/ mm/
 
 realmode_cflags := -ffreestanding -nostdlib -m16 -nostartfiles $(KINCLUDE)
 

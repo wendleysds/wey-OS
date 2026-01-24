@@ -3,9 +3,9 @@
 extern void _set_resgisters_segments(int);
 
 void user_registers(){
-    _set_resgisters_segments(USER_DATA_SEGMENT);
+    _set_resgisters_segments(GDT_USER_DATA);
 }
 
 void kernel_registers(){
-    _set_resgisters_segments(KERNEL_DATA_SELECTOR);
+    _set_resgisters_segments(GDT_KERNEL_DATA);
 }

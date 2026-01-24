@@ -1,15 +1,19 @@
 #include <wey/interrupt.h>
-#include <drivers/terminal.h>
+#include <wey/printk.h>
+#include <lib/stdio.h>
 #include <def/compile.h>
 
 void __no_return panic(const char* fmt, ...){
 	interrupts_disable();
-	terminal_write("\nPanic!\n  ");
+
+	char buffer[1024];
 
 	va_list args;
 	va_start(args, fmt);
-	terminal_vwrite(TERMINAL_DEFAULT_COLOR, fmt, args);
+	vsprintf(buffer,fmt, args);
 	va_end(args);
+
+	printk("\nPanic!\n    %s", buffer);
 
 	while(1){
 		__asm__ volatile ("hlt");
@@ -19,10 +23,10 @@ void __no_return panic(const char* fmt, ...){
 }
 
 void warning(const char* fmt, ...){
-	terminal_cwrite(0xF0FF00, "\nWarning! ");
+	/*terminal_cwrite(0xF0FF00, "\nWarning! ");
 
 	va_list args;
 	va_start(args, fmt);
 	terminal_vwrite(TERMINAL_DEFAULT_COLOR, fmt, args);
-	va_end(args);
+	va_end(args);*/
 }

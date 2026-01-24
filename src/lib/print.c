@@ -13,12 +13,36 @@
 #define __isdigit(c) ((c) >= '0' && (c) <= '9')
 #define __tolow(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
 
-#define __div(n, b) ({                                  \
-	unsigned int _res;                                  \
-	_res = ((unsigned long long) n) % (unsigned int) b; \
-	n = ((unsigned long long) n) / (unsigned int) b;    \
-	_res;                                               \
-})
+uint32_t __div(uint64_t *n, uint32_t base){
+	uint64_t rem = *n;
+	uint64_t b = base;
+	uint64_t res, d = 1;
+	uint32_t high = rem >> 32;
+
+	res = 0;
+	if (high >= base) {
+		high /= base;
+		res = (uint64_t) high << 32;
+		rem -= (uint64_t) (high*base) << 32;
+	}
+
+	while ((int64_t)b > 0 && b < rem) {
+		b = b+b;
+		d = d+d;
+	}
+
+	do {
+		if (rem >= b) {
+			rem -= b;
+			res += d;
+		}
+		b >>= 1;
+		d >>= 1;
+	} while (d);
+
+	*n = res;
+	return rem;
+}
 
 static int skip_stoi(const char **s){
 	int i = 0;
@@ -73,7 +97,7 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 		tmp[i++] = '0';
 	} else {
 		while (number){
-			tmp[i++] = (digits[__div(number, base)] | lowercase);
+			tmp[i++] = (digits[__div(&number, base)] | lowercase);
 		}
 	}
 
@@ -179,8 +203,8 @@ int vsprintf(char* restrict buf, const char* fmt, va_list args){
 				while (--field_width > 0) *str++ = ' ';
 				continue;
 			case 's': {
-				const char *s = va_arg(args, char *);
-				int len = strnlen(s, precision);
+					const char *s = va_arg(args, char *);
+					int len = (precision < 0) ? strlen(s) : strnlen(s, precision);
 				if (!(flags & LEFTPAD_FLAG))
 					while (len < field_width--) *str++ = ' ';
 				for (int i = 0; i < len; ++i) *str++ = *s++;
@@ -223,10 +247,10 @@ int vsprintf(char* restrict buf, const char* fmt, va_list args){
 		unsigned long long num;
 		if (qualifier == 'l')
 			num = (flags & SHOW_SIGN_FLAG) ? (signed long)va_arg(args, int) 
-				: (unsigned long)va_arg(args, int);
+				: (unsigned long)va_arg(args, long);
 		else if(qualifier == 'q')
 			num = (flags & SHOW_SIGN_FLAG) ? (signed long long)va_arg(args, int) 
-				: (unsigned long long)va_arg(args, int);
+				: (unsigned long long)va_arg(args, long long);
 		else if (qualifier == 'h')
 			num = (flags & SHOW_SIGN_FLAG) ? (signed short)va_arg(args, int) 
 				: (unsigned short)va_arg(args, int);
@@ -238,6 +262,23 @@ int vsprintf(char* restrict buf, const char* fmt, va_list args){
 	}
 	*str = '\0';
 	return str - buf;
+}
+
+int vsnprintf(char* restrict buf, unsigned int size, const char* restrict fmt, va_list args){
+	if (size == 0) {
+		return 0; // No space to write
+	}
+
+	char temp[4096];
+	int count = vsprintf(temp, fmt, args);
+	
+	if (size > 0) {
+		unsigned int copy_len = (count < (int)size - 1) ? count : size - 1;
+		memcpy(buf, temp, copy_len);
+		buf[copy_len] = '\0';
+	}
+	
+	return count;
 }
 
 int sprintf(char* restrict buf, const char* restrict fmt, ...){

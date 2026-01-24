@@ -1,7 +1,6 @@
 #ifndef _TERMINAL_STRUCT_H
 #define _TERMINAL_STRUCT_H
 
-
 enum vt_intensity {
 	TERMINAL_INTENSITY_HALF_BRIGHT,
 	TERMINAL_INTENSITY_NORMAL,
@@ -17,10 +16,10 @@ struct vt_state{
 
 struct vt_data{
 	unsigned short id;
-	unsigned char vt_mode;
+	unsigned char vt_is_text_mode;
 
 	struct vt_state state, saved_state;
-	const struct video_ops* ops;
+	const struct consw* vt_sw;
 
 	unsigned int vt_cols;
 	unsigned int vt_rows;
@@ -35,25 +34,22 @@ struct vt_data{
 	/* Scrolling region */
 	unsigned int vt_top, vt_bottom;
 
-	void* screenbuffer;
-	unsigned int screenbuffer_size;
+	/* In-memory character/color buffer */
+	unsigned short* screenbuffer;
+	unsigned long screenbuffer_size;
+	unsigned long scrennbuffer_pos;
 
-	/* For all chars on screen */
-	struct {
-		
-	} attributes;
+	unsigned short vt_erase_char;
+	unsigned short vt_erase_attr;
 
-	struct {
+	unsigned char vt_default_color;
+	unsigned char vt_attr;
 
-	} cursor;
+	struct font_info font;
+};
 
-	struct {
-
-	} font;
-
-	struct {
-
-	} mode;
+struct vt {
+	struct vt_data* data;
 };
 
 #endif

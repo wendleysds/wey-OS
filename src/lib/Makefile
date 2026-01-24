@@ -1,1 +1,1 @@
-obj-y += font.o list.o mem.o string.o uaccess.o utils.o
+obj-y += font.o list.o string.o print.o

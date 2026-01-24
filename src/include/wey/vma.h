@@ -15,10 +15,14 @@ typedef enum {
 	MEM_WRITE  = 1 << 1,
 	MEM_KERNEL = 1 << 2,
 	MEM_USER   = 1 << 3,
+	MEM_GLOBAL = 1 << 4,
+	MEM_DEVICE = 1 << 5,
+	MEM_CACHE  = 1 << 6,
+
 	// Process flags / flags for mem_region
-	MEM_EXEC   = 1 << 4,
-	MEM_SHARED = 1 << 5,
-	MEM_LOCKED = 1 << 6,
+	MEM_EXEC   = 1 << 7,
+	MEM_SHARED = 1 << 8,
+	MEM_LOCKED = 1 << 9,
 } mem_flags_t;
 
 struct mem_region {

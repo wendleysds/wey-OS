@@ -1,6 +1,6 @@
 #include <wey/panic.h>
 #include <mm/page.h>
-#include <asm/paging.h>
+#include <wey/vma.h>
 #include <asm/page.h>
 #include <lib/string.h>
 #include <def/err.h>
@@ -12,6 +12,7 @@
 
 #define SELF_PDE_INDEX 1023
 #define SELF_PDE_BASE  (SELF_PDE_INDEX << 22)
+
 
 // pgd virtual table base address
 #define PGD_VADDR ((pgd_t*)0xFFFFF000)
@@ -317,4 +318,39 @@ void pgd_remove_kernel(pgd_t* pgd){
 		if(i == SELF_PDE_INDEX) continue;
 		pgd[i] = 0;
 	}
+}
+
+int mmu_flags_arch(mem_flags_t flags){
+	int f = 0;
+
+	if(flags & MEM_READ)
+		f |= _PAGE_P;
+	if(flags & MEM_WRITE)
+		f |= _PAGE_RW;
+	if(flags & MEM_USER)
+		f |= _PAGE_US;
+
+	if (flags & MEM_GLOBAL) 
+		f |= _PAGE_GLOBAL;
+
+	if (flags & MEM_DEVICE)
+		f |= _PAGE_PCD | _PAGE_PWT;
+	
+	return f;
+}
+
+mem_flags_t arch_mmu_flags(int flags){
+	mem_flags_t f = 0;
+
+	if(flags & _PAGE_P)
+		f |= MEM_READ;
+	if(flags & _PAGE_RW)
+		f |= MEM_WRITE;
+	if(flags & _PAGE_US)
+		f |= MEM_USER;
+
+	if (flags & _PAGE_GLOBAL) 
+		f |= MEM_GLOBAL;
+
+	return f;
 }

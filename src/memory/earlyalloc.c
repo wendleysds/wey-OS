@@ -43,5 +43,5 @@ void* __init early_alloc(size_t size){
 	uintptr_t ret = alloc_addr + alloc_offs;
 	size = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	alloc_offs += size;
-	return (void*)ret;
+	return (void*)(__va(ret));
 }

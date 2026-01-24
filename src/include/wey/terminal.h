@@ -6,9 +6,14 @@
 
 #define TERMINAL_DEFAULT_COLOR TERMINAL_COLOR_LIGHT_GREY
 
+#define VT_FG(c) ((c) & 0x0F)
+#define VT_BG(c) (((c) >> 4) & 0x0F)
+
+#define VT_COLOR(fg, bg) (((bg) << 4) | (fg))
+
 struct vt_data;
 struct font_info;
-struct device;
+struct video_info;
 
 typedef enum {
 	TERMINAL_COLOR_BLACK =          0x0,
@@ -29,27 +34,44 @@ typedef enum {
 	TERMINAL_COLOR_WHITE =          0xF,
 } terminal_color_t;
 
-enum terminal_scroll_direction{
-	SCROLL_UP,
-	SCROLL_DOWN,
-};
+typedef enum {
+	TERMINAL_SCROLL_UP,
+	TERMINAL_SCROLL_DOWN,
+} terminal_scroll_t;
 
-struct video_ops {
+struct consw {
+	int (*setup)(struct video_info* video_info);
 	void (*init)(struct vt_data *vt);
+	void (*exit_early)();
 	void (*clean)(struct vt_data *vt);
-	void (*putc)(struct vt_data *vt, int ch, unsigned int x, unsigned int y, unsigned char color /*Fore & Back color*/);
+	void (*clear_area)(struct vt_data *vt, unsigned int start_y, unsigned int start_x, unsigned int count);
+	void (*putc)(struct vt_data *vt, uint16_t ca, unsigned int x, unsigned int y);
+	void (*puts)(struct vt_data *vt, uint16_t* s, unsigned int start_x, unsigned int start_y);
 	void (*cursor)(struct vt_data *vt, uint8_t enabled);
-	void (*scroll)(struct vt_data *vt, unsigned int top, unsigned int bottom, enum terminal_scroll_direction dir);
-	void (*font_set)(struct vt_data *vt, struct font_info* font);
-	void (*font_get)(struct vt_data *vt, struct font_info* font);
-	void (*resize)(struct vt_data *vt, unsigned int heigth, unsigned int width);
+	void (*scroll)(struct vt_data *vt, unsigned int top, unsigned int bottom, terminal_scroll_t scroll_dir, unsigned int lines);
+	int (*font_set)(struct vt_data *vt, struct font_info* font);
+	int (*notify_switch)(struct vt_data *vt);
+	struct font_info* (*font_get)(struct vt_data *vt);
+	uint8_t	(*build_attr)(struct vt_data *vt, uint8_t color, enum vt_intensity intensity);
 };
 
-struct video_driver {
-	const char* desc;
-	const struct video_ops* ops;
-	struct device *dev;
-	int flags;
-};
+static inline uint8_t color_base(terminal_color_t c){
+	return c & 0x7;
+}
+
+static inline enum vt_intensity color_intensity(terminal_color_t c){
+	if (c & 0x8)
+		return TERMINAL_INTENSITY_BOLD;
+	return TERMINAL_INTENSITY_NORMAL;
+}
+
+int terminal_early_init();
+
+int terminal_init();
+void terminal_clean(struct vt_data* vt);
+void terminal_puts(struct vt_data* vt, const char* s);
+void terminal_scroll(struct vt_data *vt, unsigned int top, unsigned int bottom, terminal_scroll_t scroll_dir, unsigned int lines);
+int terminal_font_set(struct vt_data *vt, struct font_info* font);
+struct font_info* terminal_font_get(struct vt_data *vt);
 
 #endif

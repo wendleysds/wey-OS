@@ -23,7 +23,7 @@ static int get_cache_index(size_t size){
 }
 
 static struct slab* slab_create(struct slab_cache* cache){
-	// metada + objs
+	// metadata + objs
 	struct page* page = page_alloc(1, PAGE_SLAB);
 	if(!page)
 		return NULL;
@@ -62,8 +62,8 @@ static struct slab* slab_create(struct slab_cache* cache){
 }
 
 static void slab_destroy(struct slab* slab){
-	pgd_unmap((uintptr_t)slab);
 	page_free(slab->page);
+	pgd_unmap((uintptr_t)slab);
 }
 
 void __init slab_init(){

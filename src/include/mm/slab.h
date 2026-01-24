@@ -8,6 +8,7 @@
 // Slab allocator for small objects
 
 #define SLAB_SIZES { 8, 16, 32, 64, 128, 256, 512, 1024, 2048 }
+#define SLAB_MAX_SIZE 2048
 
 struct slab {
 	struct list_head list;  // link to other slabs in cache

@@ -2,8 +2,8 @@
 #include <wey/interrupt.h>
 #include <io/ports.h>
 #include <def/config.h>
+#include <def/init.h>
 #include <stdint.h>
-#include <drivers/terminal.h>
 
 #define PIC1		0x20
 #define PIC2		0xA0
@@ -61,7 +61,7 @@ static void _irq15_handler() {
     outb(PIC1_COMMAND, PIC_EOI);
 }
 
-void pic_init(uint32_t frequency) {
+void __init pic_init(uint32_t frequency) {
 	pic_remap();
 
 	uint16_t divisor = (uint16_t)(PIC_FREQUENCY / frequency);

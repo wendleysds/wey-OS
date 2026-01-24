@@ -28,8 +28,8 @@ __init void setup_arch(){
 	gdt_load(&gdt_descriptor);
 
 	memset(&tss, 0x0, sizeof(tss));
-	tss.ss0 = KERNEL_DATA_SELECTOR;
-	tss.esp0 = PROC_KERNEL_STACK_VIRTUAL_TOP;
+	tss.ss0 = GDT_KERNEL_DATA;
+	//tss.esp0 = PROC_KERNEL_STACK_VIRTUAL_TOP;
 	tss.iopb = sizeof(tss);
 
 	tss_load(0x28); // TSS segment is the 6th entry in the GDT (index 5), so selector is 0x28

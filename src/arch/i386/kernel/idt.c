@@ -1,9 +1,9 @@
 #include <wey/interrupt.h>
+#include <wey/printk.h>
 #include <def/config.h>
 #include <def/init.h>
 #include <lib/string.h>
 #include <arch/i386/pic.h>
-#include <drivers/terminal.h>
 
 static const char* exception_messages[] = {
 	"Division By Zero", "Debug", "Non Maskable Interrupt", "Breakpoint",
@@ -48,7 +48,7 @@ __init void idt_init(){
 		idt_set_gate(
 			i, 
 			(uint32_t)interrupt_pointer_table[i], 
-			KERNEL_CODE_SELECTOR, 
+			GDT_KERNEL_CODE, 
 			(IDT_PRESENT | IDT_DPL0 | IDT_TYPE_INT_GATE32)
 		);
 	}
@@ -74,27 +74,27 @@ void interrupt_register(int interrupt, irq_handler_t handler){
 }
 
 static void _print_frame(struct registers* regs){
-	terminal_write(
+	printk(
 		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n",
 		regs->ax, regs->bx, regs->cx, regs->dx
 	);
 
-	terminal_write( 
+	printk( 
 		"esi 0x%x edi 0x%x esp 0x%x ebp 0x%x\n",
 		regs->si, regs->di, regs->sp, regs->bp
 	);
 
-	terminal_write(
+	printk(
 		"ip 0x%x cs 0x%x ss 0x%x\n",
 		regs->ip, regs->cs, regs->ss
 	);
 
-	terminal_write(
+	printk(
 		"eflags 0x%x kesp 0x%x\n",
 		regs->flags, regs->ksp
 	);
 
-	terminal_write(
+	printk(
 		"int 0x%x err 0x%x\n",
 		regs->int_no, regs->err_code
 	);
@@ -109,13 +109,13 @@ void __cdecl interrupt_handler(struct registers* regs){
 		interrupt_callbacks[interrupt](regs);
 	}
 	else if(interrupt < 32){
-		terminal_write(
+		printk(
 			"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
 			interrupt, interrupt, exception_messages[interrupt], regs->ip);
 
 		_print_frame(regs);
 
-		terminal_write("System Halted!\n");
+		printk("System Halted!\n");
 		while(1){
 			__asm__ volatile ("hlt");
 		}

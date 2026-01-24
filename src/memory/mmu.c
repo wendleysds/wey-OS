@@ -12,32 +12,6 @@
 
 static pgd_t* _kernel_pgd = NULL;
 
-static mem_flags_t pflags_to_mflags(int pflags){
-	mem_flags_t f = 0;
-
-	if(pflags & _PAGE_P)
-		f |= MEM_READ;
-	if(pflags & _PAGE_RW)
-		f |= MEM_WRITE;
-	if(pflags & _PAGE_US)
-		f |= MEM_USER;
-
-	return f;
-}
-
-static int mflags_to_pflags(mem_flags_t mflags){
-	int f = 0;
-
-	if(mflags & MEM_READ)
-		f |= _PAGE_P;
-	if(mflags & MEM_WRITE)
-		f |= _PAGE_RW;
-	if(mflags & MEM_USER)
-		f |= _PAGE_US;
-	
-	return f;
-}
-
 int __init mmu_init(){
 	_kernel_pgd = pgd_alloc();
 	if(!_kernel_pgd){
@@ -101,7 +75,7 @@ int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags){
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	unsigned int count = alignedSize / PTE_PAGE_SIZE;
 
-	int pflags = mflags_to_pflags(mem_flags);
+	int pflags = mmu_flags_arch(mem_flags);
 	for(unsigned int i = 0; i < count; i++){
 		int status = pgd_map(vaddr, paddr, pflags);
 		if(status != SUCCESS){
@@ -156,7 +130,7 @@ int mmu_set_flags(void* virtaddr, int size, mem_flags_t flags){
 	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
 	unsigned int count = alignedSize / PTE_PAGE_SIZE;
 
-	int target_flags = mflags_to_pflags(flags);
+	int target_flags = mmu_flags_arch(flags);
 	int old_flags = pte_get_flags(vaddr);
 
 	for(unsigned int i = 0; i < count; i++){

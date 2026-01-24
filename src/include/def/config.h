@@ -115,6 +115,9 @@ extern __kernel_high_end
 #define EARY_STACK_ADDR_BOTTOM 0x90000
 #define EARY_STACK_ADDR (EARY_STACK_ADDR_BOTTOM - EARLY_STACK_SIZE)
 
+/*Printk*/
+#define PRINTK_BUFFER_SIZE KiB(16)
+
 /*Files and File System*/
 #define PATH_MAX 128
 #define FILE_DESCRIPTORS_MAX 64
@@ -137,7 +140,6 @@ extern __kernel_high_end
 #define PROC_USER_STACK_VIRUTAL_BUTTOM (PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE)
 
 /*Terminal/Console*/
-#define TERMINALS_MAX 12
-#define VIDEO_DRIVERS_MAX 4
+#define TERMINALS_MAX 6
 
 #endif

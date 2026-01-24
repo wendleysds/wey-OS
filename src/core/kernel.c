@@ -1,57 +1,63 @@
+#include "def/compile.h"
+#include "def/err.h"
 #include <def/init.h>
 #include <mm/slab.h>
 #include <mm/page.h>
 #include <wey/interrupt.h>
 #include <wey/mmu.h>
+#include <wey/panic.h>
+
+#include <lib/font.h>
+#include <wey/terminal_struct.h>
+#include <wey/terminal.h>
+#include <wey/printk.h>
+#include <mm/kheap.h>
 
 #include <uapi/headers.h>
 
-#define __hlt do {__asm__ volatile("hlt");}while(1)
-
-extern __init void setup_arch();
+#define halt() do {__asm__ volatile("hlt");}while(1)
 
 extern struct boot_header boot_header;
 
+extern __init void setup_arch();
+
+static inline __no_return void module_failed(const char* module, int res){
+	panic("%s failed with status %d!", module, res);
+	halt();
+}
+
 __no_return void kmain(){
-	/*terminal_init();
-	terminal_clear();*/
+	int res;
 
 	setup_arch();
 
 	interrupts_disable();
 
-	// vt_init();
+	res = PTR_ERR(
+		page_init(boot_header.e820_table, boot_header.e820_entries_count)
+	);
 
-	page_init(boot_header.e820_table, boot_header.e820_entries_count);
+	if(IS_ERR_VALUE(res)){
+		module_failed("page allocator", res);
+	}
 
 	slab_init();
 
-	pgd_map(0xD0000000, 0xB8000, _PAGE_P | _PAGE_RW);
-	volatile char* mem = (volatile char*)0xD0000000;
-
-	mmu_init();
-
-	char* test = slab_alloc(32);
-
-	if(test){
-		test[0] = 'O';
-		test[1] = 'K';
-		test[2] = 'N';
-
-		mem[0] = test[0];
-		mem[1] = 0xF;
-		mem[2] = test[1];
-		mem[3] = 0xF;
-	}else{
-		mem[0] = 'N';
-		mem[1] = 0xF;
-		mem[2] = 'O';
-		mem[3] = 0xF;
+	res = mmu_init();
+	if(IS_ERR_VALUE(res)){
+		module_failed("MMU", res);
 	}
-	
-	while(1) __asm__ volatile ("hlt");
+
+	res = terminal_init();
+	if(IS_ERR_VALUE(res)){
+		module_failed("VTerminal", res);
+	}
 
 	interrupts_enable();
+
+	printk("OK");
+
+	halt();
 
 	__builtin_unreachable();
 }

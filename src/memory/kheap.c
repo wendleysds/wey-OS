@@ -9,7 +9,7 @@ void* kmalloc(size_t size){
     if (size == 0)
         return NULL;
 
-    if (size >= PTE_PAGE_SIZE) {
+    if (size >= SLAB_MAX_SIZE) {
         size_t pages = ALIGN(size, PTE_PAGE_SIZE) / PTE_PAGE_SIZE;
         struct page* page = page_alloc(pages, PAGE_KERNEL);
         if (!page)

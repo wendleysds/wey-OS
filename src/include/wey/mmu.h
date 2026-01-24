@@ -3,6 +3,9 @@
 
 #include <wey/vma.h>
 
+extern int mmu_flags_arch(mem_flags_t flags);
+extern mem_flags_t arch_mmu_flags(int flags);
+
 int mmu_init();
 pgd_t* mmu_create_page();
 int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags);

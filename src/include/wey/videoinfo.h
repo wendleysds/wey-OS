@@ -16,6 +16,9 @@ struct video_info
 	uint16_t mode;
 	uint8_t type;
 
+	uint8_t isVGA;
+	uint16_t ega_bx;
+
 	uint16_t width;
 	uint16_t height;
 	uint16_t pitch;
