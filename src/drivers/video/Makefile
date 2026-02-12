@@ -1,1 +1,1 @@
-obj-y += terminal.o vga.o
+obj-y += vga.o
