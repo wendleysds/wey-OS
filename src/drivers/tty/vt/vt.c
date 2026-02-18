@@ -20,12 +20,12 @@ extern const struct consw vgadrv_consw;
 
 int cur_vt, last_vt;
 
-struct vt_data* terminal_get(int index){
+struct vt* terminal_get(int index){
 	if(index >= TERMINALS_MAX || index < 0){
 		return NULL;
 	}
 
-	return terminals[index].data;
+	return &terminals[index];
 }
 
 static inline int vt_is_visible(struct vt_data *vt) {
@@ -192,8 +192,8 @@ void vt_switch(int new_vt){
     if (new_vt == cur_vt)
         return;
 
-    struct vt_data *old = terminal_get(cur_vt);
-    struct vt_data *new = terminal_get(new_vt);
+    struct vt_data *old = terminal_get(cur_vt)->data;
+    struct vt_data *new = terminal_get(new_vt)->data;
 
     if (!new)
         return;
@@ -229,7 +229,7 @@ static void _vt_console_write_impl(struct vt_data *vt, const char *buf, int leng
 }
 
 static void _vt_console_write(const char *buf, int length){
-	_vt_console_write_impl(terminal_get(cur_vt), buf, length);
+	_vt_console_write_impl(terminal_get(cur_vt)->data, buf, length);
 }
 
 static void __init _vt_early_console_write(const char* s, int length){
@@ -270,7 +270,7 @@ int __init terminal_init(){
 		return res;
 	}
 
-	struct vt_data* new_data = terminal_get(0);
+	struct vt_data* new_data = terminal_get(0)->data;
 
 	if(old_data->screenbuffer_size != new_data->screenbuffer_size){
 		return INVALID_ARG;
