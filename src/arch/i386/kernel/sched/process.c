@@ -5,7 +5,7 @@
 #include <lib/string.h>
 
 void start_thread(struct registers* regs, void* entry_point, void* user_stack){
-	memset(&regs, 0, sizeof(struct registers));
+	memset(regs, 0, sizeof(struct registers));
 	regs->cs = GDT_USER_CODE;
 	regs->ss = GDT_USER_DATA;
 	regs->ip = (uint32_t)entry_point;

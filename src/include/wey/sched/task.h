@@ -5,9 +5,9 @@
 
 struct task;
 
-extern void free_task(struct task *task);
-extern struct task* alloc_task();
+struct task* task_create(const char* name, int priority);
+int task_destroy(struct task* task);
 
-extern pid_t kernel_thread(int (*fn)(), const char* name);
+pid_t kernel_thread(int (*fn)(), const char* name);
 
 #endif

@@ -3,11 +3,11 @@ global interrupt_pointer_table
 extern interrupt_handler
 
 _isr_common:
-	pusha
+	pushad
 	push esp
 	call interrupt_handler
 	add esp, 4
-	popa
+	popad
 
 	add esp, 8
 	iret

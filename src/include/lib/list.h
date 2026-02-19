@@ -1,6 +1,8 @@
 #ifndef _LIST_H
 #define _LIST_H
 
+#include <stddef.h>
+
 #define container_of(ptr, type, member) ({          \
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
 	(type *)( (char *)__mptr - offsetof(type,member) );})
@@ -30,5 +32,17 @@ struct list_head {
 
 void list_add(struct list_head *new, struct list_head *head);
 void list_remove(struct list_head *entry);
+
+static inline void list_add_head(struct list_head *new, struct list_head *head){
+	list_add(new, head);
+}
+
+static inline void list_add_tail(struct list_head *new, struct list_head *tail){
+	list_add(new, tail->prev);
+}
+
+static inline int list_empty(struct list_head *head){
+	return head->next == head;
+}
 
 #endif

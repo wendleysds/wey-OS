@@ -1,5 +1,6 @@
 global _switch_to
 global _ret_from_interrupt
+global _ret_from_fork
 
 ;struct registers {
 ;	// pushad regs order
@@ -52,6 +53,12 @@ _ret_from_interrupt:
 
 	iret
 
+; asmlinkage __no_return void _ret_from_fork(void);
+_ret_from_fork:
+	popad       ; restore all registers
+	add esp, 8  ; clear err_code and int_no
+	iret        ; kachow
+
 
 ; asmlinkage void _switch_to(struct registers* prev, struct registers* to);
 _switch_to:
@@ -62,9 +69,11 @@ _switch_to:
 	mov eax, [esp+4]
 	mov ecx, [esp+8]
 
-	pushad
+	cmp eax, 0
+	jz .skip_save
 	mov [eax+12], esp
+
+.skip_save:
 	mov esp, [ecx+12]
-	popad
 
 	ret

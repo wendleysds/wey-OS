@@ -1,3 +1,4 @@
+#include "wey/printk.h"
 #include <wey/sched.h>
 #include <def/compile.h>
 
@@ -14,5 +15,10 @@ void context_switch(struct task* prev, struct task* to){
 	// TODO: do some checks here, like if the tasks are valid or permissions
 
 	current = to;
+
+	if(unlikely(!prev)){
+		_switch_to(NULL, &to->regs);
+	}
+
 	_switch_to(&prev->regs, &to->regs);
 }
