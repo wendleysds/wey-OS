@@ -21,7 +21,7 @@ extern void* interrupt_pointer_table[TOTAL_INTERRUPTS];
 static struct InterruptDescriptor idt[TOTAL_INTERRUPTS];
 static struct IDTr_ptr idtr_ptr;
 
-static irq_handler_t interrupt_callbacks[TOTAL_INTERRUPTS] = {0x0};
+static interrupt_handler_t interrupt_callbacks[TOTAL_INTERRUPTS] = {0x0};
 
 extern void kernel_registers();
 extern void user_registers();
@@ -65,7 +65,7 @@ void interrupts_disable(){
 	__asm__ volatile ("cli");
 }
 
-void interrupt_register(int interrupt, irq_handler_t handler){
+void interrupt_register(int interrupt, interrupt_handler_t handler){
 	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
 		return;
 	}
@@ -121,6 +121,18 @@ void __cdecl interrupt_handler(struct registers* regs){
 		}
 	}
 
-	pic_send_eoi(interrupt);
+	interrupt_eoi(interrupt);
 	user_registers();
+}
+
+void interrupt_eoi(uint8_t interrupt){
+	pic_send_eoi(interrupt);
+}
+
+void interrupt_mask(uint8_t interrupt){
+	IRQ_set_mask(interrupt);
+}
+
+void interrupt_unmask(uint8_t interrupt){
+	IRQ_clear_mask(interrupt);
 }

@@ -1,4 +1,3 @@
-#include <arch/i386/pic.h>
 #include <wey/interrupt.h>
 #include <io/ports.h>
 #include <def/config.h>
@@ -31,7 +30,17 @@ static uint16_t __pic_get_irq_reg(int ocw3)
     return (inb(PIC2_COMMAND) << 8) | inb(PIC1_COMMAND);
 }
 
-static void _timer_iqr_handler(struct registers* regs){
+static uint16_t pic_get_irr()
+{
+    return __pic_get_irq_reg(PIC_READ_IRR);
+}
+
+static uint16_t pic_get_isr()
+{
+    return __pic_get_irq_reg(PIC_READ_ISR);
+}
+
+static void _default_timer_iqr_handler(struct registers* regs){
 	outb(PIC1_COMMAND, PIC_EOI);
 }
 
@@ -70,7 +79,7 @@ void __init pic_init(uint32_t frequency) {
 	outb(PIC_COMMAND, divisor & 0xFF);         // low end
 	outb(PIC_CHANNEL0, (divisor >> 8) & 0xFF); // high end
 
-	interrupt_register(0x20, _timer_iqr_handler);
+	interrupt_register(0x20, _default_timer_iqr_handler);
 }
 
 void pic_send_eoi(uint8_t irq)
@@ -95,6 +104,11 @@ void pic_send_eoi(uint8_t irq)
 void pic_disable() {
     outb(PIC1_DATA, 0xff);
     outb(PIC2_DATA, 0xff);
+}
+
+void pic_enable() {
+	outb(PIC1_DATA, 0x0);
+	outb(PIC2_DATA, 0x0);
 }
 
 void IRQ_set_mask(uint8_t IRQline) {
@@ -123,14 +137,4 @@ void IRQ_clear_mask(uint8_t IRQline) {
     }
     value = inb(port) & ~(1 << IRQline);
     outb(port, value);        
-}
-
-uint16_t pic_get_irr()
-{
-    return __pic_get_irq_reg(PIC_READ_IRR);
-}
-
-uint16_t pic_get_isr()
-{
-    return __pic_get_irq_reg(PIC_READ_ISR);
 }

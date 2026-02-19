@@ -1,0 +1,1 @@
+obj-y += context.o process.o switch.asm.o

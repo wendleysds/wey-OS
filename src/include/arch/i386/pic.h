@@ -1,5 +1,5 @@
-#ifndef _TIMER_H
-#define _TIMER_H
+#ifndef _X86_PIC_H
+#define _X86_PIC_H
 
 #include <stdint.h>
 
