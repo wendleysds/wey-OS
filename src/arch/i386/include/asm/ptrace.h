@@ -16,9 +16,9 @@ struct registers {
 	// Automatically pushed by the processor
 	// he dont push SS and SP if the privelege level inst change
 	unsigned long ip;
-	unsigned short cs, _csh;
+	unsigned long cs;
 	unsigned long flags, sp;
-	unsigned short ss, _ssh;
+	unsigned long ss;
 } __packed;
 
 struct task;

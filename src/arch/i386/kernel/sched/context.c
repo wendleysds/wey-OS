@@ -1,8 +1,10 @@
 #include <wey/sched.h>
+#include <def/compile.h>
 
 struct task* current = 0x0;
 
-extern void _switch_to(struct registers* prev, struct registers* to);
+extern asmlinkage void _switch_to(struct registers* prev, struct registers* to);
+extern asmlinkage __no_return void _ret_from_interrupt(struct registers* regs);
 
 void context_switch(struct task* prev, struct task* to){
 	if(prev == to || to == current){
