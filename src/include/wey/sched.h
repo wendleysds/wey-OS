@@ -30,7 +30,8 @@ struct task {
 	void* kstack;
 	
 	struct list_head tasks;
-	
+	struct list_head queue;
+
 	struct mm_struct* mm;
 	task_state_t state;
 	int priority;

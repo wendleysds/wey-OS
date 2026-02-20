@@ -17,8 +17,8 @@ static struct task* _next(){
 		return 0x0;
 	}
 
-	next_task = list_entry(_readyQueue.next, struct task, tasks);
-	list_remove(&next_task->tasks);
+	next_task = list_entry(_readyQueue.next, struct task, queue);
+	list_remove(&next_task->queue);
 
 	return next_task;
 }
@@ -58,9 +58,9 @@ int __init scheduler_init(){
 
 void scheduler_add(struct task* task){
 	task->state = TASK_READY;
-	list_add_tail(&task->tasks, &_readyQueue);
+	list_add_tail(&task->queue, &_readyQueue);
 }
 
 void scheduler_remove(struct task* task){
-	list_remove(&task->tasks);
+	list_remove(&task->queue);
 }

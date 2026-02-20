@@ -12,6 +12,7 @@ struct task* task_create(const char* name, int priority){
 		new_task->priority = priority; 
 		new_task->state = TASK_NEW; 
 		INIT_LIST_HEAD(&new_task->tasks); 
+		INIT_LIST_HEAD(&new_task->queue); 
 		INIT_LIST_HEAD(&new_task->children); 
 		INIT_LIST_HEAD(&new_task->sibling); 
 	} 
