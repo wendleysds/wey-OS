@@ -15,6 +15,7 @@ void context_switch(struct task* prev, struct task* to){
 	// TODO: do some checks here, like if the tasks are valid or permissions
 
 	current = to;
+	current->state = TASK_RUNNING;
 
 	if(unlikely(!prev)){
 		_switch_to(NULL, &to->regs);

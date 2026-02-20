@@ -35,10 +35,10 @@ static inline __no_return void module_failed(const char* module, int res){
 }
 
 extern void start_thread(struct registers* regs, void* entry_point, void* user_stack);
-extern asmlinkage __no_return void _ret_from_fork(void);
+extern asmlinkage __no_return void ret_from_fork(void);
 
 static void _routine_test(){
-	printk("Hello, World!");
+	printk("Hello, World!\n");
 	halt();
 }
 
@@ -63,15 +63,13 @@ static int _kernel_thread(struct task* task){
 		memcpy(ksp, obj, size); \
 	} while(0)
 
-	int returns = (int)_ret_from_fork;
+	int returns = (int)ret_from_fork;
 
 	push(&task->regs, sizeof(task->regs));
 	push(&returns, sizeof(int));
 
 	task->regs.ksp = (unsigned long)ksp;
 	task->regs.ax = 0xCAFE;
-
-	printk("%X\n", (uint32_t*)ksp);
 
 	#undef push
 
@@ -127,7 +125,7 @@ __no_return void kmain(){
 
 	scheduler_add(t1);
 
-	printk("OK");
+	printk("OK\n");
 
 	interrupts_enable(); // Start scheduler
 

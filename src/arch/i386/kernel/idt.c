@@ -26,6 +26,8 @@ static interrupt_handler_t interrupt_callbacks[TOTAL_INTERRUPTS] = {0x0};
 extern void kernel_registers();
 extern void user_registers();
 
+volatile int need_resched = 0;
+
 static inline void _idt_load(struct IDTr_ptr* ptr){
 	__asm__ volatile ("lidt (%0)" : : "r"(ptr));
 }
@@ -121,8 +123,10 @@ void __cdecl interrupt_handler(struct registers* regs){
 		}
 	}
 
-	interrupt_eoi(interrupt);
-	user_registers();
+	if(interrupt == 0x20)
+		need_resched = 1;
+
+	//user_registers();
 }
 
 void interrupt_eoi(uint8_t interrupt){

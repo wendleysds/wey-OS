@@ -1,16 +1,105 @@
 global interrupt_pointer_table
+global ret_from_fork
+global ret_from_registers
 
 extern interrupt_handler
+extern interrupt_eoi
+extern _scheduler_tick
+extern need_resched
+
+;struct registers {
+;	// pushad regs order
+;	unsigned long di (00), si (04), bp (08), ksp (12);
+;	unsigned long bx (16), dx (20), cx (24), ax  (28);
+;
+;	// err_code pushed by the processor if
+;	// theres one
+;	unsigned long int_no (32), err_code (36);
+;
+;	// Automatically pushed by the processor
+;	// he dont push SS and SP if the privelege level inst change
+;	unsigned long ip (40);
+;	unsigned long cs (44);
+;	unsigned long flags (48), sp (52);
+;	unsigned long ss (56);
+;} __packed;
+
+; asmlinkage __no_return void ret_from_registers(struct registers* regs);
+ret_from_registers:
+	mov ebp, esp
+
+	xor eax, eax
+	mov ax, cs
+	cmp eax, [ebp+44]
+	je .same_priv
+
+	mov ax, word [ebp+44]
+
+	mov ds, ax
+	mov es, ax
+	mov gs, ax
+	mov fs, ax
+
+	push dword [ebp+56]
+	push dword [ebp+52]
+
+.same_priv:
+
+	push dword [ebp+48]
+	push dword [ebp+44]
+	push dword [ebp+40]
+
+	mov edi, [ebp+0]
+	mov esi, [ebp+4]
+	mov ebx, [ebp+16]
+	mov edx, [ebp+20]
+	mov ecx, [ebp+24]
+	mov eax, [ebp+28]
+	mov ebp, [ebp+8]
+
+	iret
+
+_ret_from_intr:
+	mov ebp, esp
+
+	mov eax, [ebp+32]
+	cmp eax, 32
+	jl .no_eoi
+
+	push eax
+	call interrupt_eoi
+	add esp, 4
+
+.no_eoi:
+	mov eax, [need_resched]
+	test eax, eax
+	jz .restore
+
+	mov dword [need_resched], 0
+
+	push ebp
+	call _scheduler_tick
+	add esp, 4
+
+	mov ebp, esp
+
+.restore:
+	popad       ; restore all registers
+	add esp, 8  ; clear err_code and int_no
+	iret        ; kachow
+
+ret_from_fork:
+	popad
+	add esp, 8
+	iret
 
 _isr_common:
 	pushad
 	push esp
 	call interrupt_handler
 	add esp, 4
-	popad
 
-	add esp, 8
-	iret
+	jmp _ret_from_intr
 
 %macro ISR_NERRC 1
 	global int%1:

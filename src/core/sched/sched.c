@@ -6,7 +6,6 @@
 #include <def/status.h>
 #include <lib/string.h>
 #include <wey/interrupt.h>
-#include <wey/timer.h>
 
 static LIST_HEAD(_readyQueue);
 static LIST_HEAD(_terminateQueue);
@@ -30,6 +29,7 @@ asmlinkage void schedule(){
 
 	if(next_task == 0x0){
 		if(prev_task->state == TASK_RUNNING){
+			printk("resuming: '%s'\n", prev_task->name);
 			return;
 		}
 
@@ -43,15 +43,13 @@ asmlinkage void schedule(){
 	context_switch(prev_task, next_task);
 }
 
-static void scheduler_tick(struct registers* regs){
+void _scheduler_tick(struct registers* regs){
 	schedule();
 }
 
 int __init scheduler_init(){
 	INIT_LIST_HEAD(&_readyQueue);
 	INIT_LIST_HEAD(&_terminateQueue);
-
-	timer_register_callback(scheduler_tick);
 
 	return SUCCESS;
 }
