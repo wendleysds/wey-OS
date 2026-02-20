@@ -37,6 +37,8 @@ asmlinkage void schedule(){
 		panic("no tasks!");
 	}
 
+	printk("Switching to '%s'\n", next_task->name);
+
 	if(likely(prev_task))
 		scheduler_add(prev_task);
 

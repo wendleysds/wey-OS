@@ -43,7 +43,7 @@ static void _routine_test(){
 }
 
 static int _kernel_thread(struct task* task){
-	const int stack_size = 1024;
+	const int stack_size = 4096;
 	char* ksp = kmalloc(stack_size);
 	char* usp = kmalloc(stack_size);
 
@@ -123,7 +123,18 @@ __no_return void kmain(){
 		module_failed("KThrd", res);
 	}
 
+	struct task* t2 = task_create("task 2", 0);
+	if(!t2){
+		panic("NO MEMORY");
+	}
+
+	res = _kernel_thread(t2);
+	if(IS_ERR_VALUE(res)){
+		module_failed("KThrd", res);
+	}
+
 	scheduler_add(t1);
+	scheduler_add(t2);
 
 	printk("OK\n");
 
