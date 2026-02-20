@@ -10,7 +10,7 @@ void __no_return panic(const char* fmt, ...){
 
 	va_list args;
 	va_start(args, fmt);
-	vsprintf(buffer,fmt, args);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
 
 	printk("\nPanic!\n    %s", buffer);

@@ -2,6 +2,7 @@
 #include <mm/page.h>
 #include <asm/paging.h>
 #include <lib/string.h>
+#include <stdint.h>
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
@@ -15,11 +16,19 @@ void* kmalloc(size_t size){
         if (!page)
             return NULL;
 
-		pgd_map(
-			page_to_virt(page), 
-			page_to_phys(page), 
-			(_PAGE_P | _PAGE_RW)
-		);
+		uintptr_t phys = page_to_phys(page);
+		uintptr_t virt = page_to_virt(page);
+
+		for(size_t i = 0; i < pages; i++){
+			pgd_map(
+				virt,
+				phys,
+				(_PAGE_P | _PAGE_RW)
+			);
+
+			virt += PTE_PAGE_SIZE;
+			phys += PTE_PAGE_SIZE;
+		}
 
         return (void*)page_to_virt(page);
     }
