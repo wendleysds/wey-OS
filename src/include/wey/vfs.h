@@ -3,6 +3,7 @@
 
 #include <wey/blkdev.h>
 #include <wey/stat.h>
+#include <wey/atomic.h>
 #include <mm/kheap.h>
 #include <lib/list.h>
 #include <stdint.h>
@@ -16,14 +17,17 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+typedef long long off_t;
+
 struct inode {
 	uint32_t ino;
 
 	uint16_t mode;
 	uint32_t size;
 	void *private_data;
-
 	dev_t i_rdev;
+
+	atomic_t refcount;
 
 	struct super_block* i_sb;
 	const struct inode_operations *i_op;
@@ -33,41 +37,41 @@ struct inode {
 };
 
 struct file {
-    struct inode *inode;
-    uint32_t pos;
-    uint32_t flags;
-    void *private_data;
-
-    const struct file_operations *f_op;
+	struct inode *inode;
+	off_t pos;
+	int flags;
+	atomic_t refcount;
+	void *private_data;
+	const struct file_operations *f_op;
 };
 
 struct stat {
-    uint32_t mode;
-    uint32_t size;
-    uint32_t uid;
-    uint8_t attr;
-    uint32_t atime;
-    uint32_t mtime;
-    uint32_t ctime;
+	uint32_t mode;
+	uint32_t size;
+	uint32_t uid;
+	uint8_t attr;
+	uint32_t atime;
+	uint32_t mtime;
+	uint32_t ctime;
 };
 
 struct file_operations {
-    int (*read)(struct file *file, void *buffer, uint32_t count);
-    int (*write)(struct file *file, const void *buffer, uint32_t count);
-    int (*lseek)(struct file *file, int offset, int whence);
+	int (*read)(struct file *file, void *buffer, uint32_t count);
+	int (*write)(struct file *file, const void *buffer, uint32_t count);
+	int (*lseek)(struct file *file, int offset, int whence);
 	int (*open) (struct inode *ino, struct file *file);
-    int (*close)(struct file *file);
+	int (*close)(struct file *file);
 	int (*release) (struct inode *ino, struct file *file);
 };
 
 struct inode_operations {
-    struct inode* (*lookup)(struct inode *dir, const char *name);
-    int (*create)(struct inode *dir, const char *name, uint16_t mode);
-    int (*unlink)(struct inode *dir, const char *name);
-    int (*mkdir)(struct inode *dir, const char *name);
-    int (*rmdir)(struct inode *dir, const char *name);
-    int (*getattr)(struct inode *dir, const char *name, struct stat* restrict statbuf);
-    int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
+	struct inode* (*lookup)(struct inode *dir, const char *name);
+	int (*create)(struct inode *dir, const char *name, uint16_t mode);
+	int (*unlink)(struct inode *dir, const char *name);
+	int (*mkdir)(struct inode *dir, const char *name);
+	int (*rmdir)(struct inode *dir, const char *name);
+	int (*getattr)(struct inode *dir, const char *name, struct stat* restrict statbuf);
+	int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
 };
 
 struct file_system_type{
@@ -137,6 +141,31 @@ struct super_block* alloc_super();
 
 struct inode* inode_alloc(struct super_block *sb);
 struct inode* inode_new(struct super_block *sb);
+
+static inline void inode_get(struct inode* ino){
+	atomic_inc(&ino->refcount);
+}
+
+static inline void inode_put(struct inode* ino){
+	if(atomic_dec_and_test(&ino->refcount) == 0){
+		ino->i_sb->s_op->destroy_inode(ino);
+	}
+}
+
+static inline void file_get(struct file* file){
+	atomic_inc(&file->refcount);
+}
+
+static inline void file_put(struct file* file){
+	if(atomic_dec_and_test(&file->refcount) == 0){
+		file->f_op->release(file->inode, file);
+
+		if (file->inode)
+            inode_put(file->inode);
+
+		kfree(file);
+	}
+}
 
 void inode_destroy(struct inode*);
 
