@@ -37,8 +37,8 @@ static inline void list_add_head(struct list_head *new, struct list_head *head){
 	list_add(new, head);
 }
 
-static inline void list_add_tail(struct list_head *new, struct list_head *tail){
-	list_add(new, tail->prev);
+static inline void list_add_tail(struct list_head *new, struct list_head *head){
+	list_add(new, head->prev);
 }
 
 static inline int list_empty(struct list_head *head){

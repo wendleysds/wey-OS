@@ -18,6 +18,7 @@
 #define NOT_EXISTS      -15
 #define NOT_FOUND       -16
 #define LIST_FULL       -17
+#define NO_ENTRY        -18
 
 // Memory
 #define NO_MEMORY       -20

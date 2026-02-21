@@ -2,6 +2,8 @@
 #define _VMA_H
 
 #include <asm/paging.h>
+#include <wey/vfs.h>
+#include <wey/atomic.h>
 #include <stdint.h>
 
 #define MAP_POPULATE  0x1
@@ -30,6 +32,8 @@ struct mem_region {
 	uintptr_t end;
 	mem_flags_t mem_flags;
 	unsigned int mpa_flags;
+	struct file* file;
+	off_t file_offset;
 	struct mem_region *next;
 };
 
@@ -38,7 +42,18 @@ struct mm_struct {
 	struct mem_region *vma;
 	uintptr_t brk_start;
 	uintptr_t brk;
-	uint16_t refcount;
+	atomic_t refcount;
 };
+
+struct mem_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr);
+
+int vma_add(
+	struct mm_struct* mm, uintptr_t start, uintptr_t end,
+	mem_flags_t mem_flags, unsigned int mpa_flags,
+	struct file* file, off_t file_offset
+);
+
+int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
+int vma_destroy(struct mm_struct* mm);
 
 #endif
