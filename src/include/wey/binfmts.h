@@ -1,12 +1,13 @@
 #ifndef _BINARY_FORMATS_H
 #define _BINARY_FORMATS_H
 
-#include <wey/process.h>
 #include <wey/vfs.h>
-#include <wey/mmu.h>
+#include <wey/vma.h>
 #include <stdint.h>
 
 #define BINPRM_BUFF_SIZE 256
+
+struct list_head;
 
 struct binprm{
     int argc, envc;
@@ -32,6 +33,10 @@ struct binprm{
 
 struct binfmt{
     int (*load_binary)(struct binprm *bprm);
-}__attribute__((packed));
+	struct list_head formats; 
+};
+
+void binfmt_register(struct binfmt* fmt);
+void binfmt_unregister(struct binfmt* fmt);
 
 #endif

@@ -1,42 +1,36 @@
 #include <wey/elf.h>
 #include <wey/binfmts.h>
 #include <wey/vfs.h>
-#include <wey/mmu.h>
-#include <wey/sched.h>
+#include <wey/vma.h>
+#include <def/init.h>
 #include <def/err.h>
 
-static int load_elf_binarie(struct binprm *bprm);
-
-struct binfmt elf_format = {
-    .load_binary = load_elf_binarie
-};
-
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
-    if (!ehdr) {
-        return NULL_PTR;
-    }
+	if (!ehdr) {
+		return NULL_PTR;
+	}
 
-    if(memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
-        return INVALID_FORMAT; // Not an ELF file
-    }
+	if(memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
+		return INVALID_FORMAT; // Not an ELF file
+	}
 
-    if (ehdr->e_ident[EI_CLASS] != ELFCLASS32 || ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
-        return NOT_SUPPORTED; // Only 32-bit ELF files are supported
-    }
+	if (ehdr->e_ident[EI_CLASS] != ELFCLASS32 || ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
+		return NOT_SUPPORTED; // Only 32-bit ELF files are supported
+	}
 
-    if (ehdr->e_machine != EM_386) {
-        return NOT_SUPPORTED; // Only x86 architecture is supported
-    }
-    
-    if (ehdr->e_type != ET_EXEC) {
-        return INVALID_ARG; // Not an executable ELF file
-    }
+	if (ehdr->e_machine != EM_386) {
+		return NOT_SUPPORTED; // Only x86 architecture is supported
+	}
 
-    if (ehdr->e_version != EV_CURRENT || ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
-        return NOT_SUPPORTED; // Unsupported ELF version
-    }
+	if (ehdr->e_type != ET_EXEC) {
+		return INVALID_ARG; // Not an executable ELF file
+	}
 
-    return OK;
+	if (ehdr->e_version != EV_CURRENT || ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
+		return NOT_SUPPORTED; // Unsupported ELF version
+	}
+
+	return OK;
 }
 
 static int load_elf_binarie(struct binprm *bprm){
@@ -50,17 +44,15 @@ static int load_elf_binarie(struct binprm *bprm){
 	res = vfs_read(bprm->file, bprm->buff, sizeof(bprm->buff));
 
 	if(IS_STAT_ERR(res)){
-        return res;
-    }
+		return res;
+	}
 
 	struct Elf32_Ehdr* ehdr = (struct Elf32_Ehdr*)bprm->buff;
 	struct Elf32_Phdr* phdrs = (struct Elf32_Phdr*)((uint8_t*)ehdr + ehdr->e_phoff);
 
-	if((res = _validade_elf_ehdr(ehdr)) != OK){
-		return INVALID_FORMAT;
+	if(IS_ERR_VALUE(res = _validade_elf_ehdr(ehdr))){
+		return res;
 	}
-
-	uint8_t flags = FPAGING_P | FPAGING_US;
 
 	for (int i = 0; i < ehdr->e_phnum; i++) {
 		struct Elf32_Phdr* phdr = &phdrs[i];
@@ -68,38 +60,22 @@ static int load_elf_binarie(struct binprm *bprm){
 			continue;
 		}
 
-		void* segment = kmalloc(phdr->p_memsz);
-		if(!segment){
-			return NO_MEMORY;
-		}
+		uint8_t flags = MEM_USER | MEM_READ;
+		if (phdr->p_flags & PF_W) flags |= MEM_WRITE;
+		if (phdr->p_flags & PF_X) flags |= MEM_EXEC;
 
-		vfs_lseek(bprm->file, phdr->p_offset, SEEK_SET);
-		int readBytes = vfs_read(bprm->file, segment, phdr->p_filesz);
-
-		if(IS_STAT_ERR(readBytes) || readBytes != phdr->p_filesz){
-			kfree(segment);
-			return READ_FAIL;
-		}
-
-		// Zero extra part (BSS)
-		memset(segment + phdr->p_filesz, 0x0, phdr->p_memsz - phdr->p_filesz);
-
-		res = vma_add(bprm->mm, 
-			(void*)phdr->p_vaddr, 
-			segment, 
-			phdr->p_memsz, 
-			flags | (phdr->p_flags & PF_W ? FPAGING_RW : 0),
-			1
-		);
-
-		mmu_map_pages(
-			(void*)phdr->p_vaddr,
-			mmu_translate(segment),
-			phdr->p_memsz,
-			flags | (phdr->p_flags & PF_W ? FPAGING_RW : 0)
+		res = vma_add(
+			bprm->mm,
+			phdr->p_vaddr,
+			phdr->p_vaddr + phdr->p_memsz,
+			flags,
+			MAP_PRIVATE,
+			bprm->file,
+			phdr->p_offset
 		);
 
 		if(res != SUCCESS){
+			vma_destroy(bprm->mm);
 			return res;
 		}
 	}
@@ -108,3 +84,14 @@ static int load_elf_binarie(struct binprm *bprm){
 
 	return SUCCESS;
 }
+
+static __initdata struct binfmt elf_format = {
+	.load_binary = load_elf_binarie,
+};
+
+static int __init _register_elffmt(){
+	binfmt_register(&elf_format);
+	return SUCCESS;
+}
+
+core_initcall(_register_elffmt);

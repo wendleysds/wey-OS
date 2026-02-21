@@ -86,7 +86,7 @@ static __always_inline void arch_atomic_dec(atomic_t *v){
 }
 
 static __always_inline int arch_atomic_dec_and_test(atomic_t *v){
-	int result;
+	char result;
 	__asm__ volatile(
 		"lock decl %0; setz %1"
 		: "+m"(v->value), "=q"(result)
