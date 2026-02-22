@@ -33,8 +33,6 @@ struct device {
 	struct list_head list;
 };
 
-void device_init();
-
 int __must_check device_register(struct device *dev);
 void device_unregister(struct device *dev);
 

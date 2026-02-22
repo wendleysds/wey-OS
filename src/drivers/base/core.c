@@ -4,20 +4,10 @@
 #include <def/status.h>
 #include <wey/panic.h>
 #include <lib/string.h>
-
-extern void chrdev_init();
-extern void blkdev_init();
+#include <def/init.h>
 
 struct device* devices[DEVICES_MAX] = { 0 };
 uint16_t next_id = 1;
-
-void device_init(){
-	blkdev_init();
-	chrdev_init();
-
-	memset(devices, 0x0, sizeof(devices));
-	next_id = 1;
-}
 
 int __must_check device_register(struct device *dev){
 	int freeIndex = -1;
@@ -73,3 +63,11 @@ struct device* device_get_id(uint16_t id){
 
     return 0x0;
 }
+
+static int __init device_init(){
+	memset(devices, 0x0, sizeof(devices));
+	next_id = 1;
+	return SUCCESS;
+}
+
+core_initcall(device_init);

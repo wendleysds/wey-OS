@@ -4,12 +4,9 @@
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
+#include <def/init.h>
 
 static struct chrdev* chrdevs[MINOR_MAX];
-
-void chrdev_init(){
-	memset(chrdevs, 0x0, sizeof(chrdevs));
-}
 
 int chrdev_device_add(struct chrdev *cdev, struct device *dev){
 	if(!cdev || !dev){
@@ -77,3 +74,10 @@ static int chrdev_open(struct inode *ino, struct file *file){
 const struct file_operations def_chr_fops = {
 	.open = chrdev_open,
 };
+
+static int __init chrdev_init(){
+	memset(chrdevs, 0x0, sizeof(chrdevs));
+	return SUCCESS;
+}
+
+core_initcall(chrdev_init);

@@ -1,15 +1,11 @@
 #include <wey/device.h>
 #include <wey/vfs.h>
-#include <wey/blkdev.h>
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
+#include <def/init.h>
 
 static struct blkdev* blkdevs[MINOR_MAX];
-
-void blkdev_init(){
-	memset(blkdevs, 0x0, sizeof(blkdevs));
-}
 
 int blkdev_device_add(struct blkdev *blkdev){
 	if(!blkdev || !blkdev->dev){
@@ -86,3 +82,10 @@ struct blkdev* blkdev_find_by_name(const char* name){
 const struct file_operations def_blk_fops = {
 	.open = blkdev_open,
 };
+
+static __init int blkdev_init(){
+	memset(blkdevs, 0x0, sizeof(blkdevs));
+	return OK;
+}
+
+core_initcall(blkdev_init);

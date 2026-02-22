@@ -85,7 +85,7 @@ static int load_elf_binarie(struct binprm *bprm){
 	return SUCCESS;
 }
 
-static __initdata struct binfmt elf_format = {
+static struct binfmt elf_format = {
 	.load_binary = load_elf_binarie,
 };
 

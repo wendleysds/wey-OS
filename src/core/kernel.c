@@ -123,6 +123,14 @@ __no_return void kmain(){
 		module_failed("page allocator", res);
 	}
 
+	struct page_metadata* mt = (struct page_metadata*)res;
+	printk("pages: %d/%d [%d KiB], range 0x%X - 0x%X [%d MiB]\n",
+		mt->pages_length, mt->allocated_pages,
+		(mt->pages_length / sizeof(struct page)) / KiB(1),
+		mt->start_addr, mt->end_addr,
+		(mt->end_addr - mt->start_addr) / MiB(1)
+	);
+
 	slab_init();
 
 	res = mmu_init();
