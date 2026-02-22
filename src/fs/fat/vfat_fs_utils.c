@@ -1,3 +1,4 @@
+#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/status.h>
 
@@ -56,10 +57,11 @@ uint32_t fat_get_eof(struct FAT* fat){
 }
 
 void fat_add(struct FAT* fat, uint32_t index, uint32_t next){
+	uint32_t offset;
+
     switch (fat->type) {
         case FAT_TYPE_12:
-            uint32_t offset = (index * 3) / 2;
-
+            offset = (index * 3) / 2;
             if (index & 1) {
                 uint16_t current = fat->table.fat12[offset] | (fat->table.fat12[offset + 1] << 8);
                 current &= 0x000F;
@@ -156,7 +158,10 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
         return INVALID_ARG;
     }
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
 
     uint32_t cluster = dirCluster;
     while (!fat_is_eof(fat, dirCluster)) {
@@ -166,10 +171,12 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
             struct FATLegacyEntry buffer;
             if (stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				stream_dispose(stream);
                 return ERROR_IO;
             }
 
             if (buffer.name[0] == 0x0) {
+				stream_dispose(stream);
                 return FILE_NOT_FOUND;
             }
 
@@ -178,6 +185,7 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
             }
 
             if(buffer.fstClusLO == entry->fstClusLO && buffer.fstClusHI == entry->fstClusHI){
+				stream_dispose(stream);
                 return _SEC(lba) + (i * sizeof(buffer)) ;
             }
         }
@@ -185,5 +193,6 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
         cluster = fat_next_cluster(fat, cluster);
     }
 
+	stream_dispose(stream);
     return FILE_NOT_FOUND;
 }

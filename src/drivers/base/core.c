@@ -1,3 +1,4 @@
+#include <wey/printk.h>
 #include <wey/device.h>
 #include <def/config.h>
 #include <def/status.h>
@@ -36,7 +37,7 @@ int __must_check device_register(struct device *dev){
 		return SUCCESS;
 	}
 
-    warning("device_register(): device '%s' not registered! max devices reached\n", dev->name);
+    printk("device_register(): device '%s' not registered! max devices reached\n", dev->name);
 
     return LIST_FULL;
 }

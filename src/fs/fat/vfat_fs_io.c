@@ -1,3 +1,4 @@
+#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/status.h>
 
@@ -6,18 +7,24 @@ static int fat_entry_update(struct FAT* fat, uint32_t dirCluster, struct FATLega
         return INVALID_ARG;
     }
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
 
     int lba = fat_get_entry_lba(fat, dirCluster, entry);
     if(lba < 0){
+		stream_dispose(stream);
         return lba;
     }
 
     stream_seek(stream, lba, SEEK_SET);
     if (stream_write(stream, entry, sizeof(struct FATLegacyEntry)) != SUCCESS) {
+		stream_dispose(stream);
         return ERROR_IO;
     }
 
+	stream_dispose(stream);
     return SUCCESS;
 }
 
@@ -28,7 +35,6 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
 
     struct FATFileDescriptor* fd = (struct FATFileDescriptor*)file->inode->private_data;
     struct FAT* fat = fd->fat;
-    struct Stream* stream = fat->stream;
 
     if (fd->entry.attr & ATTR_DIRECTORY){
         return NOT_SUPPORTED; // Cannot write to a directory
@@ -46,6 +52,11 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
 		}
 	}
 
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
+
     uint32_t totalReaded = 0;
 
     uint32_t clusterOffset = cursor % fd->fat->clusterSize;
@@ -56,6 +67,7 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
         uint32_t toRead = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
 
         if(stream_read(stream, (uint8_t*)buffer + totalReaded, toRead) != SUCCESS){
+			stream_dispose(stream);
             return ERROR_IO;
         }
 
@@ -68,6 +80,7 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
             uint32_t next = fat_next_cluster(fat, fd->currentCluster);
             if(fat_is_eof(fat, next)){
                 file->pos = fd->entry.fileSize;
+				stream_dispose(stream);
                 return END_OF_FILE; // Reached end of file
             }
 
@@ -80,6 +93,7 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
         }
     }
 
+	stream_dispose(stream);
     file->pos = cursor;
     return totalReaded;
 }
@@ -91,7 +105,6 @@ int fat_write(struct file *file, const void *buffer, uint32_t count){
 
     struct FATFileDescriptor* fd = (struct FATFileDescriptor*)file->inode->private_data;
     struct FAT* fat = fd->fat;
-    struct Stream* stream = fat->stream;
 
     if (fd->entry.attr & ATTR_DIRECTORY){
         return NOT_SUPPORTED; // Cannot write to a directory
@@ -109,6 +122,11 @@ int fat_write(struct file *file, const void *buffer, uint32_t count){
 
     uint32_t clusterOffset = cursor % fd->fat->clusterSize;
     uint32_t bytesLeftInCluster = fat->clusterSize - clusterOffset;
+
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
 
     int8_t status;
     stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
@@ -148,6 +166,8 @@ int fat_write(struct file *file, const void *buffer, uint32_t count){
     }
 
 out:
+	stream_dispose(stream);
+
     file->pos = cursor;
     if(file->pos > fd->entry.fileSize){
         fd->entry.fileSize = file->pos;
@@ -223,7 +243,11 @@ int fat_update(struct FAT* fat){
         return INVALID_ARG;
     }
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
+
     int8_t status = SUCCESS;
 
     uint32_t fatStartSector = fat->headers.boot.rsvdSecCnt;
@@ -239,7 +263,9 @@ int fat_update(struct FAT* fat){
         case FAT_TYPE_12: table = fat->table.fat12; break;
         case FAT_TYPE_16: table = fat->table.fat16; break;
         case FAT_TYPE_32: table = fat->table.fat32; break;
-        default: return INVALID_ARG;
+        default:
+			status = INVALID_ARG;
+			goto out;
     }
 
     stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
@@ -257,5 +283,6 @@ int fat_update(struct FAT* fat){
     }
 
 out:
+	stream_dispose(stream);
     return status;
 }

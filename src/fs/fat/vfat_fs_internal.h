@@ -149,7 +149,7 @@ struct FAT{
 	uint32_t totalClusters;
 	uint32_t firstDataSector;
 
-	struct Stream* stream;
+	struct blkdev* bdev;
 };
 
 struct FATFileDescriptor{

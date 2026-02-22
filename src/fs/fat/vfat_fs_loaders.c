@@ -2,7 +2,6 @@
 #include <def/err.h>
 #include <io/stream.h>
 #include <wey/mmu.h>
-#include <drivers/terminal.h>
 
 static int fat12_load(struct FAT* fat, struct Stream* stream, const uint8_t* sector0Buffer){
     memcpy(

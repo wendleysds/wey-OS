@@ -7,7 +7,10 @@
 #include <lib/string.h>
 
 static void vfat_destroy_inode(struct inode* inode){
-	kfree(inode->private_data);
+	if(inode->private_data){
+		kfree(inode->private_data);
+	}
+
 	kfree(inode);
 }
 
@@ -130,7 +133,8 @@ static struct FAT* fat_init(struct blkdev* bdev){
         goto err;
     }
 
-    fat->stream = stream;
+	fat->bdev = bdev;
+	stream_dispose(stream);
 
     return fat;
 
@@ -229,7 +233,6 @@ static int fat_unmount(struct super_block* sb){
             return INVALID_FS;
         }
 
-        stream_dispose(fat->stream);
         kfree(fat);
     }
 

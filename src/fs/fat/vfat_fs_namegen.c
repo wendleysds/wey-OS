@@ -1,5 +1,5 @@
 #include <lib/string.h>
-#include <lib/utils.h>
+#include <lib/stdio.h>
 #include <stdint.h>
 
 /*
@@ -46,8 +46,7 @@ void fat_name_append_tilde(char *outname, int n){
     base[MAX_BASENAME] = '\0';
 
     char suffix[6];
-    suffix[0] = '~';
-    itoa(n, suffix + 1, 10);
+	snprintf(suffix, sizeof(suffix), "~%u", n);
 
     int baseLen = strlen(base);
     int suffixLen = strlen(suffix);

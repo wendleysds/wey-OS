@@ -1,3 +1,4 @@
+#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/err.h>
 #include <def/config.h>
@@ -31,7 +32,11 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
         return NOT_SUPPORTED; // lfn not supported wet
     }
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
+
     struct FATLegacyEntry buffer;
     memset(&buffer, 0x0, sizeof(buffer));
 
@@ -47,6 +52,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
 
         for(uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
             if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				stream_dispose(stream);
                 return ERROR_IO;
             }
 
@@ -58,7 +64,8 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                 if (strlen(filename) <= 11){
                     // TODO: Check if hava an LFN above
                     // if not
-                        return FILE_EXISTS;
+					stream_dispose(stream);
+                    return FILE_EXISTS;
                 }
 
                 // TODO: Parse LFN and compare with filename
@@ -80,6 +87,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                 case FAT_TYPE_16: fat_add(fat, _cluster, 0xFFFF); break;
                 case FAT_TYPE_32: fat_add(fat, _cluster, 0x0FFFFFFF); break;
                 default:
+					stream_dispose(stream);
                     return INVALID_FS;
             }
 
@@ -97,6 +105,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
 
             stream_seek(stream, -sizeof(buffer), SEEK_CUR);
             if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				stream_dispose(stream);
                 return ERROR_IO;
             }
 
@@ -119,6 +128,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
 
                 if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
                     _fat_remove(fat, name, dirCluster);
+					stream_dispose(stream);
                     return ERROR_IO;
                 }
                 
@@ -134,10 +144,12 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
 
                 if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
                     _fat_remove(fat, name, dirCluster);
+					stream_dispose(stream);
                     return ERROR_IO;
                 }
             }
 
+			stream_dispose(stream);
             return fat_update(fat);
         }
 
@@ -151,6 +163,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
         if(fat_is_eof(fat, cluster)){
             cluster = fat_append_cluster(fat, previus);
             if(cluster == FAT_INVAL){
+				stream_dispose(stream);
                 return OUT_OF_BOUNDS; // FAT Full
             }
         }
@@ -162,7 +175,11 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
 		return INVALID_ARG;
 	}
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
+
     uint32_t cluster = dirCluster; 
 
     struct FATLegacyEntry entry;
@@ -177,9 +194,11 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(entry)); ++i) {
             if ((status = stream_read(stream, &entry, sizeof(entry))) != SUCCESS)
+				stream_dispose(stream);
                 return status;
 
             if (entry.name[0] == 0x0) {
+				stream_dispose(stream);
 				return FILE_NOT_FOUND;
 			}
 
@@ -198,6 +217,7 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
             stream_write(stream, &del, 1);
             fat_free_chain(fat, fileCluster);
 
+			stream_dispose(stream);
             return fat_update(fat);
         }
 
@@ -208,6 +228,7 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
         cluster = next;
     }
 
+	stream_dispose(stream);
     return FILE_NOT_FOUND;
 }
 

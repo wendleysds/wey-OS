@@ -1,4 +1,6 @@
+#include "io/stream.h"
 #include "vfat_fs_internal.h"
+#include "wey/vfs.h"
 #include <mm/kheap.h>
 #include <def/err.h>
 
@@ -7,7 +9,10 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
         return INVALID_ARG;
     }
 
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return NO_MEMORY;
+	}
 
     int count = 0;
     uint32_t cluster = dirCluster;
@@ -18,10 +23,12 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
             struct FATLegacyEntry buffer;
             if (stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+				stream_dispose(stream);
                 return ERROR_IO;
             }
 
             if (buffer.name[0] == 0x0) {
+				stream_dispose(stream);
                 return count;
             }
 
@@ -39,6 +46,8 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
         cluster = fat_next_cluster(fat, cluster);
     }
 
+	stream_dispose(stream);
+
     return count;
 }
 
@@ -54,7 +63,11 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
     }
 
     struct FAT* fat = dirfd->fat;
-    struct Stream* stream = fat->stream;
+    struct Stream* stream = stream_new(fat->bdev);
+	if(!stream){
+		return ERR_PTR(NO_MEMORY);
+	}
+
     uint32_t cluster = dirfd->firstCluster; 
 
     struct FATLegacyEntry entry;
@@ -70,10 +83,12 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(entry)); ++i) {
             if (stream_read(stream, &entry, sizeof(entry)) != SUCCESS) {
+				stream_dispose(stream);
                 return ERR_PTR(ERROR_IO);
             }
 
             if (entry.name[0] == 0x0) {
+				stream_dispose(stream);
                 return ERR_PTR(FILE_NOT_FOUND);
             }
 
@@ -87,12 +102,14 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
 
 			struct inode* inode = inode_new(dir->i_sb);
 			if(!inode){
+				stream_dispose(stream);
 				return ERR_PTR(NO_MEMORY);
 			}
 
             struct FATFileDescriptor* newfd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
             if(!newfd){
-                kfree(inode);
+                inode_destroy(inode);
+				stream_dispose(stream);
                 return ERR_PTR(NO_MEMORY);
             }
 
@@ -111,6 +128,7 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
             inode->i_op = &vfat_fs_iop;
             inode->i_fop = &vfat_fs_fop;
 
+			stream_dispose(stream);
             return inode;
         }
 
@@ -121,6 +139,7 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
         cluster = next;
     }
 
+	stream_dispose(stream);
     return ERR_PTR(FILE_NOT_FOUND);
 }
 
@@ -158,7 +177,7 @@ int fat_rmdir(struct inode *dir, const char* name){
 
     struct FATFileDescriptor* tfd = (struct FATFileDescriptor*)tinode->private_data; 
     int itensCount = _fat_count_entries(fat, tfd->firstCluster);
-    inode_destroy(tinode);
+    inode_put(tinode);
 
     if(IS_STAT_ERR(itensCount)){
         return itensCount;

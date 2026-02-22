@@ -1,2 +1,2 @@
-#subdir-y += ata/ base/ block/ char/ video/
-subdir-y += video/ tty/
+#subdir-y += ata/ char/
+subdir-y += video/ tty/ block/ base/
