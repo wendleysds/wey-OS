@@ -17,7 +17,6 @@
 #include <wey/printk.h>
 #include <mm/kheap.h>
 
-#include <wey/timer.h>
 #include <wey/sched.h>
 
 #include <uapi/headers.h>
@@ -101,11 +100,6 @@ __no_return void kmain(){
 	res = terminal_init();
 	if(IS_ERR_VALUE(res)){
 		module_failed("VTerminal", res);
-	}
-
-	res = timer_init();
-	if(IS_ERR_VALUE(res)){
-		module_failed("Timer", res);
 	}
 
 	res = scheduler_init();

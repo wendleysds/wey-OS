@@ -40,10 +40,6 @@ static uint16_t pic_get_isr()
     return __pic_get_irq_reg(PIC_READ_ISR);
 }
 
-static void _default_timer_iqr_handler(struct registers* regs){
-	outb(PIC1_COMMAND, PIC_EOI);
-}
-
 // IRQ7 handler (slave PIC spurious check)
 static void _irq7_handler() {
     uint8_t isr = pic_get_isr();
@@ -78,8 +74,6 @@ void __init pic_init(uint32_t frequency) {
 	outb(PIC_CHANNEL0, 0x36);                  // Channel 0, lobyte/hibyte
 	outb(PIC_COMMAND, divisor & 0xFF);         // low end
 	outb(PIC_CHANNEL0, (divisor >> 8) & 0xFF); // high end
-
-	interrupt_register(0x20, _default_timer_iqr_handler);
 }
 
 void pic_send_eoi(uint8_t irq)

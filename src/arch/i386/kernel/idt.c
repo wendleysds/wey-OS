@@ -1,7 +1,10 @@
+#include "asm/ptrace.h"
 #include <wey/interrupt.h>
 #include <wey/printk.h>
+#include <mm/kheap.h>
 #include <def/config.h>
 #include <def/init.h>
+#include <def/err.h>
 #include <lib/string.h>
 #include <arch/i386/pic.h>
 
@@ -21,7 +24,7 @@ extern void* interrupt_pointer_table[TOTAL_INTERRUPTS];
 static struct InterruptDescriptor idt[TOTAL_INTERRUPTS];
 static struct IDTr_ptr idtr_ptr;
 
-static interrupt_handler_t interrupt_callbacks[TOTAL_INTERRUPTS] = {0x0};
+static struct irq_desc irq_table[TOTAL_INTERRUPTS];
 
 extern void kernel_registers();
 extern void user_registers();
@@ -42,6 +45,7 @@ void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8
 }
 
 __init void idt_init(){
+	memset(irq_table, 0x0, sizeof(irq_table));
 	memset(idt, 0x0, sizeof(idt));
 	idtr_ptr.limit = sizeof(idt) - 1;
 	idtr_ptr.base = (uintptr_t)&idt;
@@ -56,7 +60,6 @@ __init void idt_init(){
 	}
 
 	_idt_load(&idtr_ptr);
-	interrupts_enable();
 }
 
 void interrupts_enable(){
@@ -67,12 +70,79 @@ void interrupts_disable(){
 	__asm__ volatile ("cli");
 }
 
-void interrupt_register(int interrupt, interrupt_handler_t handler){
+int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev){
 	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
-		return;
+		return INVALID_ARG;
 	}
 	
-	interrupt_callbacks[interrupt] = handler;
+	struct irq_handler_node* node = kmalloc(sizeof(struct irq_handler_node));
+	if(!node){
+		return NO_MEMORY;
+	}
+
+    node->handler = handler;
+    node->device = dev;
+
+    node->next = irq_table[interrupt].handlers;
+    irq_table[interrupt].handlers = node;
+
+	return OK;
+}
+
+int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
+	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
+		return INVALID_ARG;
+	}
+
+	struct irq_handler_node *cur, *prev = NULL;
+	cur = irq_table[interrupt].handlers;
+
+	while(cur){
+		if(cur->device == dev && cur->handler == handler){
+			if(prev){
+				prev->next = cur->next;
+			}else{
+				irq_table[interrupt].handlers = cur->next;
+			}
+
+			kfree(cur);
+			return OK;
+		}
+
+		prev = cur;
+		cur = cur->next;
+	}
+
+	return NOT_FOUND;
+}
+
+static int irq_id_to_int_no(irq_id_t irq){
+	int irq_start = 0x20;
+	switch (irq) {
+		case IRQ_WR_TIMER: return      irq_start + 0;
+		case IRQ_KEYBOARD: return      irq_start + 1;
+		case IRQ_ATA_PRIMARY: return   irq_start + 14;
+		case IRQ_ATA_SECONDARY: return irq_start + 15;
+		default: return IRQ_NOT_MAPPED;
+	}
+}
+
+int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev){
+	int int_no = irq_id_to_int_no(irq);
+	if(int_no == IRQ_NOT_MAPPED){
+		return INVALID_ARG;
+	}
+
+	return interrupt_register(int_no, handler, dev);
+}
+
+int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev){
+	int int_no = irq_id_to_int_no(irq);
+	if(int_no == IRQ_NOT_MAPPED){
+		return INVALID_ARG;
+	}
+
+	return interrupt_unregister(int_no, handler, dev);
 }
 
 static void _print_frame(struct registers* regs){
@@ -102,31 +172,66 @@ static void _print_frame(struct registers* regs){
 	);
 }
 
+static void _build_irq_info(struct irq_info* info, struct registers* regs){
+	info->cpu.cpu_id = 0;
+	info->cpu.regs = regs;
+	info->cpu.from_user = regs_is_user_mode(regs);
+
+	irq_id_t irq_id = IRQ_NOT_MAPPED;
+	switch (regs->int_no) {
+		case 0x20: irq_id = IRQ_WR_TIMER; break;
+		case 0x20 + 1: irq_id = IRQ_KEYBOARD; break;
+		case 0x20 + 14: irq_id = IRQ_ATA_PRIMARY; break;
+		case 0x20 + 15: irq_id = IRQ_ATA_SECONDARY; break;
+		default:break;
+	}
+
+	info->route.hw_line = regs->int_no;
+	info->route.irq_id = irq_id;
+	info->needs_eoi = (regs->int_no > 0x20 && !info->cpu.from_user);
+}
+
 void __cdecl interrupt_handler(struct registers* regs){
 	kernel_registers();
 
 	int interrupt = regs->int_no;
 
-	if(interrupt_callbacks[interrupt] != 0){
-		interrupt_callbacks[interrupt](regs);
+	struct irq_handler_node* h = irq_table[interrupt].handlers;
+
+	struct irq_info info;
+	_build_irq_info(&info, regs);
+
+	char handled = !!(h);
+
+	while(h) {
+		info.device = h->device;
+		h->handler(&info);
+		h = h->next;
 	}
-	else if(interrupt < 32){
-		printk(
-			"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-			interrupt, interrupt, exception_messages[interrupt], regs->ip);
 
-		_print_frame(regs);
+	if(interrupt < 32){
+		if(interrupt != 0xE){
+			printk(
+				"Received trap %d <0x%x>: '%s' at 0x%x\n",
+				interrupt, interrupt, exception_messages[interrupt], regs->ip);
+		}else if(!handled){
+			printk(
+				"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
+				interrupt, interrupt, exception_messages[interrupt], regs->ip);
 
-		printk("System Halted!\n");
-		while(1){
-			__asm__ volatile ("hlt");
+			_print_frame(regs);
+
+			printk("System Halted!\n");
+			while(1){
+				__asm__ volatile ("hlt");
+			}
+
+			__builtin_unreachable();
 		}
 	}
 
-	if(interrupt == 0x20)
+	if(info.route.irq_id == IRQ_WR_TIMER)
 		need_resched = 1;
-
-	//user_registers();
 }
 
 void interrupt_eoi(uint8_t interrupt){
