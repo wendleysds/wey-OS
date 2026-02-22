@@ -23,13 +23,14 @@
 #include <lib/string.h>
 
 #define halt() do {__asm__ volatile("hlt");}while(1)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 extern struct boot_header boot_header;
 
 extern __init void setup_arch();
 
 static inline __no_return void module_failed(const char* module, int res){
-	panic("%s failed with status %d!", module, res);
+	panic("%s failed with status %x!", module, res);
 	halt();
 }
 
@@ -75,6 +76,38 @@ static int _kernel_thread(struct task* task){
 	return SUCCESS;
 }
 
+static initcall_entry_t* initcall_levels[] __initdata = {
+	__initcall0_start,
+	__initcall1_start,
+	__initcall2_start,
+	__initcall3_start,
+	__initcall4_start,
+	__initcall5_start,
+	__initcall6_start,
+	__initcall7_start,
+	__initcall_end,
+};
+
+static __init void _do_initcall_level(int level){
+	initcall_entry_t *fn;
+	
+	for(fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++){
+		int res = initcall_from_entry(fn)();
+		if(IS_STAT_ERR(res)){
+			panic("initcall '0x%X' returned status %d\n", 
+				initcall_from_entry(fn), 
+				res
+			);
+		}
+	}
+}
+
+static __init void do_initcalls(){
+	for(int i = 0; i < ARRAY_SIZE(initcall_levels) - 1; i++){
+		_do_initcall_level(i);
+	}
+}
+
 __no_return void kmain(){
 	int res;
 
@@ -107,6 +140,8 @@ __no_return void kmain(){
 		module_failed("Scheduler", res);
 	}
 
+	do_initcalls();
+
 	struct task* t1 = task_create("task 1", 0);
 	if(!t1){
 		panic("NO MEMORY");
@@ -131,6 +166,7 @@ __no_return void kmain(){
 	scheduler_add(t2);
 
 	printk("OK\n");
+
 
 	interrupts_enable(); // Start scheduler
 

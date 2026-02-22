@@ -145,6 +145,24 @@ int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev){
 	return interrupt_unregister(int_no, handler, dev);
 }
 
+void irq_mask(irq_id_t irq){
+	int int_no = irq_id_to_int_no(irq);
+	if(int_no == IRQ_NOT_MAPPED){
+		return;
+	}
+
+	interrupt_mask(int_no);
+}
+
+void irq_unmask(irq_id_t irq){
+	int int_no = irq_id_to_int_no(irq);
+	if(int_no == IRQ_NOT_MAPPED){
+		return;
+	}
+
+	interrupt_unmask(int_no);
+}
+
 static void _print_frame(struct registers* regs){
 	printk(
 		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n",

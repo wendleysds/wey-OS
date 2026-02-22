@@ -2,6 +2,7 @@
 #define _CPU_SCHEDULER_H
 
 #include <asm/ptrace.h>
+#include <asm/context.h>
 #include <wey/vma.h>
 #include <def/compile.h>
 #include <def/config.h>

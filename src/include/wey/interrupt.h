@@ -57,6 +57,8 @@ int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev);
 
 int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev);
 int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev);
+void irq_mask(irq_id_t irq);
+void irq_unmask(irq_id_t irq);
 
 void interrupts_enable();
 void interrupts_disable();

@@ -8,9 +8,6 @@
 #define SECTOR_SIZE 512
 #define WORDS_PER_SECTOR 256
 
-#define ATA_PRIMARY_IRQ   (14 + 0x20)
-#define ATA_SECONDARY_IRQ (15 + 0x20)
-
 // ATA Registers
 #define ATA_REG_DATA       0x00
 #define ATA_REG_ERROR      0x01

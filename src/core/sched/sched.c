@@ -1,4 +1,4 @@
-#include "wey/printk.h"
+#include <wey/printk.h>
 #include <wey/sched.h>
 #include <wey/panic.h>
 #include <asm/context.h>
@@ -13,7 +13,7 @@ static LIST_HEAD(_terminateQueue);
 static struct task* _next(){
 	struct task* next_task = 0x0;
 
-	if(_readyQueue.next == &_readyQueue){
+	if(list_empty(&_readyQueue)){
 		return 0x0;
 	}
 
@@ -39,8 +39,9 @@ asmlinkage void schedule(){
 
 	printk("Switching to '%s'\n", next_task->name);
 
-	if(likely(prev_task))
+	if(likely(prev_task) && prev_task->state != TASK_SLEEPING){
 		scheduler_add(prev_task);
+	}
 
 	context_switch(prev_task, next_task);
 }

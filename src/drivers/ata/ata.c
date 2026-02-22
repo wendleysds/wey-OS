@@ -1,12 +1,13 @@
 #include <io/ports.h>
 #include <def/err.h>
+#include <def/init.h>
 #include <wey/panic.h>
-#include <lib/string.h>
-#include <wey/process.h>
+#include <wey/printk.h>
 #include <wey/vfs.h>
-#include <drivers/ata.h>
 #include <wey/blkdev.h>
 #include <wey/device.h>
+#include <drivers/ata.h>
+#include <lib/string.h>
 
 #include "ata_internal.h"
 
@@ -105,6 +106,7 @@ static void _ata_probe_all() {
 			struct ATADevice* atadev = &ch->devices[drive];
 			atadev->channel = ch;
 			atadev->drive = drive;
+			INIT_LIST_HEAD(&atadev->sleepQueue);
 
 			uint16_t buffer[WORDS_PER_SECTOR];
 			if (ata_identify(atadev, buffer) == SUCCESS) {
@@ -139,7 +141,7 @@ static void _ata_probe_all() {
 				int res = _ata_register_device(atadev, channel);
 
 				if(IS_STAT_ERR(res)){
-					warning("_ata_probe_all(): error registering dev! %d\n", res);
+					printk("_ata_probe_all(): error registering dev! %d\n", res);
 				}
 			} else {
 				atadev->exists = 0;
@@ -173,8 +175,13 @@ int ata_identify(struct ATADevice* atadev, uint16_t* buffer) {
     return SUCCESS;
 }
 
-void ata_init(){
+static __init int ata_init(){
 	memset(&_ata_primary, 0x0, sizeof(struct ATAChannel));
 	memset(&_ata_secondary, 0x0, sizeof(struct ATAChannel));
+
 	_ata_probe_all();
+
+	return OK;
 }
+
+device_initcall(ata_init);
