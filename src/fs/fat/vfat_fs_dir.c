@@ -102,9 +102,11 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
             newfd->parentDirCluster = cluster;
             newfd->entry = entry;
 
+			inode->ino = newfd->firstCluster;
             inode->mode = (entry.attr & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
             inode->size = entry.fileSize;
             inode->private_data = (void*)newfd;
+			atomic_set(&inode->refcount, 1);
 
             inode->i_op = &vfat_fs_iop;
             inode->i_fop = &vfat_fs_fop;

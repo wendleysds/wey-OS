@@ -1,6 +1,7 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
+#include <wey/spinlock.h>
 #include <wey/blkdev.h>
 #include <wey/stat.h>
 #include <wey/atomic.h>
@@ -28,6 +29,7 @@ struct inode {
 	dev_t i_rdev;
 
 	atomic_t refcount;
+	spinlock_t i_lock;
 
 	struct super_block* i_sb;
 	const struct inode_operations *i_op;
@@ -95,6 +97,7 @@ struct super_block {
 	struct blkdev* bdev;
 	struct file* bdev_file;
 
+	spinlock_t s_inode_lock;
 	struct list_head s_inodes;
 };
 
@@ -141,14 +144,15 @@ struct super_block* alloc_super();
 
 struct inode* inode_alloc(struct super_block *sb);
 struct inode* inode_new(struct super_block *sb);
+void inode_destroy(struct inode*);
 
 static inline void inode_get(struct inode* ino){
 	atomic_inc(&ino->refcount);
 }
 
 static inline void inode_put(struct inode* ino){
-	if(atomic_dec_and_test(&ino->refcount) == 0){
-		ino->i_sb->s_op->destroy_inode(ino);
+	if(atomic_dec_and_test(&ino->refcount)){
+		inode_destroy(ino);
 	}
 }
 
@@ -157,17 +161,16 @@ static inline void file_get(struct file* file){
 }
 
 static inline void file_put(struct file* file){
-	if(atomic_dec_and_test(&file->refcount) == 0){
+	if(atomic_dec_and_test(&file->refcount)){
 		file->f_op->release(file->inode, file);
 
-		if (file->inode)
-            inode_put(file->inode);
+		if (file->inode){
+			inode_put(file->inode);
+		}
 
 		kfree(file);
 	}
 }
-
-void inode_destroy(struct inode*);
 
 int kernel_exec(const char* pathname, const char* argv[], const char* envp[]);
 

@@ -2,11 +2,28 @@
 #include <wey/vfs.h>
 #include <wey/mmu.h>
 #include <def/err.h>
+#include <def/init.h>
 #include <io/stream.h>
 #include <lib/string.h>
 
 static void vfat_destroy_inode(struct inode* inode){
 	kfree(inode->private_data);
+	kfree(inode);
+}
+
+static struct inode* vfat_alloc_inode(struct super_block* sb){
+	struct inode* inode = (struct inode*)kzalloc(sizeof(struct inode));
+	if(inode){
+		inode->i_op = &vfat_fs_iop;
+		inode->i_fop = &vfat_fs_fop;
+		inode->i_sb = sb;
+		atomic_set(&inode->refcount, 1);
+	}
+	return inode;
+}
+
+static void vfat_free_inode(struct inode* inode){
+	kfree(inode);
 }
 
 const struct inode_operations vfat_fs_iop = {
@@ -23,11 +40,12 @@ const struct file_operations vfat_fs_fop = {
     .read = fat_read,
     .write = fat_write,
     .lseek = fat_lseek,
-    .close = fat_close
 };
 
 const struct super_operations vfat_fs_sop = {
-	.destroy_inode = vfat_destroy_inode
+	.destroy_inode = vfat_destroy_inode,
+	.alloc_inode = vfat_alloc_inode,
+	.free_inode = vfat_free_inode,
 };
 
 static int8_t _valid_fat_sector(const uint8_t* sector0){
@@ -175,6 +193,7 @@ static struct inode* fat_mount(struct file_system_type* fs_type, int flags, cons
     fat_root->mode = S_IFDIR;
     fat_root->private_data = (void*)root_fd;
 	fat_root->i_sb = fat_sb;
+	atomic_inc(&fat_root->refcount);
 
     fat_sb->root_inode = fat_root;
     fat_sb->private_data = (void*)fat;
@@ -223,6 +242,8 @@ static struct file_system_type fat_fs = {
     .unmount = fat_unmount
 };
 
-void fat_fs_init(){
-    vfs_register_filesystem(&fat_fs);
+static int fat_fs_init(){
+    return vfs_register_filesystem(&fat_fs);
 }
+
+fs_initcall(fat_fs_init);

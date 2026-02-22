@@ -64,7 +64,7 @@ static inline struct inode* vfs_traverse_path(const char* path){
         }
 
         if (current != root){
-			inode_destroy(current);
+			inode_put(current);
 		}
         
         current = next;
@@ -73,7 +73,7 @@ static inline struct inode* vfs_traverse_path(const char* path){
 
     if(!current->i_fop || !current->i_fop->read){
         if (current != root){
-            inode_destroy(current);
+            inode_put(current);
         }
 
         return ERR_PTR(INVALID_FILE);
@@ -83,7 +83,7 @@ static inline struct inode* vfs_traverse_path(const char* path){
 
 out_free:
 	if (current != root){
-		inode_destroy(current);
+		inode_put(current);
 	}
 
 	return ERR_PTR(res);
