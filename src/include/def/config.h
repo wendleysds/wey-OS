@@ -57,8 +57,8 @@ extern __kernel_high_end
 #define TOTAL_INTERRUPTS 256
 #define TIMER_FREQUENCY 20
 
-#define KiB(x) (x * 1024)
-#define MiB(x) (x * KiB(1024))
+#define KiB(x) ((x) * 1024)
+#define MiB(x) ((x) * KiB(1024))
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
@@ -124,9 +124,9 @@ extern __kernel_high_end
 #define FILESYSTEMS_MAX 8
 
 /*Devices*/
-#define DEVICES_MAX 16
-#define MAJOR_MAX 6
-#define MINOR_MAX 8
+#define MAJOR_MAX 12
+#define MINOR_MAX 12
+#define DEVICES_MAX ((MAJOR_MAX + MINOR_MAX) * 2)
 
 /*Processes*/
 #define PROC_MAX 32

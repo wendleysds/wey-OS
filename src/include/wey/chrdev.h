@@ -1,17 +1,12 @@
-#ifndef _CDEV_H
-#define _CDEV_H
-
-#include <wey/device.h>
+#ifndef _CHRDEV_H
+#define _CHRDEV_H
 
 struct file_operations;
 
-struct chrdev{
-	char name[16];
-	const struct file_operations *ops;
-	dev_t devt;
-};
+int chardev_register(unsigned int major, unsigned int base_minor, 
+	unsigned int minor_total, const char *name, const struct file_operations *fops);
 
-int chrdev_device_add(struct chrdev *cdev, struct device *dev);
-void chrdev_device_remove(struct chrdev *cdev, struct device *dev);
+void chardev_unregister(unsigned int major, unsigned int base_minor,
+	unsigned int minor_total, const char *name);
 
 #endif

@@ -1,74 +1,150 @@
+#include <wey/spinlock.h>
 #include <wey/device.h>
 #include <wey/vfs.h>
+#include <wey/printk.h>
 #include <wey/chrdev.h>
 #include <lib/string.h>
+#include <lib/stdio.h>
 #include <def/config.h>
 #include <def/err.h>
 #include <def/init.h>
 
-static struct chrdev* chrdevs[MINOR_MAX];
+struct chrdev{
+	const struct file_operations *ops;
+	struct chrdev* next;
+	unsigned int major;
+	unsigned int first_minor; 
+	unsigned int minors_total;
+	char name[32];
+	struct list_head list;
+} * chrdevs[MAJOR_MAX];
 
-int chrdev_device_add(struct chrdev *cdev, struct device *dev){
-	if(!cdev || !dev){
-		return INVALID_ARG;
-	}
+static spinlock_t cdev_lock;
 
-	int i;
-	for (i = MINOR_MAX - 1; i >= -1; i--){
-		if(i == -1) return LIST_FULL;
-		if(chrdevs[i] == cdev){
-			return INVALID_ARG;
+static int _find_free_major(){
+	for(int i = 0; i < MAJOR_MAX; i++){
+		if(chrdevs[i] == NULL){
+			return i;
 		}
-
-		if(!chrdevs[i]) break;
-	}
-	
-	dev_t devt = MKDEV(DEVCHAR_MAJOR, i);
-
-	cdev->devt = devt;
-	dev->devt = devt;
-
-	if(IS_STAT_ERR(device_register(dev))){
-		return FAILED;
 	}
 
-	chrdevs[i] = cdev;
-
-	return SUCCESS;
+	return NOT_FOUND;
 }
 
-void chrdev_device_remove(struct chrdev *cdev, struct device *dev){
-	if (!cdev || !dev)
-		return;
+static inline unsigned int _major_to_index(unsigned int major){
+	return major % MAJOR_MAX;
+}
 
-	int i;
-	for (i = 0; i < MINOR_MAX; i++) {
-		if (chrdevs[i] == cdev) {
-			device_unregister(dev);
-			chrdevs[i] = NULL;
-			break;
+static struct chrdev* _reserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total, const char *name){
+	if (major >= MAJOR_MAX) {
+		return ERR_PTR(INVALID_ARG);
+	}
+
+	if (minor_total > MINOR_MASK + 1 - base_minor) {
+		return ERR_PTR(INVALID_ARG);
+	}
+
+	if (major == 0) {
+		if(IS_ERR_VALUE(major = _find_free_major())){
+			return ERR_PTR(major);
 		}
 	}
+
+	struct chrdev* cdev = (struct chrdev*)kmalloc(sizeof(struct chrdev));
+	if(!cdev){
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	int i = _major_to_index(major);
+	struct chrdev *cur = chrdevs[i], *prev = NULL;
+	for (; cur; prev = cur, cur = cur->next) {
+		if (cur->major < major)
+			continue;
+
+		if (cur->major > major)
+			break;
+
+		if (cur->first_minor + cur->minors_total <= base_minor)
+			continue;
+
+		if (cur->first_minor >= base_minor + minor_total)
+			break;
+
+		kfree(cdev);
+		return ERR_PTR(LIST_FULL);
+	}
+
+	cdev->major = major;
+	cdev->first_minor = base_minor;
+	cdev->minors_total = minor_total;
+	strncpy(cdev->name, name, sizeof(cdev->name));
+
+	if (!prev) {
+		cdev->next = cur;
+		chrdevs[i] = cdev;
+	} else {
+		cdev->next = prev->next;
+		prev->next = cdev;
+	}
+
+	return cdev;
+}
+
+static struct chrdev* _unreserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total){
+	const unsigned int index = _major_to_index(major);
+	struct chrdev **current = &chrdevs[index];
+
+	while (*current) {
+		struct chrdev *entry = *current;
+
+		const uint8_t match =
+			(entry->major == major) &&
+			(entry->first_minor == base_minor) &&
+			(entry->minors_total == minor_total);
+
+		if (match) {
+			*current = entry->next;
+			entry->next = NULL;
+			return entry;
+		}
+
+		current = &entry->next;
+	}
+
+	return NULL;
+}
+
+int chardev_register(unsigned int major, unsigned int base_minor, 
+	unsigned int minor_total, const char *name, const struct file_operations *fops)
+{
+	struct chrdev* cdev = _reserve_minors_region(major, base_minor, minor_total, name);
+	if(IS_ERR_VALUE(cdev)){
+		return PTR_ERR(cdev);
+	}
+
+	cdev->ops = fops;
+	return major ? 0 : cdev->major;
+}
+
+void chardev_unregister(unsigned int major, unsigned int base_minor,
+	unsigned int minor_total, const char *name)
+{
+	struct chrdev* cdev = _unreserve_minors_region(major, base_minor, minor_total);
+	if(!cdev){
+		return;
+	}
+
+	if(strncmp(cdev->name, name, sizeof(cdev->name)) != 0){
+		return;
+	}
+
+	kfree(cdev);
 }
 
 static int chrdev_open(struct inode *ino, struct file *file){
-	if (!ino || !file)
-		return INVALID_ARG;
 
-	int minor = MINOR(ino->i_rdev);
-	if (minor < 0 || minor >= MINOR_MAX)
-		return INVALID_ARG;
 
-	struct chrdev *cdev = chrdevs[minor];
-	if (!cdev || !cdev->ops)
-		return NULL_PTR;
-
-	file->f_op = (struct file_operations*)cdev->ops;
-
-	if(!cdev->ops->open)
-		return SUCCESS;
-
-	return file->f_op->open(ino, file);
+	return NOT_IMPLEMENTED;
 }
 
 const struct file_operations def_chr_fops = {
@@ -77,6 +153,7 @@ const struct file_operations def_chr_fops = {
 
 static int __init chrdev_init(){
 	memset(chrdevs, 0x0, sizeof(chrdevs));
+	spinlock_init(&cdev_lock);
 	return SUCCESS;
 }
 
