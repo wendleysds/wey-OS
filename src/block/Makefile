@@ -1,1 +1,1 @@
-obj-y += blkdev.o
+obj-y += blkdev.o blk_elevator.o blk_request.o partitions.o

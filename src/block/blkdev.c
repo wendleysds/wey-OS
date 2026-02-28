@@ -1,82 +1,169 @@
+#include <lib/list.h>
 #include <wey/device.h>
 #include <wey/vfs.h>
+#include <wey/blkdev.h>
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
 #include <def/init.h>
 
-static struct blkdev* blkdevs[MINOR_MAX];
+static struct blk_major_name{
+	char name[32];
+	int major;
+	struct blk_major_name *next;
+} * major_names[MAJOR_MAX];
 
-int blkdev_device_add(struct blkdev *blkdev){
-	if(!blkdev || !blkdev->dev){
+static inline unsigned int major_to_index(unsigned int major){
+	return major % MAJOR_MAX;
+}
+
+static int find_free_major(){
+	for(int i = MAJOR_MAX-1; i > 0; i--){
+		if(major_names[i] == NULL){
+			return i;
+		}
+	}
+
+	return 0;
+}
+
+int blkdev_register(unsigned int major, const char* name){
+	if (major >= MAJOR_MAX) {
 		return INVALID_ARG;
 	}
 
-	int i;
-	for (i = MINOR_MAX - 1; i >= -1; i--){
-		if(i == -1) return LIST_FULL;
-		if(blkdevs[i] == blkdev){
-			return INVALID_ARG;
+	int ret = SUCCESS;
+	struct blk_major_name** cur, *entry;
+
+	if(major == 0){
+		major = find_free_major();
+		if(major == 0){
+			return LIST_FULL;
 		}
 
-		if(!blkdevs[i]) break;
-	}
-	
-	dev_t devt = MKDEV(DEVBLOCK_MAJOR, i);
-
-	blkdev->devt = devt;
-	blkdev->dev->devt = devt;
-
-	if(IS_STAT_ERR(device_register(blkdev->dev))){
-		return FAILED;
+		ret = major;
 	}
 
-	blkdevs[i] = blkdev;
+	entry = kmalloc(sizeof(struct blk_major_name));
+	if(!entry){
+		ret = NO_MEMORY;
+		goto out;
+	}
+
+	strncpy(entry->name, name, sizeof(entry->name));
+	entry->major = major;
+
+	for (cur = &major_names[major_to_index(major)]; *cur; cur = &(*cur)->next) {
+		if ((*cur)->major == major){
+			break;
+		}
+	}
+
+	if (!*cur){
+		*cur = entry;
+		goto out;
+	}
+		
+	ret = LIST_FULL;
+	kfree(entry);
+
+out:
+	return ret;
+}
+
+void blkdev_unregister(unsigned int major, const char *name){
+	struct blk_major_name** cur, * entry;
+
+	if (!name)
+		return;
+
+	if (major >= MAJOR_MAX)
+		return;
+
+	cur = &major_names[major_to_index(major)];
+
+	while (*cur) {
+		entry = *cur;
+
+		if (entry->major == major && strcmp(entry->name, name) == 0) {
+			*cur = entry->next;
+			kfree(entry);
+			return;
+		}
+
+		cur = &entry->next;
+	}
+}
+
+int add_disk(struct gendisk* disk){
+	if (!disk)
+		return INVALID_ARG;
+
+	if (disk->major >= MAJOR_MAX)
+		return INVALID_ARG;
+
+	if (!major_names[major_to_index(disk->major)])
+		return INVALID_ARG;
+
+	if (disk->minors_total <= 0)
+		return INVALID_ARG;
+
+	INIT_LIST_HEAD(&disk->blkdevs);
+
+	struct blkdev *bdev = kmalloc(sizeof(struct blkdev));
+	if (!bdev){
+		return NO_MEMORY;
+	}
+
+	struct request_queue *queue = kmalloc(sizeof(struct request_queue));
+	if (!bdev){
+		kfree(bdev);
+		return NO_MEMORY;
+	}
+
+	queue->head = queue->tail = NULL;
+	spinlock_init(&queue->lock);
+	queue->elevator = &fifo_elevator;
+	queue->bdev = bdev;
+
+	bdev->major = disk->major;
+	bdev->minor = disk->first_minor;
+	bdev->start_sector = 0;
+	bdev->nr_sectors = disk->capacity;
+	bdev->disk = disk;
+	bdev->queue = queue;
+	disk->bdev = bdev;
+
+	list_add_tail(&bdev->list, &disk->blkdevs);
+
+	int res = blk_scan_partitions(disk);
+	if(IS_ERR_VALUE(res)){
+		kfree(bdev);
+		kfree(queue);
+		return res;
+	}
 
 	return SUCCESS;
 }
 
-void blkdev_device_remove(struct blkdev *blkdev){
-	if(!blkdev){
-		return;
-	}
-
-	blkdevs[MINOR(blkdev->devt)] = 0x0;
-	device_unregister(blkdev->dev);
+void remove_disk(struct gendisk* disk){
+    struct blkdev *pos;
+    list_for_each_entry(pos, &disk->blkdevs, list) {
+        list_remove(&pos->list);
+        kfree(pos);
+    }
 }
 
 static int blkdev_open(struct inode *ino, struct file *file){
-	if (!ino || !file)
-		return INVALID_ARG;
-
-	int minor = MINOR(ino->i_rdev);
-	if (minor < 0 || minor >= MINOR_MAX)
-		return INVALID_ARG;
-
-	struct blkdev *blkdev = blkdevs[minor];
-	if (!blkdev || !blkdev->ops)
-		return NULL_PTR;
-
-	file->f_op = blkdev->ops;
-
-	if(!blkdev->ops->open)
-		return SUCCESS;
-
-	return file->f_op->open(ino, file);
+	return NOT_IMPLEMENTED;
 }
 
 struct blkdev* blkdev_find_by_name(const char* name){
-	if(!name) return ERR_PTR(NULL_PTR);
+	return ERR_PTR(NOT_IMPLEMENTED);
+}
 
-	for (int i = 0; i < MINOR_MAX; i++){
-		if(blkdevs[i]){
-			if(strcmp(blkdevs[i]->dev->name, name) == 0){
-				return blkdevs[i];
-			}
-		}
-	}
-	
-	return ERR_PTR(NOT_FOUND);
+struct gendisk* gendisk_alloc(){
+	return kzalloc(sizeof(struct gendisk));
 }
 
 const struct file_operations def_blk_fops = {
@@ -84,7 +171,7 @@ const struct file_operations def_blk_fops = {
 };
 
 static __init int blkdev_init(){
-	memset(blkdevs, 0x0, sizeof(blkdevs));
+	memset(major_names, 0x0, sizeof(major_names));
 	return OK;
 }
 
