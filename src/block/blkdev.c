@@ -1,3 +1,4 @@
+#include "wey/printk.h"
 #include <lib/list.h>
 #include <wey/device.h>
 #include <wey/vfs.h>
@@ -12,6 +13,8 @@ static struct blk_major_name{
 	int major;
 	struct blk_major_name *next;
 } * major_names[MAJOR_MAX];
+
+static struct list_head disks[MAJOR_MAX];
 
 static inline unsigned int major_to_index(unsigned int major){
 	return major % MAJOR_MAX;
@@ -109,14 +112,14 @@ int add_disk(struct gendisk* disk){
 		return INVALID_ARG;
 
 	INIT_LIST_HEAD(&disk->blkdevs);
+	INIT_LIST_HEAD(&disk->list);
 
 	struct blkdev *bdev = kmalloc(sizeof(struct blkdev));
-	if (!bdev){
+	if (!bdev)
 		return NO_MEMORY;
-	}
 
 	struct request_queue *queue = kmalloc(sizeof(struct request_queue));
-	if (!bdev){
+	if (!queue) {
 		kfree(bdev);
 		return NO_MEMORY;
 	}
@@ -134,13 +137,17 @@ int add_disk(struct gendisk* disk){
 	bdev->queue = queue;
 	disk->bdev = bdev;
 
+	INIT_LIST_HEAD(&bdev->list);
+	list_add_tail(&disk->list, &disks[disk->major]);
 	list_add_tail(&bdev->list, &disk->blkdevs);
 
+	printk("BLK: added disk \"%s\" (major=%u minor=%u)\n",
+		disk->name, disk->major, disk->first_minor);
+
 	int res = blk_scan_partitions(disk);
-	if(IS_ERR_VALUE(res)){
-		kfree(bdev);
-		kfree(queue);
-		return res;
+	if (IS_ERR_VALUE(res) && res != NOT_FOUND) {
+		printk("BLK-core: failed to read \"%s\" partitions %d\n",
+				disk->name, res);
 	}
 
 	return SUCCESS;
@@ -158,8 +165,31 @@ static int blkdev_open(struct inode *ino, struct file *file){
 	return NOT_IMPLEMENTED;
 }
 
-struct blkdev* blkdev_find_by_name(const char* name){
+struct blkdev* blk_find_by_name(const char* name){
 	return ERR_PTR(NOT_IMPLEMENTED);
+}
+
+struct blkdev* blk_lookup(unsigned int major, unsigned int minor){
+	struct gendisk* disk;
+	struct blkdev* dev;
+	list_for_each_entry(disk, &disks[major], list){
+		if (minor >= disk->first_minor && minor < disk->first_minor + disk->minors_total){
+			unsigned int partno = minor - disk->first_minor;
+			if (partno == 0){
+				return disk->bdev;
+			}
+				
+			list_for_each_entry(dev, &disk->blkdevs, list){
+				if(dev->minor == minor){
+					return dev;
+				}
+			}
+
+			return NULL;
+		}
+	}
+
+	return NULL;
 }
 
 struct gendisk* gendisk_alloc(){
@@ -172,6 +202,10 @@ const struct file_operations def_blk_fops = {
 
 static __init int blkdev_init(){
 	memset(major_names, 0x0, sizeof(major_names));
+	for (int i = 0; i < MAJOR_MAX; i++){
+    	INIT_LIST_HEAD(&disks[i]);
+	}
+
 	return OK;
 }
 

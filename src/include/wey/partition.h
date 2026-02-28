@@ -50,7 +50,7 @@ struct MBRPartitionEntry{
 	uint8_t chsFirst[3];
 	uint8_t type;
 	uint8_t chsLast[3];
-	uint32_t lbaFirstSector;
+	uint32_t lbaStart;
 	uint32_t totalSectors;
 } __packed;
 

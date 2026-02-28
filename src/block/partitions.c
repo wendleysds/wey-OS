@@ -1,64 +1,157 @@
+#include "def/status.h"
 #include "wey/printk.h"
 #include <lib/list.h>
 #include <lib/string.h>
 #include <def/err.h>
+#include <stdint.h>
+#include <mm/kheap.h>
 #include <wey/blkdev.h>
 #include <wey/partition.h>
 
+#define GPT_PARTITION -1
+
 struct sync_wait {
-    volatile int done;
+	volatile int done;
 };
 
 static void scan_endio(struct bio *bio){
-    struct sync_wait *wait = bio->private;
-    wait->done = 1;
+	struct sync_wait *wait = bio->private;
+	wait->done = 1;
 }
 
-int blk_scan_partitions(struct gendisk* disk){
-	struct bio bio;
-	memset(&bio, 0x0, sizeof(struct bio));
-
-	uint8_t sec0[disk->sec_size];
-	memset(sec0, 0x0, disk->sec_size);
+static int block_read(struct blkdev* dev, sector_t sector, unsigned int len, void* buffer){
+	struct bio* bio = kmalloc(sizeof(struct bio));
+	if(!bio) return NO_MEMORY;
+	memset(bio, 0x0, sizeof(struct bio));
 
 	struct sync_wait wait = {0};
 
-	bio.sector = 0;
-	bio.len = disk->sec_size;
-	bio.buffer = sec0;
-	bio.op = BLK_READ;
-	bio.end_io = scan_endio;
-	bio.private = &wait;
-	bio.next = NULL;
+	bio->sector = sector;
+	bio->len = len;
+	bio->buffer = buffer;
+	bio->op = BLK_READ;
+	bio->end_io = scan_endio;
+	bio->private = &wait;
+	bio->next = NULL;
 
-	blk_submit_bio(disk->bdev, &bio);
+	blk_submit_bio(dev, bio);
 
 	while (!wait.done)
 		asm volatile ("hlt");
 
-	if (bio.status) {
-		return bio.status;
-	}
+	int res = bio->status;
+	kfree(bio);
+	return res;
+}
 
+int mbr_is_valid(void *sector0){
+	uint8_t* sec0 = sector0;
 	if (sec0[510] != 0x55 || sec0[511] != 0xAA) {
-		printk("Invalid MBR signature\n");
 		return INVALID_FORMAT;
 	}
 
-	struct MBRPartitionEntry * parts = (struct MBRPartitionEntry *)(sec0 + 0x1BE);
-
-	printk("MBR partitions:\n");
+	struct MBRPartitionEntry *parts = (struct MBRPartitionEntry*)(sec0 + 0x1BE);
 
 	for (int i = 0; i < 4; i++) {
+		if(parts[i].type == MBR_TYPE_GPT_PROTECT){
+			return GPT_PARTITION;
+		}
 
-		if (parts[i].type == 0)
+		// Not supported
+		if(parts[i].type == MBR_TYPE_EXTENDED){
 			continue;
+		}
 
-		printk("  Part %d:\n", i + 1);
-		printk("    Type: 0x%x\n", parts[i].type);
-		printk("    Start LBA: %u\n", parts[i].lbaFirstSector);
-		printk("    Sectors: %u\n", parts[i].totalSectors);
+		if (parts[i].type != MBR_TYPE_EMPTY){
+			return OK;
+		}
 	}
 
-	return NOT_IMPLEMENTED;
+	return NOT_FOUND;
+}
+
+int gpt_is_valid(void *sector1){
+	return NOT_IMPLEMENTED;	
+}
+
+int partition_detect(void *sector0, partition_entry_t *out_type){
+	int res = mbr_is_valid(sector0);
+	if(res == OK){
+		*out_type = PARTITION_MBR;
+		return OK;
+	}
+
+	if(res == GPT_PARTITION){
+		return NOT_SUPPORTED;
+	}
+
+	return NOT_FOUND; // Fallback
+}
+
+static void parse_mbr_partitions(struct gendisk* disk, uint8_t *sector0){
+	int res;
+	struct MBRPartitionEntry *parts = (struct MBRPartitionEntry*)(sector0 + 0x1BE);
+
+	for(int i = 0; i < 4; i++){
+		struct MBRPartitionEntry *part = &parts[i];
+		if(part->type == MBR_TYPE_EXTENDED){
+			continue;
+		}
+
+		if (part->type == MBR_TYPE_EMPTY){
+			continue;
+		}
+
+		struct blkdev* bdev_part = (struct blkdev*)kmalloc(sizeof(struct blkdev));
+		if(!bdev_part){
+			res = NO_MEMORY;
+			goto parse_fail;
+		}
+
+		bdev_part->major = disk->major;
+		bdev_part->minor = disk->first_minor + i + 1;
+
+		bdev_part->start_sector = part->lbaStart * disk->sec_size;
+		bdev_part->nr_sectors = part->totalSectors;
+
+		bdev_part->queue = disk->bdev->queue;
+
+		bdev_part->disk = disk;
+		list_add_tail(&bdev_part->list, &disk->blkdevs);
+
+		printk("BLK: found MBR partition \"%s%d\" (major=%u minor=%u)\n", 
+			disk->name, bdev_part->minor, bdev_part->major, bdev_part->minor);
+
+		continue;
+parse_fail:
+		printk("BLK-code: parse_mbr_partitions: failted to parse part \"%d\" %d", i+1, res);
+	}
+}
+
+int blk_scan_partitions(struct gendisk* disk){
+	uint8_t sec0[disk->sec_size];
+	memset(sec0, 0x0, disk->sec_size);
+
+	int res = block_read(disk->bdev, 0, disk->sec_size, sec0);
+
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	partition_entry_t out_type;
+	res = partition_detect(sec0, &out_type);
+
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	switch (out_type) {
+		case PARTITION_MBR:
+			parse_mbr_partitions(disk, sec0);
+			break;
+
+		default: return NOT_SUPPORTED;
+	}
+
+	return SUCCESS;
 }

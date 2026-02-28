@@ -2,7 +2,7 @@
 #define _VIRTUAL_FILE_SYSTEM_H
 
 #include <wey/spinlock.h>
-#include <wey/blkdev.h>
+#include <wey/device.h>
 #include <wey/stat.h>
 #include <wey/atomic.h>
 #include <mm/kheap.h>
@@ -60,7 +60,7 @@ struct stat {
 struct file_operations {
 	int (*read)(struct file *file, void *buffer, uint32_t count);
 	int (*write)(struct file *file, const void *buffer, uint32_t count);
-	int (*lseek)(struct file *file, int offset, int whence);
+	int (*lseek)(struct file *file, off_t offset, int whence);
 	int (*open) (struct inode *ino, struct file *file);
 	int (*close)(struct file *file);
 	int (*release) (struct inode *ino, struct file *file);

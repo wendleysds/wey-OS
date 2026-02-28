@@ -2,6 +2,8 @@
 #include "def/config.h"
 #include "def/err.h"
 #include "def/status.h"
+#include <lib/list.h>
+#include "wey/blkdev.h"
 #include "wey/sched/task.h"
 #include <def/init.h>
 #include <mm/slab.h>
@@ -175,8 +177,7 @@ __no_return void kmain(){
 
 	printk("OK\n");
 
-
-	interrupts_enable(); // Start scheduler
+	//interrupts_enable(); // Start scheduler
 
 	halt();
 

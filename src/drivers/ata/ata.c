@@ -145,6 +145,7 @@ static int ata_register_device(struct ATADevice *atadev, char channel){
 
 	if(IS_ERR_VALUE(res)){
 		atadev->exists = 0;
+		printk("ATA: ata_register_device: error registering \"%s\"! %d\n",disk->name, res);
 		kfree(disk);
 	}
 
@@ -191,7 +192,6 @@ static void ata_probe_all() {
 
 				res = ata_register_device(atadev, channel);
 				if(IS_STAT_ERR(res)){
-					printk("ATA: probe_all: error registering dev! %d\n", res);
 					continue;
 				}
 

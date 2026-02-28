@@ -21,21 +21,21 @@ struct chrdev{
 
 static spinlock_t cdev_lock;
 
-static int _find_free_major(){
-	for(int i = 0; i < MAJOR_MAX; i++){
+static int find_free_major(){
+	for(int i = MAJOR_MAX-1; i > 0; i--){
 		if(chrdevs[i] == NULL){
 			return i;
 		}
 	}
 
-	return NOT_FOUND;
+	return 0;
 }
 
-static inline unsigned int _major_to_index(unsigned int major){
+static inline unsigned int major_to_index(unsigned int major){
 	return major % MAJOR_MAX;
 }
 
-static struct chrdev* _reserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total, const char *name){
+static struct chrdev* reserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total, const char *name){
 	if (major >= MAJOR_MAX) {
 		return ERR_PTR(INVALID_ARG);
 	}
@@ -45,8 +45,9 @@ static struct chrdev* _reserve_minors_region(unsigned int major, unsigned int ba
 	}
 
 	if (major == 0) {
-		if(IS_ERR_VALUE(major = _find_free_major())){
-			return ERR_PTR(major);
+		major = find_free_major();;
+		if(major == 0){
+			return ERR_PTR(LIST_FULL);
 		}
 	}
 
@@ -55,7 +56,7 @@ static struct chrdev* _reserve_minors_region(unsigned int major, unsigned int ba
 		return ERR_PTR(NO_MEMORY);
 	}
 
-	int i = _major_to_index(major);
+	int i = major_to_index(major);
 	struct chrdev *cur = chrdevs[i], *prev = NULL;
 	for (; cur; prev = cur, cur = cur->next) {
 		if (cur->major < major)
@@ -90,8 +91,8 @@ static struct chrdev* _reserve_minors_region(unsigned int major, unsigned int ba
 	return cdev;
 }
 
-static struct chrdev* _unreserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total){
-	const unsigned int index = _major_to_index(major);
+static struct chrdev* unreserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total){
+	const unsigned int index = major_to_index(major);
 	struct chrdev **current = &chrdevs[index];
 
 	while (*current) {
@@ -117,7 +118,7 @@ static struct chrdev* _unreserve_minors_region(unsigned int major, unsigned int 
 int chardev_register(unsigned int major, unsigned int base_minor, 
 	unsigned int minor_total, const char *name, const struct file_operations *fops)
 {
-	struct chrdev* cdev = _reserve_minors_region(major, base_minor, minor_total, name);
+	struct chrdev* cdev = reserve_minors_region(major, base_minor, minor_total, name);
 	if(IS_ERR_VALUE(cdev)){
 		return PTR_ERR(cdev);
 	}
@@ -129,7 +130,7 @@ int chardev_register(unsigned int major, unsigned int base_minor,
 void chardev_unregister(unsigned int major, unsigned int base_minor,
 	unsigned int minor_total, const char *name)
 {
-	struct chrdev* cdev = _unreserve_minors_region(major, base_minor, minor_total);
+	struct chrdev* cdev = unreserve_minors_region(major, base_minor, minor_total);
 	if(!cdev){
 		return;
 	}

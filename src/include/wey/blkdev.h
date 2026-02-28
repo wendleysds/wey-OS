@@ -81,6 +81,7 @@ struct gendisk {
 
 	void *private;
 	struct list_head blkdevs;
+	struct list_head list;
 };
 
 struct blkdev {
@@ -107,7 +108,7 @@ void remove_disk(struct gendisk* disk);
 
 struct gendisk* gendisk_alloc();
 
-struct blkdev* blkdev_find_by_name(const char* name);
+struct blkdev* blk_find_by_name(const char* name);
 struct blkdev* blk_lookup(unsigned int major, unsigned int minor);
 int blk_submit_bio(struct blkdev *bdev, struct bio *bio);
 void blk_run_queue(struct request_queue *q);

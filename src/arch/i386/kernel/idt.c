@@ -228,7 +228,7 @@ void __cdecl interrupt_handler(struct registers* regs){
 	}
 
 	if(interrupt < 32){
-		if(interrupt != 0xE){
+		if(handled){
 			printk(
 				"Received trap %d <0x%x>: '%s' at 0x%x\n",
 				interrupt, interrupt, exception_messages[interrupt], regs->ip);
