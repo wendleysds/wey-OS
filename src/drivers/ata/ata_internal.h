@@ -1,11 +1,10 @@
 #ifndef _ATA_INTERNAL_H
 #define _ATA_INTERNAL_H
 
+#include "wey/blkdev.h"
 #include <stdint.h>
 
 #define TRIES 100000
-
-#define SECTOR_SIZE 512
 #define WORDS_PER_SECTOR 256
 
 // ATA Registers
@@ -81,9 +80,7 @@ static inline uint8_t ata_status(struct ATADevice* atadev) {
 	return inb_p(ATA_IO(atadev->channel, ATA_REG_STATUS));
 }
 
-int ata_read(struct file *file, void *buffer, uint32_t count);
-int ata_write(struct file *file, const void *buffer, uint32_t count);
-int ata_lseek(struct file *file, int offset, int whence);
+int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned int seccount, void* buffer);
 
 void ata_register_irq(char channel);
 int ata_wait_irq(struct ATADevice* atadev);

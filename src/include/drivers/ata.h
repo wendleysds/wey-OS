@@ -2,25 +2,28 @@
 #define _ATA_LBA_H
 
 #include <wey/device.h>
+#include <wey/spinlock.h>
 #include <stdint.h>
 
 struct list_head;
 struct ATAChannel;
 
+struct ATADeviceInfo {
+	char harddrive;
+	uint64_t sectors;
+	uint16_t sec_size;
+	int supports_lba48;
+	int supports_dma;
+	int supports_ncq;
+	char model[41];
+};
+
 struct ATADevice {
 	uint8_t exists;
-	uint8_t model[41];
-	int8_t drive;
+	uint8_t drive;
 
-	struct {
-		int8_t isLBA48;
-		int8_t isHardDrive;
-		dev_t devt;
-	} info;
-
-	uint16_t UDMAmodes;
-	uint64_t addressableSectors;
-
+	dev_t devt;
+	struct ATADeviceInfo info;
 	volatile char irqTriggered;
 
 	struct ATAChannel* channel;
@@ -32,6 +35,7 @@ struct ATAChannel{
 	uint16_t ctrlBase;  // 0x3F6 or 0x376
 	struct ATADevice* active;
 	struct ATADevice devices[2];
+	spinlock_t spinlock;
 	char irqRegistered;
 };
 

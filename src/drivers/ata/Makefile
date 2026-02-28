@@ -1,1 +1,1 @@
-obj-y += ata_io.o ata_irq.o ata.o
+obj-y += ata_io.o ata_irq.o ata_identify.o ata.o
