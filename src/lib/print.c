@@ -1,4 +1,5 @@
 #include <lib/string.h>
+#include <lib/div64.h>
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -12,37 +13,6 @@
 
 #define __isdigit(c) ((c) >= '0' && (c) <= '9')
 #define __tolow(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
-
-uint32_t __div(uint64_t *n, uint32_t base){
-	uint64_t rem = *n;
-	uint64_t b = base;
-	uint64_t res, d = 1;
-	uint32_t high = rem >> 32;
-
-	res = 0;
-	if (high >= base) {
-		high /= base;
-		res = (uint64_t) high << 32;
-		rem -= (uint64_t) (high*base) << 32;
-	}
-
-	while ((int64_t)b > 0 && b < rem) {
-		b = b+b;
-		d = d+d;
-	}
-
-	do {
-		if (rem >= b) {
-			rem -= b;
-			res += d;
-		}
-		b >>= 1;
-		d >>= 1;
-	} while (d);
-
-	*n = res;
-	return rem;
-}
 
 static int skip_stoi(const char **s){
 	int i = 0;
@@ -87,17 +57,34 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 		}
 	}
 
-	// Handle special prefix (0x, 0)
+	// Handle special prefix (0x, 0, 0b)
 	if(flag & SPECIAL_FLAG){
-		size -= (base == 16) ? 2 : (base == 8) ? 1 : 0;
+		size -= (base == 16 || base == 2) ? 2 : (base == 8) ? 1 : 0;
 	}
 
 	// Convert number to string
 	if(number == 0){
 		tmp[i++] = '0';
 	} else {
-		while (number){
-			tmp[i++] = (digits[__div(&number, base)] | lowercase);
+		if (base == 16) {
+			while (number) {
+				tmp[i++] = digits[number & 0xF];
+				number >>= 4;
+			}
+		} else if (base == 8) {
+			while (number) {
+				tmp[i++] = digits[number & 0x7];
+				number >>= 3;
+			}
+		}  else if (base == 2) {
+			while (number) {
+				tmp[i++] = digits[number & 0x1];
+				number >>= 1;
+			}
+		} else {
+			while (number) {
+				tmp[i++] = digits[do_div(number, base)] | lowercase;
+			}
 		}
 	}
 
@@ -117,6 +104,9 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 		else if(base == 16){
 			*str++ = '0';
 			*str++ = ('X' | lowercase);
+		}else if(base == 2){
+			*str++ = '0';
+			*str++ = 'b';
 		}
 	}
 
@@ -239,6 +229,7 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 			case '%':
 				*str++ = '%';
 				continue;
+			case 'b': base = 2; break;
 			case 'o': base = 8; break;
 			case 'x': flags |= LOWERCASE_FLAG;
 			case 'X': base = 16; break;

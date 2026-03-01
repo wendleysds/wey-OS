@@ -1,13 +1,11 @@
 #include <stdint.h>
 #include <wey/vfs.h>
 #include <def/err.h>
+#include <lib/div64.h>
 #include <io/ports.h>
 #include <drivers/ata.h>
 
 #include "ata_internal.h"
-#include "wey/printk.h"
-
-extern uint32_t __div(uint64_t *n, uint32_t base);
 
 int ata_flush(struct ATADevice* atadev) {
 	struct ATAChannel* ch = atadev->channel;
@@ -145,7 +143,7 @@ int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned
 	}
 
 	uint64_t lba = sector;
-	uint32_t rem = __div(&lba, atadev->info.sec_size);
+	uint32_t rem = do_div(lba, atadev->info.sec_size);
 
 	if (rem != 0) {
 		return BAD_ALIGNMENT;

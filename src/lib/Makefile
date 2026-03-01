@@ -1,1 +1,1 @@
-obj-y += font.o list.o string.o print.o
+obj-y += font.o list.o string.o print.o div64.o
