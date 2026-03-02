@@ -26,7 +26,7 @@ static int block_read(struct blkdev* dev, sector_t sector, unsigned int len, voi
 
 	struct sync_wait wait = {0};
 
-	bio->sector = sector;
+	bio->sector = sector + dev->start_sector;
 	bio->len = len;
 	bio->buffer = buffer;
 	bio->op = BLK_READ;

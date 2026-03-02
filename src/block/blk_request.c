@@ -6,30 +6,40 @@
 #include <stddef.h>
 
 static struct request* bio_to_request(struct bio *bio){
-	if (bio->sector + bio->len > bio->bdev->nr_sectors){
+	if (!bio || !bio->bdev || !bio->bdev->disk){
 		return ERR_PTR(INVALID_ARG);
 	}
 
-	struct request* rq = kmalloc(sizeof(struct request));
-	if(!rq){
+	struct request *rq = kzalloc(sizeof(*rq));
+	if (!rq){
 		return ERR_PTR(NO_MEMORY);
-		
 	}
 
-	memset(rq, 0x0, sizeof(struct request));
-	uint16_t secsize = bio->bdev->disk->sec_size;
-	rq->sector = bio->sector + bio->bdev->start_sector;
-	rq->nr_sectors = ALIGN(bio->len, secsize) / secsize;
-	rq->op = bio->op;
-	rq->q = bio->bdev->queue;
+	const uint16_t secsize = bio->bdev->disk->sec_size;
+	const sector_t start   = bio->bdev->start_sector;
+	const sector_t capacity = bio->bdev->nr_sectors;
 
-	if(rq->bio_list){
-		bio->next = rq->bio_list;
-	}else{
-		bio->next = NULL;
+	const sector_t nr_sectors = ALIGN(bio->len, secsize) / secsize;
+
+	if (bio->sector < start) {
+		kfree(rq);
+		return ERR_PTR(INVALID_ARG);
 	}
 
-	rq->bio_list = bio;
+	const sector_t relative_sector = bio->sector - start;
+
+	if (relative_sector + nr_sectors > capacity) {
+		kfree(rq);
+		return ERR_PTR(OUT_OF_BOUNDS);
+	}
+
+	rq->sector     = bio->sector;
+	rq->nr_sectors = nr_sectors;
+	rq->op         = bio->op;
+	rq->q          = bio->bdev->queue;
+	rq->bio_list   = bio;
+	bio->next = NULL;
+
 	return rq;
 }
 
