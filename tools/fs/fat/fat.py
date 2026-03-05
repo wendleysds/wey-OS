@@ -771,12 +771,8 @@ class FATFS:
 
 		content = bytearray()
 
-		def _SEC(x):
-			return x * self.fat.header_boot.bytesPerSec
-		
 		f = self.fat.dev
-
-		f.seek(_SEC(lba) + clusterOffset)
+		f.seek(self.fat.lba_to_sector(lba) + clusterOffset)
 		while remaining > 0:
 			toRead = remaining if remaining < bytesLeftInCluster else bytesLeftInCluster
 			data = f.read(toRead)
@@ -807,12 +803,8 @@ class FATFS:
 		clusterOffset = cursor % self.fat.clusterSize
 		bytesLeftInCluster = self.fat.clusterSize - clusterOffset
 
-		def _SEC(x):
-			return x * self.fat.header_boot.bytesPerSec
-		
 		f = self.fat.dev
-
-		f.seek(_SEC(lba) + clusterOffset)
+		f.seek(self.fat.lba_to_sector(lba) + clusterOffset)
 		while remaining > 0:
 			toWrite = remaining if remaining < bytesLeftInCluster else bytesLeftInCluster
 			writed = f.write(buffer[totalWritten:totalWritten + toWrite])
@@ -835,7 +827,7 @@ class FATFS:
 					bytesLeftInCluster = self.fat.clusterSize - clusterOffset
 
 					lba = self.__cluster_to_lba(nextCluster)
-					f.seek(_SEC(lba) + clusterOffset)
+					f.seek(self.fat.lba_to_sector(lba) + clusterOffset)
 
 		fd.cursor = cursor
 

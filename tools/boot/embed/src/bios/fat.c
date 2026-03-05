@@ -163,7 +163,7 @@ static uint32_t cluster_to_lba(fat_info_t* fat, uint32_t cluster){
 		(fat->headers.boot.numFATs * fat->headers.fat32.FATSz32);
 
 	uint32_t lba = firstDataSector + ((cluster - 2) * fat->headers.boot.secPerClus);
-	return lba;
+	return lba + fat->disk->mbr_partitions[0].lbaFirstSector;
 }
 
 static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint32_t dirCluster, uint32_t* fsize){
@@ -177,7 +177,7 @@ static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint
     fat_name_generate_short(filename, formated_name);
 	
 	do{
-		uint32_t lba = cluster_to_lba(fat, currentCluster) + fat->disk->mbr_partitions[0].lbaFirstSector;
+		uint32_t lba = cluster_to_lba(fat, currentCluster);
 		if(IS_STAT_ERR(fat->disk->ops->read(fat->disk, lba, buffer, 1))){
 			return EOF;
 		}

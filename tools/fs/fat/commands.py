@@ -119,9 +119,12 @@ def stat(fat: FATFS, args: list[str], src: str, dst: str) -> int:
 		return 0
 	
 	lba = cluster_to_lba(fat, cluster)
-	off = (fat.fat.mbr.startLBA + lba) * fat.fat.header_boot.bytesPerSec
+	off_rel = lba * fat.fat.header_boot.bytesPerSec
+	off_rea = (fat.fat.mbr.startLBA + lba) * fat.fat.header_boot.bytesPerSec
 	print(entry)
-	print(f"data LBA     :  {lba} - {off}:{hex(off)}")
+	print("data LBA")
+	print(f"   relative: {lba} - {off_rel}:{hex(off_rel)}")
+	print(f"   real: {fat.fat.mbr.startLBA + lba} - {off_rea}:{hex(off_rea)}")
 
 	return 0
 
