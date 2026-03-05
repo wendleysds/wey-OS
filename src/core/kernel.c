@@ -33,7 +33,7 @@ extern struct boot_header boot_header;
 extern __init void setup_arch();
 
 static inline __no_return void module_failed(const char* module, int res){
-	panic("%s failed with status %x!", module, res);
+	panic("%s failed with status %d!", module, res);
 	halt();
 }
 
@@ -175,6 +175,28 @@ __no_return void kmain(){
 
 	scheduler_add(t1);
 	scheduler_add(t2);
+
+	res = vfs_mount("/dev/hda1", "/", "vfat", 0x0);
+	if(IS_ERR_VALUE(res)){
+		module_failed("mount root", res);
+	}
+
+	const char* const target = "/boot/boot.cfg";
+	struct file* f = vfs_open(target, 0x0);
+	if(IS_ERR_VALUE(f)){
+		module_failed("file open", PTR_ERR(f));
+	}
+
+	char buffer[512];
+	res = vfs_read(f, buffer, 512);
+	if(IS_ERR_VALUE(res)){
+		module_failed("file read", res);
+	}
+
+	printk("Content of \"%s\":\n", target);
+	printk(buffer);
+
+	vfs_close(f);
 
 	printk("OK\n");
 

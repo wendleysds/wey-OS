@@ -1,4 +1,3 @@
-#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include "wey/vfs.h"
 #include <mm/kheap.h>
@@ -18,11 +17,11 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
     uint32_t cluster = dirCluster;
     while (!fat_is_eof(fat, dirCluster)) {
         uint32_t lba = fat_cluster_to_lba(fat, cluster);
-        stream_seek(stream, _SEC(lba), SEEK_SET);
+        stream_seek_lba(stream, lba, SEEK_SET);
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
             struct FATLegacyEntry buffer;
-            if (stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+            if (stream_read(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
                 return ERROR_IO;
             }
@@ -79,10 +78,10 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
 
     while (1) {
         uint32_t lba = fat_cluster_to_lba(fat, cluster);
-        stream_seek(stream, _SEC(lba), SEEK_SET);
+        stream_seek_lba(stream, lba, SEEK_SET);
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(entry)); ++i) {
-            if (stream_read(stream, &entry, sizeof(entry)) != SUCCESS) {
+            if (stream_read(stream, &entry, sizeof(entry)) < 0) {
 				stream_dispose(stream);
                 return ERR_PTR(ERROR_IO);
             }

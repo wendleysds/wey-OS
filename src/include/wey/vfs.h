@@ -60,7 +60,7 @@ struct stat {
 struct file_operations {
 	int (*read)(struct file *file, void *buffer, uint32_t count);
 	int (*write)(struct file *file, const void *buffer, uint32_t count);
-	int (*lseek)(struct file *file, off_t offset, int whence);
+	off_t (*lseek)(struct file *file, off_t offset, int whence);
 	int (*open) (struct inode *ino, struct file *file);
 	int (*close)(struct file *file);
 	int (*release) (struct inode *ino, struct file *file);
@@ -162,7 +162,9 @@ static inline void file_get(struct file* file){
 
 static inline void file_put(struct file* file){
 	if(atomic_dec_and_test(&file->refcount)){
-		file->f_op->release(file->inode, file);
+		if(file->f_op && file->f_op->release){
+			file->f_op->release(file->inode, file);
+		}
 
 		if (file->inode){
 			inode_put(file->inode);

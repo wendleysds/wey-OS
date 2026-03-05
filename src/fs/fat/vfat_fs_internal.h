@@ -1,12 +1,9 @@
 #ifndef _FAT_INTERNALS_H
 #define _FAT_INTERNALS_H
 
-#include <io/stream.h>
+#include <wey/stream.h>
 #include <wey/vfs.h>
 #include <stdint.h>
-
-#define _SEC(lba) \
-    (lba * SECTOR_SIZE)
 
 #define FAT_INVAL 0xFFFFFFFF
 
@@ -174,7 +171,7 @@ int fat_rmdir(struct inode *dir, const char *name);
 // vfat io
 int fat_read(struct file *file, void *buffer, uint32_t count);
 int fat_write(struct file *file, const void *buffer, uint32_t count);
-int fat_lseek(struct file *file, int offset, int whence);
+off_t fat_lseek(struct file *file, off_t offset, int whence);
 int fat_close(struct file *file);
 
 int fat_update(struct FAT* fat);
@@ -204,7 +201,7 @@ uint32_t fat_get_eof(struct FAT* fat);
 uint32_t fat_append_cluster(struct FAT* fat, uint32_t from);
 void fat_free_chain(struct FAT* fat, uint32_t startCluster);
 
-int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry);
+off_t fat_get_entry_offset(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry);
 
 static inline uint32_t fat_cluster_to_lba(struct FAT* fat, uint32_t cluster){
 	return fat->firstDataSector + ((cluster - 2) * fat->headers.boot.secPerClus);

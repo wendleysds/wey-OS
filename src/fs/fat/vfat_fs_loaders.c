@@ -1,6 +1,5 @@
 #include "vfat_fs_internal.h"
 #include <def/err.h>
-#include <io/stream.h>
 #include <wey/mmu.h>
 
 static int fat12_load(struct FAT* fat, struct Stream* stream, const uint8_t* sector0Buffer){
@@ -38,7 +37,7 @@ static int fat12_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
         return NO_MEMORY;
     }
 
-    stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
+    stream_seek_lba(stream, fatStartSector, SEEK_SET);
     if ((status = stream_read(stream, table, fatBytes)) != SUCCESS) {
         kfree(table);
         return status;
@@ -88,7 +87,7 @@ static int fat16_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
         return NO_MEMORY;
     }
 
-    stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
+    stream_seek_lba(stream, fatStartSector, SEEK_SET);
     if ((status = stream_read(stream, table, fatBytes)) != SUCCESS) {
         kfree(table);
         return status;
@@ -120,7 +119,7 @@ static int fat32_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
     const struct FATHeader* boot = &fat->headers.boot;
     const struct FAT32HeaderExtended* extended = &fat->headers.extended.fat32;
 
-    stream_seek(stream, _SEC(extended->FSInfo), SEEK_SET);
+    stream_seek_lba(stream, extended->FSInfo, SEEK_SET);
     if((status = stream_read(stream, &fat->fsInfo, sizeof(fat->fsInfo))) != SUCCESS){
         return status;
     }
@@ -142,7 +141,7 @@ static int fat32_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
         return NO_MEMORY;
     }
 
-    stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
+    stream_seek_lba(stream, fatStartSector, SEEK_SET);
     if((status = stream_read(stream, table, fatBytes)) != SUCCESS){
         kfree(table);
         return status;

@@ -1,4 +1,3 @@
-#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/status.h>
 
@@ -153,7 +152,7 @@ void fat_free_chain(struct FAT* fat, uint32_t startCluster){
     }
 }
 
-int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry){
+off_t fat_get_entry_offset(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry){
     if(!entry || dirCluster < 2){
         return INVALID_ARG;
     }
@@ -166,11 +165,11 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
     uint32_t cluster = dirCluster;
     while (!fat_is_eof(fat, dirCluster)) {
         uint32_t lba = fat_cluster_to_lba(fat, cluster);
-        stream_seek(stream, _SEC(lba), SEEK_SET);
+        stream_seek_lba(stream, lba, SEEK_SET);
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
             struct FATLegacyEntry buffer;
-            if (stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+            if (stream_read(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
                 return ERROR_IO;
             }
@@ -186,7 +185,7 @@ int64_t fat_get_entry_lba(struct FAT* fat, uint32_t dirCluster, struct FATLegacy
 
             if(buffer.fstClusLO == entry->fstClusLO && buffer.fstClusHI == entry->fstClusHI){
 				stream_dispose(stream);
-                return _SEC(lba) + (i * sizeof(buffer)) ;
+                return stream_tell(stream);
             }
         }
 

@@ -3,7 +3,6 @@
 #include <wey/mmu.h>
 #include <def/err.h>
 #include <def/init.h>
-#include <io/stream.h>
 #include <lib/string.h>
 
 static void vfat_destroy_inode(struct inode* inode){
@@ -112,7 +111,7 @@ static struct FAT* fat_init(struct blkdev* bdev){
     }
 
     int8_t res;
-    uint8_t sector0[SECTOR_SIZE];
+    uint8_t sector0[512];
     if((res = stream_read(stream, sector0, sizeof(sector0))) != SUCCESS){
         goto err;
     }
@@ -149,7 +148,7 @@ static struct inode* fat_mount(struct file_system_type* fs_type, int flags, cons
         return ERR_PTR(INVALID_ARG);
     }
 
-	struct blkdev* bdev = blkdev_find_by_name(dev_name);
+	struct blkdev* bdev = blk_lookup(3, 1);
 	if(IS_ERR(bdev)){
 		return ERR_CAST(bdev);
 	}

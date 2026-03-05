@@ -1,4 +1,3 @@
-#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/err.h>
 #include <def/config.h>
@@ -48,10 +47,10 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
     uint32_t cluster = dirCluster;
     while(1) {
         uint32_t lba = fat_cluster_to_lba(fat, cluster);
-        stream_seek(stream, _SEC(lba), SEEK_SET);
+        stream_seek_lba(stream, lba, SEEK_SET);
 
         for(uint32_t i = 0; i < (fat->clusterSize / sizeof(struct FATLegacyEntry)); i++) {
-            if(stream_read(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+            if(stream_read(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
                 return ERROR_IO;
             }
@@ -104,13 +103,13 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
             }
 
             stream_seek(stream, -sizeof(buffer), SEEK_CUR);
-            if(stream_write(stream, &buffer, sizeof(buffer)) != SUCCESS) {
+            if(stream_write(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
                 return ERROR_IO;
             }
 
             if(attr & ATTR_DIRECTORY){
-                stream_seek(stream, _SEC(fat_cluster_to_lba(fat, _cluster)), SEEK_SET);
+                stream_seek_lba(stream, fat_cluster_to_lba(fat, _cluster), SEEK_SET);
 
                 struct FATLegacyEntry dot_entry;
                 memset(&dot_entry, 0x0, sizeof(dot_entry));
@@ -126,7 +125,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                     dot_entry.fstClusLO = dirCluster & 0xFFFF;
                 }
 
-                if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
+                if(stream_write(stream, &dot_entry, sizeof(dot_entry)) < 0) {
                     _fat_remove(fat, name, dirCluster);
 					stream_dispose(stream);
                     return ERROR_IO;
@@ -142,7 +141,7 @@ int _fat_create(struct FAT* fat, const char* filename, uint32_t dirCluster, int 
                     dot_entry.fstClusLO = _cluster & 0xFFFF;
                 }
 
-                if(stream_write(stream, &dot_entry, sizeof(dot_entry)) != SUCCESS) {
+                if(stream_write(stream, &dot_entry, sizeof(dot_entry)) < 0) {
                     _fat_remove(fat, name, dirCluster);
 					stream_dispose(stream);
                     return ERROR_IO;
@@ -190,10 +189,10 @@ int _fat_remove(struct FAT* fat, const char* filename, uint32_t dirCluster){
 
     while (1) {
         uint32_t lba = fat_cluster_to_lba(fat, cluster);
-        stream_seek(stream, _SEC(lba), SEEK_SET);
+        stream_seek_lba(stream, lba, SEEK_SET);
 
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(entry)); ++i) {
-            if ((status = stream_read(stream, &entry, sizeof(entry))) != SUCCESS)
+            if ((status = stream_read(stream, &entry, sizeof(entry))) < 0)
 				stream_dispose(stream);
                 return status;
 

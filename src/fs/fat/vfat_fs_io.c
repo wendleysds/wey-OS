@@ -1,4 +1,3 @@
-#include "io/stream.h"
 #include "vfat_fs_internal.h"
 #include <def/status.h>
 
@@ -12,14 +11,14 @@ static int fat_entry_update(struct FAT* fat, uint32_t dirCluster, struct FATLega
 		return NO_MEMORY;
 	}
 
-    int lba = fat_get_entry_lba(fat, dirCluster, entry);
-    if(lba < 0){
+    off_t offset = fat_get_entry_offset(fat, dirCluster, entry);
+    if(offset < 0){
 		stream_dispose(stream);
-        return lba;
+        return offset;
     }
 
-    stream_seek(stream, lba, SEEK_SET);
-    if (stream_write(stream, entry, sizeof(struct FATLegacyEntry)) != SUCCESS) {
+    stream_seek(stream, offset, SEEK_SET);
+    if (stream_write(stream, entry, sizeof(struct FATLegacyEntry)) < 0) {
 		stream_dispose(stream);
         return ERROR_IO;
     }
@@ -62,11 +61,12 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
     uint32_t clusterOffset = cursor % fd->fat->clusterSize;
     uint32_t bytesLeftInCluster = fat->clusterSize - clusterOffset;
 
-    stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+    stream_seek_lba(stream, lba, SEEK_SET);
+	stream_seek(stream, clusterOffset, SEEK_CUR);
     while(remaining > 0){
         uint32_t toRead = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
 
-        if(stream_read(stream, (uint8_t*)buffer + totalReaded, toRead) != SUCCESS){
+        if(stream_read(stream, (uint8_t*)buffer + totalReaded, toRead) < 0){
 			stream_dispose(stream);
             return ERROR_IO;
         }
@@ -89,7 +89,7 @@ int fat_read(struct file *file, void *buffer, uint32_t count){
             bytesLeftInCluster = fat->clusterSize - clusterOffset;
 
             lba = fat_cluster_to_lba(fat, next);
-            stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+            stream_seek_lba(stream, lba, SEEK_SET);
         }
     }
 
@@ -129,11 +129,12 @@ int fat_write(struct file *file, const void *buffer, uint32_t count){
 	}
 
     int8_t status;
-    stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+    stream_seek_lba(stream, lba, SEEK_SET);
+	stream_seek(stream, clusterOffset, SEEK_CUR);
     while(remaining > 0){
         uint32_t toWrite = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
         int res;
-        if((res = stream_write(stream, (uint8_t*)buffer + totalWritten, toWrite)) != SUCCESS){
+        if((res = stream_write(stream, (uint8_t*)buffer + totalWritten, toWrite)) < 0){
             status = ERROR_IO;
             goto out;
         }
@@ -161,7 +162,7 @@ int fat_write(struct file *file, const void *buffer, uint32_t count){
             bytesLeftInCluster = fat->clusterSize - clusterOffset;
 
             lba = fat_cluster_to_lba(fat, next);
-            stream_seek(stream, _SEC(lba) + clusterOffset, SEEK_SET);
+            stream_seek_lba(stream, lba, SEEK_SET);
         }
     }
 
@@ -187,7 +188,7 @@ out:
     return totalWritten;
 }
 
-int fat_lseek(struct file *file, int offset, int whence){
+off_t fat_lseek(struct file *file, off_t offset, int whence){
     if(!file){
         return INVALID_ARG;
     }
@@ -268,15 +269,15 @@ int fat_update(struct FAT* fat){
 			goto out;
     }
 
-    stream_seek(stream, _SEC(fatStartSector), SEEK_SET);
-    if ((status = stream_write(stream, table, fatBytes)) != SUCCESS) {
+    stream_seek_lba(stream, fatStartSector, SEEK_SET);
+    if ((status = stream_write(stream, table, fatBytes)) < 0) {
         status = ERROR_IO;
         goto out;
     }
 
     if(fat32_fsinfo_sig_valid(&fat->fsInfo) && fat->fsInfo.nextFreeCluster != -1){
-        stream_seek(stream, _SEC(fat->headers.extended.fat32.FSInfo), SEEK_SET);
-        if((status = stream_write(stream, &fat->fsInfo, sizeof(fat->fsInfo))) != SUCCESS){
+        stream_seek_lba(stream, fat->headers.extended.fat32.FSInfo, SEEK_SET);
+        if((status = stream_write(stream, &fat->fsInfo, sizeof(fat->fsInfo))) < 0){
             status = ERROR_IO;
             goto out;
         }
