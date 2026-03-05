@@ -142,29 +142,20 @@ int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned
 		return OUT_OF_BOUNDS;
 	}
 
-	uint64_t lba = sector;
-	uint32_t rem = do_div(lba, atadev->info.sec_size);
-
-	if (rem != 0) {
-		return BAD_ALIGNMENT;
-	}
-
 	int ret = OUT_OF_BOUNDS;
-
 	const int PIO28_MAX_LBA = 0x0FFFFFFF;
-	if(lba > PIO28_MAX_LBA && atadev->info.supports_lba48){
+	if(sector > PIO28_MAX_LBA && atadev->info.supports_lba48){
 		seccount &= 0xFFFF;
-		ret = _pio_48_io_cmd(atadev, cmd_pio, lba, seccount);
-	}else if(lba <= PIO28_MAX_LBA){
+		ret = _pio_48_io_cmd(atadev, cmd_pio, sector, seccount);
+	}else if(sector <= PIO28_MAX_LBA){
 		if (seccount > 256)
 			goto out;
 
 		seccount &= 0xFF;
 
 		cmd_pio -= 0x4; // convert 48 -> 28 PIO
-		ret = _pio_28_io_cmd(atadev, cmd_pio, lba, seccount);
+		ret = _pio_28_io_cmd(atadev, cmd_pio, sector, seccount);
 	}
-
 
 	if(IS_ERR_VALUE(ret)){
 		goto out;

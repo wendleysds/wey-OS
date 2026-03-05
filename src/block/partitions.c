@@ -19,7 +19,7 @@ static void scan_endio(struct bio *bio){
 	wait->done = 1;
 }
 
-static int block_read(struct blkdev* dev, sector_t sector, unsigned int len, void* buffer){
+static int block_read(struct blkdev* dev, sector_t sector, unsigned int nr_sectors, void* buffer){
 	struct bio* bio = kmalloc(sizeof(struct bio));
 	if(!bio) return NO_MEMORY;
 	memset(bio, 0x0, sizeof(struct bio));
@@ -27,7 +27,7 @@ static int block_read(struct blkdev* dev, sector_t sector, unsigned int len, voi
 	struct sync_wait wait = {0};
 
 	bio->sector = sector + dev->start_sector;
-	bio->len = len;
+	bio->nr_sectors = nr_sectors;
 	bio->buffer = buffer;
 	bio->op = BLK_READ;
 	bio->end_io = scan_endio;
@@ -111,7 +111,7 @@ static void parse_mbr_partitions(struct gendisk* disk, uint8_t *sector0){
 		bdev_part->major = disk->major;
 		bdev_part->minor = disk->first_minor + i + 1;
 
-		bdev_part->start_sector = part->lbaStart * disk->sec_size;
+		bdev_part->start_sector = part->lbaStart;
 		bdev_part->nr_sectors = part->totalSectors;
 
 		bdev_part->queue = disk->bdev->queue;
@@ -132,7 +132,7 @@ int blk_scan_partitions(struct gendisk* disk){
 	uint8_t sec0[disk->sec_size];
 	memset(sec0, 0x0, disk->sec_size);
 
-	int res = block_read(disk->bdev, 0, disk->sec_size, sec0);
+	int res = block_read(disk->bdev, 0, 1, sec0);
 
 	if(IS_ERR_VALUE(res)){
 		return res;

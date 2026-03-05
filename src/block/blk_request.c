@@ -10,27 +10,23 @@ static struct request* bio_to_request(struct bio *bio){
 		return ERR_PTR(INVALID_ARG);
 	}
 
-	struct request *rq = kzalloc(sizeof(*rq));
-	if (!rq){
-		return ERR_PTR(NO_MEMORY);
-	}
-
-	const uint16_t secsize = bio->bdev->disk->sec_size;
 	const sector_t start   = bio->bdev->start_sector;
+	const sector_t nr_sectors = bio->nr_sectors;
 	const sector_t capacity = bio->bdev->nr_sectors;
 
-	const sector_t nr_sectors = ALIGN(bio->len, secsize) / secsize;
-
 	if (bio->sector < start) {
-		kfree(rq);
 		return ERR_PTR(INVALID_ARG);
 	}
 
 	const sector_t relative_sector = bio->sector - start;
 
 	if (relative_sector + nr_sectors > capacity) {
-		kfree(rq);
 		return ERR_PTR(OUT_OF_BOUNDS);
+	}
+
+	struct request *rq = kzalloc(sizeof(*rq));
+	if (!rq){
+		return ERR_PTR(NO_MEMORY);
 	}
 
 	rq->sector     = bio->sector;

@@ -13,13 +13,15 @@ struct list_head;
 struct blkdev;
 struct bio;
 
+/*1 sector = 1 LBA*/
 typedef uint64_t sector_t;
+
 typedef void (bio_end_io_t) (struct bio*);
 
 struct bio {
 	sector_t sector;
 	struct blkdev* bdev;
-	unsigned int len;
+	unsigned int nr_sectors;
 	void *buffer;
 	void *private;
 

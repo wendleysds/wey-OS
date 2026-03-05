@@ -33,14 +33,6 @@ static inline struct blkdev* stream_bdev(struct Stream* stream){
 	return stream->bdev;
 }
 
-static inline off_t stream_seek_lba(struct Stream* stream, off_t lba, uint8_t whence){
-	return stream_seek(
-		stream,
-		(stream_bdev(stream)->disk->sec_size * lba),
-		whence
-	);
-}
-
 int stream_dispose(struct Stream* ptr);
 
 #endif

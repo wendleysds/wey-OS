@@ -3,7 +3,9 @@
 #include "def/err.h"
 #include "def/status.h"
 #include <lib/list.h>
+#include "wey/blkdev.h"
 #include "wey/sched/task.h"
+#include "wey/stream.h"
 #include <def/init.h>
 #include <mm/slab.h>
 #include <mm/page.h>
@@ -175,8 +177,6 @@ __no_return void kmain(){
 	scheduler_add(t2);
 
 	printk("OK\n");
-
-	//interrupts_enable(); // Start scheduler
 
 	halt();
 

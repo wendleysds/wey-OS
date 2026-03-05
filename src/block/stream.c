@@ -27,7 +27,7 @@ static int stream_flush(struct Stream* stream){
 	struct bio bio;
 	bio.sector = stream->cachedSectorLBA + stream_bdev(stream)->start_sector;
 	bio.buffer = stream->sector_cache;
-	bio.len = stream->sector_size;
+	bio.nr_sectors = stream->sector_size;
 	bio.op = BLK_WRITE;
 	bio.bdev = stream_bdev(stream);
 	bio.private = &wait;
@@ -112,9 +112,9 @@ int stream_read(struct Stream *stream, void *buffer, int total){
 			}
 
 			struct bio bio;
-			bio.sector = ALIGN_UP(sector + stream_bdev(stream)->start_sector, stream->sector_size);
+			bio.sector = sector + stream_bdev(stream)->start_sector;
 			bio.buffer = stream->sector_cache;
-			bio.len = stream->sector_size;
+			bio.nr_sectors = 1;
 			bio.op = BLK_READ;
 			bio.bdev = stream_bdev(stream);
 			bio.end_io = stream_endio;
@@ -173,7 +173,7 @@ int stream_write(struct Stream *stream, const void *buffer, int total){
 
 			bio.sector = sector + stream_bdev(stream)->start_sector;
 			bio.buffer = stream->sector_cache;
-			bio.len = stream->sector_size;
+			bio.nr_sectors = stream->sector_size;
 			bio.op = BLK_READ;
 			bio.bdev = stream_bdev(stream);
 			bio.private = &wait;
@@ -235,8 +235,6 @@ off_t stream_seek(struct Stream *stream, off_t offset, uint8_t whence){
 	if(target > size){
 		return OVERFLOW;
 	}
-
-	stream->cacheValid = 0;
 
 	stream->pos = target;
 	return size - target;
