@@ -1,5 +1,5 @@
-#include "wey/printk.h"
 #include <wey/sched.h>
+#include <asm/cpu.h>
 #include <def/compile.h>
 
 struct task* current = 0x0;
@@ -16,6 +16,8 @@ void context_switch(struct task* prev, struct task* to){
 
 	current = to;
 	current->state = TASK_RUNNING;
+
+	get_cpu()->tss.esp0 = (unsigned long)(to->kstack + PROC_KERNEL_STACK_SIZE);
 
 	if(unlikely(!prev)){
 		_switch_to(NULL, &to->regs);

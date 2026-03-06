@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-struct TSS{
+struct tss{
 	uint32_t link;
 	uint32_t esp0; // Kernel stack pointer
 	uint32_t ss0;  // Kernel stack segment
@@ -33,13 +33,8 @@ struct TSS{
 	uint32_t ssp;
 } __attribute__((packed));
 
-static inline void tss_load(int tss_segment){
-	__asm__ volatile (
-		"ltr %0"
-		:
-		: "r"(tss_segment)
-		: "memory"
-	);
+static inline void tss_load(unsigned long tss_segment){
+	__asm__ volatile ("ltr %0" :: "r"(tss_segment) : "memory");
 }
 
 #endif

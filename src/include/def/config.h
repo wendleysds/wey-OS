@@ -9,13 +9,13 @@
 #define GDT_KERNEL_DATA_INDEX 2
 #define GDT_USER_CODE_INDEX   3
 #define GDT_USER_DATA_INDEX   4
-#define GDT_TSS_INDEX         5
+#define GDT_TSS_BASE_INDEX    5
 
 #define GDT_KERNEL_CODE  (GDT_KERNEL_CODE_INDEX << 3)
 #define GDT_KERNEL_DATA  (GDT_KERNEL_DATA_INDEX << 3)
 #define GDT_USER_CODE    ((GDT_USER_CODE_INDEX << 3) | 3)
 #define GDT_USER_DATA    ((GDT_USER_DATA_INDEX << 3) | 3)
-#define GDT_TSS          (GDT_TSS_INDEX << 3)
+#define GDT_TSS(index)   ((index) << 3)
 
 #ifndef __ASSEMBLY__
 extern unsigned long __kernel_phys_base;
@@ -137,9 +137,13 @@ extern __kernel_high_end
 // Process Stack
 #define PROC_USER_STACK_VIRUTAL_TOP 0x3FF000
 #define PROC_USER_STACK_SIZE 8192
+#define PROC_KERNEL_STACK_SIZE 4096
 #define PROC_USER_STACK_VIRUTAL_BUTTOM (PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE)
 
 /*Terminal/Console*/
 #define TERMINALS_MAX 6
+
+/*CPU*/
+#define MAX_CPUS 4
 
 #endif
