@@ -2,14 +2,12 @@
 #define _CPU_SCHEDULER_H
 
 #include <asm/ptrace.h>
-#include <asm/context.h>
+#include <asm/process.h>
 #include <wey/vma.h>
-#include <def/compile.h>
+#include <wey/pid.h>
 #include <def/config.h>
 #include <def/init.h>
 #include <lib/list.h>
-
-typedef unsigned short pid_t;
 
 typedef enum {
 	TASK_NEW,
@@ -47,9 +45,13 @@ struct task {
 	struct list_head sibling;
 };
 
+struct task* task_create(const char* name, int priority);
+int task_destroy(struct task* task);
+
 asmlinkage void schedule();
 
 int __init scheduler_init();
+void __init scheduler_start();
 void scheduler_add(struct task* task);
 void scheduler_remove(struct task* task);
 

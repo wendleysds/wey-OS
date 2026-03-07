@@ -4,7 +4,7 @@ global ret_from_registers
 
 extern interrupt_handler
 extern interrupt_eoi
-extern _scheduler_tick
+extern schedule
 extern need_resched
 
 ;struct registers {
@@ -76,10 +76,7 @@ _ret_from_intr:
 	jz .restore
 
 	mov dword [need_resched], 0
-
-	push ebp
-	call _scheduler_tick
-	add esp, 4
+	call schedule
 
 	mov ebp, esp
 

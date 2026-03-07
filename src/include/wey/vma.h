@@ -3,7 +3,7 @@
 
 #include <asm/paging.h>
 #include <wey/vfs.h>
-#include <wey/atomic.h>
+#include <wey/spinlock.h>
 #include <stdint.h>
 
 #define MAP_POPULATE  0x1
@@ -43,7 +43,10 @@ struct mm_struct {
 	uintptr_t brk_start;
 	uintptr_t brk;
 	atomic_t refcount;
+	spinlock_t spinlock;
 };
+
+struct mm_struct* vma_alloc(pgd_t *pgd);
 
 struct mem_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr);
 
@@ -55,5 +58,7 @@ int vma_add(
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
 int vma_destroy(struct mm_struct* mm);
+
+struct mm_struct* vma_dup(struct mm_struct* mm);
 
 #endif

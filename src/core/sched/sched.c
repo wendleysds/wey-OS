@@ -1,7 +1,7 @@
+#include "wey/spinlock.h"
 #include <wey/printk.h>
 #include <wey/sched.h>
 #include <wey/panic.h>
-#include <asm/context.h>
 #include <def/compile.h>
 #include <def/status.h>
 #include <lib/string.h>
@@ -10,20 +10,29 @@
 static LIST_HEAD(_readyQueue);
 static LIST_HEAD(_terminateQueue);
 
+static volatile uint8_t scheduling = 0;
+static spinlock_t scheduler_spinlock;
+
 static struct task* _next(){
 	struct task* next_task = 0x0;
 
-	if(list_empty(&_readyQueue)){
-		return 0x0;
+	spin_lock(&scheduler_spinlock);
+
+	if(likely(!list_empty(&_readyQueue))){
+		next_task = list_entry(_readyQueue.next, struct task, queue);
+		list_remove(&next_task->queue);
 	}
 
-	next_task = list_entry(_readyQueue.next, struct task, queue);
-	list_remove(&next_task->queue);
+	spin_unlock(&scheduler_spinlock);
 
 	return next_task;
 }
 
 asmlinkage void schedule(){
+	if(unlikely(!scheduling)){
+		return;
+	}
+
 	struct task* next_task = _next();
 	struct task* prev_task = current;
 
@@ -46,22 +55,28 @@ asmlinkage void schedule(){
 	context_switch(prev_task, next_task);
 }
 
-void _scheduler_tick(struct registers* regs){
-	schedule();
-}
-
 int __init scheduler_init(){
+	spinlock_init(&scheduler_spinlock);
 	INIT_LIST_HEAD(&_readyQueue);
 	INIT_LIST_HEAD(&_terminateQueue);
+	scheduling = 0;
 
 	return SUCCESS;
 }
 
+void __init scheduler_start(){
+	scheduling = 1;
+}
+
 void scheduler_add(struct task* task){
+	spin_lock(&scheduler_spinlock);
 	task->state = TASK_READY;
 	list_add_tail(&task->queue, &_readyQueue);
+	spin_unlock(&scheduler_spinlock);
 }
 
 void scheduler_remove(struct task* task){
+	spin_lock(&scheduler_spinlock);
 	list_remove(&task->queue);
+	spin_unlock(&scheduler_spinlock);
 }

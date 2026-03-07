@@ -2,21 +2,37 @@
 #include <wey/vfs.h>
 #include <wey/vma.h>
 #include <def/err.h>
+#include <lib/string.h>
 
 #define ALIGN_DOWN(v,a) ((v) & ~((a)-1))
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 
+struct mm_struct* vma_alloc(pgd_t *pgd){
+	struct mm_struct* mm = kmalloc(sizeof(struct mm_struct));
+	if(mm){
+		memset(mm, 0x0, sizeof(struct mm_struct));
+		mm->pgd = pgd;
+		atomic_set(&mm->refcount, 1);
+		spinlock_init(&mm->spinlock);
+	}
+
+	return mm;
+}
+
 struct mem_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr) {
 	struct mem_region* region = mm->vma;
 
+	spin_lock(&mm->spinlock);
 	while (region && virtaddr >= region->start) {
 		if (virtaddr < region->end){
+			spin_unlock(&mm->spinlock);
 			return region;
 		}
 
 		region = region->next;
 	}
 
+	spin_unlock(&mm->spinlock);
 	return NULL;
 }
 
@@ -47,17 +63,21 @@ int vma_add(
 		aligned_offset -= delta;
 	}
 
+	spin_lock(&mm->spinlock);
+
 	struct mem_region* prev = NULL;
 	struct mem_region* curr = mm->vma;
-
 	while (curr && curr->start < aligned_end) {
 		if (aligned_start < curr->end && aligned_end > curr->start) {
+			spin_unlock(&mm->spinlock);
 			return INVALID_ARG;
 		}
 
 		prev = curr;
 		curr = curr->next;
 	}
+
+	spin_unlock(&mm->spinlock);
 
 	struct mem_region* new_region = kmalloc(sizeof(struct mem_region));
 	if (!new_region){
@@ -76,6 +96,8 @@ int vma_add(
 		file_get(file);
 	}
 
+	spin_lock(&mm->spinlock);
+
 	if (prev){
 		prev->next = new_region;
 	}
@@ -83,13 +105,16 @@ int vma_add(
 		mm->vma = new_region;
 	}
 
+	spin_unlock(&mm->spinlock);
+
 	return SUCCESS;
 }
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
+	spin_lock(&mm->spinlock);
+
 	struct mem_region* prev = NULL;
 	struct mem_region* region = mm->vma;
-
 	while (region) {
 		if (virtaddr >= region->start && virtaddr < region->end) {
 			if (prev) {
@@ -103,11 +128,15 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
 			}
 
 			kfree(region);
+			spin_unlock(&mm->spinlock);
 			return SUCCESS;
 		}
+
 		prev = region;
 		region = region->next;
 	}
+
+	spin_unlock(&mm->spinlock);
 
 	return NOT_FOUND;
 }
@@ -115,16 +144,66 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
 int vma_destroy(struct mm_struct* mm){
 	struct mem_region* region = mm->vma;
 
-	while (region) {
-		struct mem_region* next = region->next;
-		if(region->file){
-			file_put(region->file);
+	if(atomic_dec_and_test(&mm->refcount)){
+		while (region) {
+			struct mem_region* next = region->next;
+			if(region->file){
+				file_put(region->file);
+			}
+		
+			kfree(region);
+			region = next;
 		}
-	
-		kfree(region);
-		region = next;
+
+		mm->vma = NULL;
+		kfree(mm);
 	}
 
-	mm->vma = NULL;
 	return SUCCESS;
+}
+
+struct mm_struct* vma_dup(struct mm_struct* mm){
+	pgd_t* new_pgd = pgd_alloc();
+
+	if(new_pgd){
+		if(pgd_dup_current(new_pgd,  1) != SUCCESS){
+			pgd_free(new_pgd);
+			return NULL;
+		}
+	}
+
+	struct mm_struct* new_mm = vma_alloc(new_pgd);
+
+	if(new_mm){
+		spin_lock(&mm->spinlock);
+		struct mem_region *cur = mm->vma;
+		while(cur){
+			int res = vma_add(
+				new_mm, 
+				cur->start, 
+				cur->end, 
+				cur->mem_flags, 
+				cur->mpa_flags, 
+				cur->file, 
+				cur->file_offset
+			);
+
+			if(IS_ERR_VALUE(res)){
+				vma_destroy(new_mm);
+				goto out_free;
+			}
+
+			cur = cur->next;
+		}
+	}else{
+		goto out_free;
+	}
+
+	spin_unlock(&mm->spinlock);
+	return new_mm;
+
+out_free:
+	pgd_free(new_pgd);
+	spin_unlock(&mm->spinlock);
+	return NULL;
 }
