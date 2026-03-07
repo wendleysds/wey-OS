@@ -29,8 +29,11 @@ void start_thread_kernel(struct registers* regs, void* entry_point, void* user_s
 	start_thread_common(regs, entry_point, user_stack, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 }
 
-int copy_thread(struct task *p, struct task *c){
-	return NOT_IMPLEMENTED;
+void copy_thread(struct task *p, struct task *c){
+	memcpy(&c->regs, &p->regs, sizeof(struct registers));
+	uintptr_t offset = p->regs.sp - (uintptr_t)(p->kstack);
+	c->regs.sp = (uintptr_t)c->kstack + offset;
+    c->regs.ax = 0;
 }
 
 void context_switch(struct task* prev, struct task* to){
