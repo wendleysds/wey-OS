@@ -48,8 +48,11 @@ asmlinkage void schedule(){
 
 	printk("Switching to '%s'\n", next_task->name);
 
-	if(likely(prev_task) && prev_task->state != TASK_SLEEPING){
-		scheduler_add(prev_task);
+	if(likely(prev_task)){
+		if(prev_task->state != TASK_SLEEPING && 
+			prev_task->state != TASK_ZOMBIE){
+			scheduler_add(prev_task);
+		}
 	}
 
 	context_switch(prev_task, next_task);

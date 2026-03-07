@@ -1,3 +1,4 @@
+#include "wey/spinlock.h"
 #include <asm/paging.h>
 #include <wey/vfs.h>
 #include <wey/vma.h>
@@ -141,69 +142,64 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
 	return NOT_FOUND;
 }
 
-int vma_destroy(struct mm_struct* mm){
+void vma_destroy(struct mm_struct* mm){
 	struct mem_region* region = mm->vma;
-
-	if(atomic_dec_and_test(&mm->refcount)){
-		while (region) {
-			struct mem_region* next = region->next;
-			if(region->file){
-				file_put(region->file);
-			}
-		
-			kfree(region);
-			region = next;
+	while (region) {
+		struct mem_region* next = region->next;
+		if(region->file){
+			file_put(region->file);
 		}
-
-		mm->vma = NULL;
-		kfree(mm);
+	
+		kfree(region);
+		region = next;
 	}
 
-	return SUCCESS;
+	mm->vma = NULL;
 }
 
 struct mm_struct* vma_dup(struct mm_struct* mm){
 	pgd_t* new_pgd = pgd_alloc();
 
-	if(new_pgd){
-		if(pgd_dup_current(new_pgd,  1) != SUCCESS){
-			pgd_free(new_pgd);
-			return NULL;
-		}
+	if(!new_pgd){
+		return NULL;
+	}
+
+	if(pgd_dup_current(new_pgd,  1) != SUCCESS){
+		pgd_free(new_pgd);
+		return NULL;
 	}
 
 	struct mm_struct* new_mm = vma_alloc(new_pgd);
 
-	if(new_mm){
-		spin_lock(&mm->spinlock);
-		struct mem_region *cur = mm->vma;
-		while(cur){
-			int res = vma_add(
-				new_mm, 
-				cur->start, 
-				cur->end, 
-				cur->mem_flags, 
-				cur->mpa_flags, 
-				cur->file, 
-				cur->file_offset
-			);
-
-			if(IS_ERR_VALUE(res)){
-				vma_destroy(new_mm);
-				goto out_free;
-			}
-
-			cur = cur->next;
-		}
-	}else{
+	if(!new_mm){
 		goto out_free;
 	}
 
-	spin_unlock(&mm->spinlock);
+	struct mem_region *cur = mm->vma;
+	while(cur){
+		int res = vma_add(
+			new_mm, 
+			cur->start, 
+			cur->end, 
+			cur->mem_flags, 
+			cur->mpa_flags, 
+			cur->file, 
+			cur->file_offset
+		);
+
+		if(IS_ERR_VALUE(res)){
+			spin_unlock(&mm->spinlock);
+			vma_destroy(new_mm);
+			kfree(new_mm);
+			goto out_free;
+		}
+
+		cur = cur->next;
+	}
+
 	return new_mm;
 
 out_free:
 	pgd_free(new_pgd);
-	spin_unlock(&mm->spinlock);
 	return NULL;
 }

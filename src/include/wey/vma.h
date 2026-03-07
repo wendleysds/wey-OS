@@ -20,11 +20,12 @@ typedef enum {
 	MEM_GLOBAL = 1 << 4,
 	MEM_DEVICE = 1 << 5,
 	MEM_CACHE  = 1 << 6,
+	MEM_GROWSDOWN = 1 << 7,
 
 	// Process flags / flags for mem_region
-	MEM_EXEC   = 1 << 7,
-	MEM_SHARED = 1 << 8,
-	MEM_LOCKED = 1 << 9,
+	MEM_EXEC   = 1 << 8,
+	MEM_SHARED = 1 << 9,
+	MEM_LOCKED = 1 << 10,
 } mem_flags_t;
 
 struct mem_region {
@@ -57,7 +58,18 @@ int vma_add(
 );
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
-int vma_destroy(struct mm_struct* mm);
+
+void vma_destroy(struct mm_struct* mm);
+
+static inline void vma_put(struct mm_struct* mm){
+	if(atomic_dec_and_test(&mm->refcount)){
+		vma_destroy(mm);
+	}
+}
+
+static inline void vma_get(struct mm_struct* mm){
+	atomic_inc(&mm->refcount);
+}
 
 struct mm_struct* vma_dup(struct mm_struct* mm);
 

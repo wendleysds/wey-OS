@@ -1,10 +1,10 @@
 #include <def/config.h>
+#include <def/status.h>
 #include <asm/ptrace.h>
 #include <asm/cpuflags.h>
 #include <asm/cpu.h>
 #include <wey/sched.h>
 #include <lib/string.h>
-
 
 extern asmlinkage void _switch_to(struct registers* prev, struct registers* to);
 extern asmlinkage __no_return void _ret_from_interrupt(struct registers* regs);
@@ -29,7 +29,9 @@ void start_thread_kernel(struct registers* regs, void* entry_point, void* user_s
 	start_thread_common(regs, entry_point, user_stack, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 }
 
-int copy_thread(struct task *p, struct task *c);
+int copy_thread(struct task *p, struct task *c){
+	return NOT_IMPLEMENTED;
+}
 
 void context_switch(struct task* prev, struct task* to){
 	#undef current
@@ -50,4 +52,11 @@ void context_switch(struct task* prev, struct task* to){
 	}
 
 	_switch_to(&prev->regs, &to->regs);
+
+	if(prev && prev->state == TASK_ZOMBIE){
+		if(prev->kstack){
+			kfree(prev->kstack);
+			prev->kstack = NULL;
+		}
+	}
 }

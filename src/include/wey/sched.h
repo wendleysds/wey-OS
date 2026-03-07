@@ -13,7 +13,7 @@ typedef enum {
 	TASK_NEW,
 	TASK_READY,
 	TASK_RUNNING,
-	TASK_FINISHED,
+	TASK_ZOMBIE,
 	TASK_SLEEPING
 } task_state_t;
 
@@ -21,11 +21,10 @@ struct task {
 	pid_t pid;
 
 	char name[PROC_NAME_MAX];
-	int fileDescriptors[PROC_FD_MAX];
+	struct file* file_table[PROC_FD_MAX];
 
 	struct registers regs;
 	
-	void* ustack;
 	void* kstack;
 	
 	struct list_head tasks;
@@ -36,7 +35,6 @@ struct task {
 	int priority;
 	char *pwd;
 
-	int exit_state;
 	int exit_code;
 
 	struct task* parent;
@@ -46,6 +44,7 @@ struct task {
 };
 
 struct task* task_create(const char* name, int priority);
+void task_exit(struct task* task, int status);
 int task_destroy(struct task* task);
 
 asmlinkage void schedule();
