@@ -3,6 +3,7 @@
 #include <asm/cpu.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>
+#include <wey/syscall.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
 
@@ -74,4 +75,6 @@ __init void setup_arch(){
 	pic_init(TIMER_FREQUENCY);
 
 	idt_init();
+
+	syscalls_init();
 }

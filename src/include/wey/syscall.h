@@ -41,11 +41,11 @@
 #define SYSCALL_DEFINEx(x, sname, ...) \
     __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
 
-#define SYSCALL_DEFINE0(sname) \
-    asmlinkage long sys##name(void)                         \
-        __attribute__((alias(stringfy(__se_sys##name))));   \
-    asmlinkage long __se_sys##name(void);                   \
-    asmlinkage long __se_sys##name(void)
+#define SYSCALL_DEFINE0(name) \
+    asmlinkage long sys_##name(void)                         \
+        __attribute__((alias(stringfy(__se_sys_##name))));   \
+    asmlinkage long __se_sys_##name(void);                   \
+    asmlinkage long __se_sys_##name(void)
 
 #define SYSCALL_DEFINE1(name, ...) SYSCALL_DEFINEx(1, _##name, __VA_ARGS__)
 #define SYSCALL_DEFINE2(name, ...) SYSCALL_DEFINEx(2, _##name, __VA_ARGS__)
@@ -57,7 +57,5 @@
 typedef asmlinkage long (*sys_fn_t)(long long, long long, long long, long long, long long, long long);
 
 void syscalls_init();
-
-sys_fn_t _syscall(long no);
 
 #endif

@@ -92,12 +92,12 @@ _ret_from_intr:
 
 ; asmlinkage __no_return void ret_from_fork(bool from_user);
 ret_from_fork:
-	mov eax, [esp] ; from_user flag
+	pop eax ; from_user flag
 	test eax,eax
 	jnz .user
 
 .kernel:
-	jmp kernel_thread_trampoline
+	call kernel_thread_trampoline
 
 .user:
 	popad

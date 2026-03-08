@@ -3,32 +3,11 @@
 #include "def/compile.h"
 #include "def/config.h"
 #include "wey/pid.h"
+#include <wey/syscall.h>
 #include <stdint.h>
 #include <wey/panic.h>
 #include <def/err.h>
 #include <wey/sched.h>
-
-
-/*
-kernel_thread()
-	start_thread_kernel()
-
-fork()
-	copy_process()
-		copy task_struct
-		copy mm
-		copy fd table
-		copy registers
-		retorn child
-
-	child->pid = pid_alloc()
-	child->regs.ax = 0
-	parent->regs.ax = child->pid
-
-exec()
-	load_elf()
-	start_thread_user()
-*/
 
 asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args){
 	int ret = fn(args);
@@ -46,12 +25,20 @@ static struct task *copy_process() {
 	struct task *cur = current;
 
 	struct task *child = task_create(cur->name, cur->priority);
-	if (!child)
+	if (!child){
 		return NULL;
+	}
+
+	pid_t child_pid = pid_alloc();
+	if(child_pid == -1){
+		kfree(child);
+		return ERR_PTR(LIST_FULL);
+	}
 
 	void *new_kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
 	if (!new_kstack) {
-		task_destroy(child);
+		kfree(child);
+		pid_free(child_pid);
 		return NULL;
 	}
 
@@ -61,7 +48,8 @@ static struct task *copy_process() {
 	struct mm_struct *c_mm = vma_dup(cur->mm);
 	if (IS_ERR_OR_NULL(c_mm)) {
 		kfree(new_kstack);
-		task_destroy(child);
+		kfree(child);
+		pid_free(child_pid);
 		return NULL;
 	}
 
@@ -77,6 +65,7 @@ static struct task *copy_process() {
 	child->parent = cur;
 	list_add(&child->sibling, &cur->children);
 
+	child->pid = child_pid;
 	return child;
 }
 
@@ -104,4 +93,14 @@ pid_t kernel_thread(int (*fn)(void*), const char* name, void* args){
 
 	scheduler_add(task);
 	return task->pid;
+}
+
+SYSCALL_DEFINE0(fork){
+	struct task* child = copy_process();
+	if(IS_ERR_VALUE(child)){
+		return PTR_ERR(child);
+	}
+
+	scheduler_add(child);
+	return child->pid;
 }

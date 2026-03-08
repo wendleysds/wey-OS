@@ -34,22 +34,29 @@ void start_thread_kernel(struct registers* regs, void* entry_point, void* kernel
 }
 
 void copy_thread(struct task *p, struct task *c, int (*fn)(void*), void* args){
+	unsigned long* ksp = c->kstack + PROC_KERNEL_STACK_SIZE;
+
 	// Create kernel thread
 	if(!p){
-		unsigned long* ksp = c->kstack + PROC_KERNEL_STACK_SIZE;
 		*(--ksp) = (unsigned long)args;
 		*(--ksp) = (unsigned long)fn;
 		*(--ksp) = 0;
-		*(--ksp) = (unsigned long)ret_from_fork;
-		
-		c->regs.ksp = (unsigned long)ksp;
-		return;
+		goto out;
 	}
 
+	// Create user thread
+	ksp = (void*)((char*)ksp - sizeof(struct registers));
+
 	memcpy(&c->regs, &p->regs, sizeof(struct registers));
-	uintptr_t offset = p->regs.ksp - (uintptr_t)p->kstack;
-	c->regs.ksp = (uintptr_t)c->kstack + offset;
+
 	c->regs.ax = 0;
+	memcpy(ksp, &c->regs, sizeof(struct registers));
+
+	*(--ksp) = 1;
+out:
+	*(--ksp) = (unsigned long)ret_from_fork;
+	c->regs.ksp = (unsigned long)ksp;
+	return;
 }
 
 void context_switch(struct task* prev, struct task* to){
