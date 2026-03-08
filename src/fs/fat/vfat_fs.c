@@ -148,6 +148,7 @@ static struct inode* fat_mount(struct file_system_type* fs_type, int flags, cons
         return ERR_PTR(INVALID_ARG);
     }
 
+	// TODO: Add lookup with dev name	
 	struct blkdev* bdev = blk_lookup(3, 1);
 	if(IS_ERR(bdev)){
 		return ERR_CAST(bdev);

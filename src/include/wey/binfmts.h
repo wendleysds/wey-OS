@@ -5,28 +5,27 @@
 #include <wey/vma.h>
 #include <stdint.h>
 
-#define BINPRM_BUFF_SIZE 256
+#define BINPRM_BUFF_SIZE 512
 
 struct list_head;
 
 struct binprm{
-    int argc, envc;
+	int argc, envc;
 
-    void* entryPoint;
+	void* entryPoint;
 
 	uintptr_t curMemTop;
 
-	struct file* executable;
 	struct file* interpreter;
-    struct file* file;
+	struct file* file;
 
 	const char* filename;
 	const char* interp;
 	const char* fdpath;
 
-    int execfd;
+	int execfd;
 
-    struct mm_struct* mm;
+	struct mm_struct* mm;
 
 	char buff[BINPRM_BUFF_SIZE];
 }__attribute__((packed));

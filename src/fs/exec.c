@@ -1,3 +1,4 @@
+#include "wey/vma.h"
 #include <lib/list.h>
 #include <stdint.h>
 #include <wey/binfmts.h>
@@ -55,10 +56,143 @@ static int _copy_char_arr(void** stack, const char** arr) {
     return count;
 }
 
-static struct binprm* alloc_binprm(char* filename);
-static void bprm_free(struct binprm* bprm);
+static struct binprm* bprm_alloc(const char* filename){
+	struct binprm* bprm = kzalloc(sizeof(struct binprm));
 
-static int exec_binprm();
-static int load_binprm();
+	if(!bprm){
+		return ERR_PTR(NO_MEMORY);
+	}
 
-int kernel_exec(const char* pathname, const char* argv[], const char* envp[]);
+	pgd_t* pgd = mmu_create_page();
+	if(!pgd){
+		kfree(bprm);
+		return ERR_PTR(NO_MEMORY);
+	}
+	
+	if(mmu_page_switch(pgd) != SUCCESS){
+		mmu_destroy_page(pgd);
+	}
+
+	struct mm_struct* mm = vma_alloc(pgd);
+	if(!mm){
+		kfree(bprm);
+		mmu_destroy_page(pgd);
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	struct file* file = vfs_open(filename, 0x0);
+	if(IS_ERR_VALUE(file)){
+		kfree(bprm);
+		kfree(mm);
+		mmu_destroy_page(pgd);
+		return ERR_CAST(file);
+	}
+
+	bprm->filename = filename;
+	bprm->mm = mm;
+	bprm->file = file;
+
+	return bprm;
+}
+
+static void bprm_destroy(struct binprm* bprm){
+	mmu_destroy_page(bprm->mm->pgd);
+	vma_destroy(bprm->mm);
+	kfree(bprm->mm);
+
+	vfs_close(bprm->file);
+	if(bprm->interpreter){
+		vfs_close(bprm->interpreter);
+	}
+
+	kfree(bprm);
+}
+
+static inline void bprm_free(struct binprm* bprm){
+	kfree(bprm);
+}
+
+static int exec_binprm(struct binprm* bprm){
+	struct task* cur = current;
+
+	int res = vma_add(
+		bprm->mm, 
+		PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE, 
+		PROC_USER_STACK_VIRUTAL_TOP, 
+		(MEM_READ | MEM_WRITE | MEM_USER | MEM_GROWSDOWN), 
+		MAP_PRIVATE, 
+		NULL, 
+		0x0
+	);
+
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	res = mmu_page_switch(bprm->mm->pgd);
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	if(cur->mm){
+		mmu_destroy_page(cur->mm->pgd);
+		vma_destroy(cur->mm);
+		kfree(cur->mm);
+	}
+	
+	cur->mm = bprm->mm;
+
+	for(int i = 0; i < PROC_FD_MAX; i++){
+		if(cur->file_table[i]){
+			vfs_close(cur->file_table[i]);
+			cur->file_table[i] = NULL;
+		}
+	}
+
+	start_thread_user(
+		&cur->regs, 
+		bprm->entryPoint, 
+		(void*)PROC_USER_STACK_VIRUTAL_TOP
+	);
+
+	char* binname = strrchr(bprm->filename, '/') + 1;
+	memset(cur->name, 0x0, sizeof(cur->name));
+	strncpy(cur->name, binname, sizeof(cur->name));
+
+	bprm_free(bprm);
+	ret_from_registers(&cur->regs);
+
+	__builtin_unreachable();
+}
+
+static int load_binprm(struct binprm* bprm){
+	struct binfmt* fmt;
+	list_for_each_entry(fmt, &formats, formats){
+		if(fmt->load_binary(bprm) == SUCCESS){
+			return SUCCESS;
+		}
+	}
+
+	return INVALID_FORMAT;
+}
+
+int kernel_exec(const char* pathname, const char* argv[], const char* envp[]){
+	struct binprm* bprm = bprm_alloc(pathname);
+	if(IS_ERR_VALUE(bprm)){
+		return PTR_ERR(bprm);
+	}
+
+	int res = load_binprm(bprm);
+	if(IS_ERR_VALUE(res)){
+		bprm_destroy(bprm);
+		return res;
+	}
+
+	res = exec_binprm(bprm);
+	if(IS_ERR_VALUE(res)){
+		bprm_destroy(bprm);
+		return res;
+	}
+
+	return res;
+}

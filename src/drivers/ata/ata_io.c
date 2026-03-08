@@ -35,7 +35,9 @@ static int _pio_28_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint32_t lba, u
 	}
 
 	struct ATAChannel* ch = atadev->channel;
+	ch->irqRegistered = 0;
 
+	inb(ATA_IO(ch, ATA_REG_STATUS));
 	while (ata_status(atadev) & ATA_SR_BSY);
 
 	outb_p(ATA_IO(ch, ATA_REG_HDDEVSEL), 0xE0 | (atadev->drive << 4) | ((lba >> 24) & 0x0F));
@@ -56,7 +58,9 @@ static int _pio_48_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint64_t lba, u
 	}
 
 	struct ATAChannel* ch = atadev->channel;
+	ch->irqRegistered = 0;
 
+	inb(ATA_IO(ch, ATA_REG_STATUS));
 	while (ata_status(atadev) & ATA_SR_BSY);
 
 	outb_p(ATA_IO(ch, ATA_REG_HDDEVSEL), 0x40 | (atadev->drive << 4));
@@ -161,6 +165,7 @@ int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned
 		goto out;
 	}
 
+	while (ata_status(atadev) & ATA_SR_BSY);
 	ret = ata_wait_irq(atadev);
 
 	if(IS_ERR_VALUE(ret)){

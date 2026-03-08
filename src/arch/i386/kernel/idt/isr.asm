@@ -28,9 +28,9 @@ extern need_resched
 ;	unsigned long ss (56);
 ;} __packed;
 
-; asmlinkage __no_return void ret_from_registers(struct registers* regs);
+; asmlinkage void ret_from_registers(struct registers* regs);
 ret_from_registers:
-	mov ebp, esp
+	mov ebp, [esp+4]
 
 	xor eax, eax
 	mov ax, cs

@@ -61,6 +61,7 @@ __init void idt_init(){
 	}
 
 	_idt_load(&idtr_ptr);
+	printk("Setup: idt: loaded \"%#lx\".\n", &idtr_ptr);
 }
 
 void interrupts_enable(){

@@ -1,3 +1,4 @@
+#include "wey/mmu.h"
 #include <def/config.h>
 #include <def/status.h>
 #include <asm/ptrace.h>
@@ -9,11 +10,10 @@
 #include <lib/string.h>
 
 extern asmlinkage void _switch_to(struct registers* prev, struct registers* to);
-extern asmlinkage __no_return void _ret_from_interrupt(struct registers* regs);
 extern asmlinkage __no_return void ret_from_fork(unsigned long from_user);
 
 static void start_thread_common(
-	struct registers* regs, void* entry_point, void* stack, 
+	struct registers* regs, void* entry_point, 
 	unsigned long cs, unsigned long ss
 ){
 	memset(regs, 0, sizeof(struct registers));
@@ -24,12 +24,12 @@ static void start_thread_common(
 }
 
 void start_thread_user(struct registers* regs, void* entry_point, void* user_stack){
-	start_thread_common(regs, entry_point, user_stack, GDT_USER_CODE, GDT_USER_DATA);
+	start_thread_common(regs, entry_point, GDT_USER_CODE, GDT_USER_DATA);
 	regs->sp = (uint32_t)user_stack;
 }
 
 void start_thread_kernel(struct registers* regs, void* entry_point, void* kernel_stack){
-	start_thread_common(regs, entry_point, kernel_stack, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
+	start_thread_common(regs, entry_point, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 	regs->ksp = (uint32_t)kernel_stack;
 }
 
@@ -72,6 +72,10 @@ void context_switch(struct task* prev, struct task* to){
 	cpu->current = to;
 	cpu->current->state = TASK_RUNNING;
 	cpu->tss.esp0 = (unsigned long)(to->kstack + PROC_KERNEL_STACK_SIZE);
+
+	if(to->mm){
+		mmu_page_switch(to->mm->pgd);
+	}
 
 	if(unlikely(!prev)){
 		_switch_to(NULL, &to->regs);

@@ -59,11 +59,11 @@ void ata_register_irq(char channel){
 	}
 
 	atachannel->irqRegistered = 1;
-
 	uint8_t irq = (channel == 0 ? IRQ_ATA_PRIMARY : IRQ_ATA_SECONDARY);
 
 	irq_register(irq, ata_irq_handler, atachannel);
 	irq_unmask(irq);
+	outb(ATA_IO(atachannel, ATA_REG_CONTROL), 0x00);
 }
 
 int ata_wait_irq(struct ATADevice* atadev){
@@ -74,6 +74,13 @@ int ata_wait_irq(struct ATADevice* atadev){
 		return ata_polling(atadev);
 
 	spin_lock(&channel->spinlock);
+
+	uint8_t status = ata_status(atadev);
+	if (status & ATA_SR_DRQ) {
+		spin_unlock(&channel->spinlock);
+		return SUCCESS;
+	}
+
 	channel->active = atadev;
 
 	scheduler_remove(t);
@@ -83,16 +90,16 @@ int ata_wait_irq(struct ATADevice* atadev){
 	spin_unlock(&channel->spinlock);
 
 	while (1) {
-        schedule();
+		schedule();
 
-        spin_lock(&channel->spinlock);
-        if (atadev->irqTriggered) {
-            atadev->irqTriggered = 0;
-            spin_unlock(&channel->spinlock);
-            break;
-        }
-        spin_unlock(&channel->spinlock);
-    }
+		spin_lock(&channel->spinlock);
+		if (atadev->irqTriggered) {
+			atadev->irqTriggered = 0;
+			spin_unlock(&channel->spinlock);
+			break;
+		}
+		spin_unlock(&channel->spinlock);
+	}
 
 	return OK;
 }

@@ -1,3 +1,4 @@
+#include "wey/printk.h"
 #include <def/init.h>
 #include <def/config.h>
 #include <asm/cpu.h>
@@ -12,12 +13,18 @@ static struct gdt_entry gdt[TOTAL_GDT_SEGMENTS];
 static struct gdt_descriptor gdt_descriptor;
 
 static inline void gdt_set_tss(int cpu, struct tss *tss){
-	gdt[GDT_TSS_BASE_INDEX + cpu] = GDT_ENTRY(
-		(unsigned long)&tss, 
-		sizeof(struct tss)-1, 
+	int idx = GDT_TSS_BASE_INDEX + cpu;
+
+	gdt[idx] = GDT_ENTRY(
+		(unsigned long)tss, 
+		sizeof(struct tss),
 		GDT_TSS_AVAILABLE, 
 		GDT_FLAG_32BIT
 	);
+
+	printk("Setup: tss: loaded \"%#lx\" idx %d (%#x).\n", tss, idx, GDT_TSS(idx));
+
+	tss_load(GDT_TSS(idx));
 }
 
 static inline void tss_init(int cpu){
@@ -27,14 +34,10 @@ static inline void tss_init(int cpu){
 
 	struct tss *t = &cpus[cpu].tss;
 	memset(t, 0, sizeof(*t));
-
 	t->ss0 = GDT_KERNEL_DATA;
-	t->esp0 = 0;
 	t->iopb = sizeof(struct tss);
 
 	gdt_set_tss(cpu, t);
-
-	tss_load(GDT_TSS(GDT_TSS_BASE_INDEX + cpu));
 }
 
 // no SMP yet, just use cpu 0
@@ -43,18 +46,13 @@ struct cpu* get_cpu(void){
 	return &cpus[0];
 }
 
-void cpu_init(void){
+__init void cpu_init(void){
 	struct cpu *cpu = &cpus[0];
 	cpu->id = 0;
 	tss_init(cpu->id);
 }
 
-__init void setup_arch(){
-	memset(cpus, 0x0, sizeof(cpus));
-	for(uint8_t i = 0; i < MAX_CPUS; i++){
-		cpus[i].id = -1;
-	}
-
+__init void gdt_setup(){
 	struct gdt_entry _gdt[TOTAL_GDT_SEGMENTS] = {
 		GDT_ENTRY(0, 0, 0, 0),                                    // Null
 		GDT_ENTRY(0, 0xFFFFF, GDT_CODE_RING0, GDT_FLAGS_DEFAULT), // Kernel code
@@ -69,6 +67,17 @@ __init void setup_arch(){
 	gdt_descriptor.size = sizeof(gdt) - 1;
 
 	gdt_load(&gdt_descriptor);
+
+	printk("Setup: gdt: loaded \"%#lx\".\n", &gdt_descriptor);
+}
+
+__init void setup_arch(){
+	memset(cpus, 0x0, sizeof(cpus));
+	for(uint8_t i = 0; i < MAX_CPUS; i++){
+		cpus[i].id = -1;
+	}
+
+	gdt_setup();
 
 	cpu_init();
 

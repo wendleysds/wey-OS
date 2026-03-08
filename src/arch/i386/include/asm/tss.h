@@ -14,23 +14,12 @@ struct tss{
 	uint32_t sr3;
 	uint32_t eip;
 	uint32_t eflags;
-	uint32_t eax;
-	uint32_t ecx;
-	uint32_t edx;
-	uint32_t ebx;
-	uint32_t esp;
-	uint32_t ebp;
-	uint32_t esi;
-	uint32_t edi;
-	uint32_t es;
-	uint32_t cs;
-	uint32_t ss;
-	uint32_t ds;
-	uint32_t fs;
-	uint32_t gs;
+	uint32_t eax, ecx, edx, ebx;
+	uint32_t esp, ebp, esi, edi;
+	uint32_t es, cs, ss, ds, fs, gs;
 	uint32_t ldtr;
-	uint32_t iopb;
-	uint32_t ssp;
+	uint16_t iopb;
+	uint16_t ssp;
 } __attribute__((packed));
 
 static inline void tss_load(unsigned long tss_segment){

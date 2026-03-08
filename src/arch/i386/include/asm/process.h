@@ -2,11 +2,14 @@
 #define _X86_PROCESS_H
 
 #include <asm/cpu.h>
+#include <def/compile.h>
 
 #define current get_cpu()->current
 
 struct task;
 struct registers;
+
+extern asmlinkage void ret_from_registers(struct registers* regs);
 
 void start_thread_user(struct registers* regs, void* entry_point, void* user_stack);
 void start_thread_kernel(struct registers* regs, void* entry_point, void* kernel_stack);

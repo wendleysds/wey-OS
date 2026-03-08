@@ -20,3 +20,6 @@
 #19 i386 rmdir sys_rmdir
 #20 i386 ioctl sys_ioctl
 #21 i386 reboot sys_reboot
+
+# tmp
+100 i386 tmp_vt_write sys_tmp_vt_write

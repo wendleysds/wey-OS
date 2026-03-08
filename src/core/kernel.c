@@ -1,3 +1,5 @@
+#include "wey/syscall.h"
+#include "wey/vfs.h"
 #include <lib/list.h>
 #include <lib/font.h>
 #include <def/init.h>
@@ -64,9 +66,13 @@ static __init void do_initcalls(){
 	}
 }
 
-static int test(void* args){
-	printk("Args: %#lX\n", args);
-	return 0;
+static int init(void* args){
+	int res = vfs_mount("/dev/hda1", "/", "vfat", 0x0);
+	if(res != SUCCESS){
+		panic("Failed to mount root! \"%d\"", res);
+	}
+
+	return kernel_exec("/init", 0x0, 0x0);
 }
 
 __no_return void kmain(){
@@ -99,7 +105,7 @@ __no_return void kmain(){
 
 	interrupts_enable();
 
-	pid_t pid = kernel_thread(test, "test", (void*)0xCAFE);
+	pid_t pid = kernel_thread(init, "init", (void*)0xCAFE);
 	printk("kernel thread pid: %d\n", pid);
 
 	scheduler_start();
@@ -107,4 +113,12 @@ __no_return void kmain(){
 	while(1) cpu_relax();
 
 	__builtin_unreachable();
+}
+
+SYSCALL_DEFINE2(tmp_vt_write, const char*, str, int, len){
+	for(int i = 0; i < len; i++){
+		printk("%c", str[i]);
+	}
+
+	return len;
 }
