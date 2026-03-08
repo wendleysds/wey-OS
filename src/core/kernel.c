@@ -12,6 +12,7 @@
 #include <wey/terminal.h>
 #include <wey/printk.h>
 #include <wey/sched.h>
+#include <wey/fork.h>
 
 #include <asm/cpu.h>
 #include <uapi/headers.h>
@@ -63,6 +64,11 @@ static __init void do_initcalls(){
 	}
 }
 
+static int test(void* args){
+	printk("Args: %#lX\n", args);
+	return 0;
+}
+
 __no_return void kmain(){
 	setup_arch();
 
@@ -85,10 +91,18 @@ __no_return void kmain(){
 	module_load("MMU", mmu_init);
 	module_load("VTerminal", terminal_init);
 	module_load("Scheduler", scheduler_init);
+	module_load("Fork", fork_init);
 
 	do_initcalls();
 
 	printk("OK\n");
+
+	interrupts_enable();
+
+	pid_t pid = kernel_thread(test, "test", (void*)0xCAFE);
+	printk("kernel thread pid: %d\n", pid);
+
+	scheduler_start();
 
 	while(1) cpu_relax();
 

@@ -2,9 +2,13 @@ global interrupt_pointer_table
 global ret_from_fork
 global ret_from_registers
 
+; methods
 extern interrupt_handler
 extern interrupt_eoi
 extern schedule
+extern kernel_thread_trampoline
+
+; vars
 extern need_resched
 
 ;struct registers {
@@ -33,7 +37,7 @@ ret_from_registers:
 	cmp eax, [ebp+44]
 	je .same_priv
 
-	mov ax, word [ebp+44]
+	mov ax, word [ebp+56]
 
 	mov ds, ax
 	mov es, ax
@@ -85,9 +89,19 @@ _ret_from_intr:
 	add esp, 8  ; clear err_code and int_no
 	iret        ; kachow
 
+
+; asmlinkage __no_return void ret_from_fork(bool from_user);
 ret_from_fork:
+	mov eax, [esp] ; from_user flag
+	test eax,eax
+	jnz .user
+
+.kernel:
+	jmp kernel_thread_trampoline
+
+.user:
 	popad
-	add esp, 8
+	add esp,8
 	iret
 
 _isr_common:

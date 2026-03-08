@@ -1,5 +1,13 @@
+#include "asm/process.h"
+#include "asm/ptrace.h"
+#include "def/compile.h"
+#include "def/config.h"
+#include "wey/pid.h"
+#include <stdint.h>
+#include <wey/panic.h>
 #include <def/err.h>
 #include <wey/sched.h>
+
 
 /*
 kernel_thread()
@@ -22,9 +30,19 @@ exec()
 	start_thread_user()
 */
 
-void __init fork_init() {}
+asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args){
+	int ret = fn(args);
+	// do exit
+	panic("DEBUG: process \"%s\" exit with status %d.\n", current->name, ret);
+	__builtin_unreachable();
+}
 
-struct task *copy_process() {
+int __init fork_init() {
+	pid_init();
+	return SUCCESS;
+}
+
+static struct task *copy_process() {
 	struct task *cur = current;
 
 	struct task *child = task_create(cur->name, cur->priority);
@@ -37,10 +55,8 @@ struct task *copy_process() {
 		return NULL;
 	}
 
-	memcpy(new_kstack, cur->kstack, PROC_KERNEL_STACK_SIZE);
 	child->kstack = new_kstack;
-
-	copy_thread(cur, child);
+	copy_thread(cur, child, 0x0, 0x0);
 
 	struct mm_struct *c_mm = vma_dup(cur->mm);
 	if (IS_ERR_OR_NULL(c_mm)) {
@@ -64,6 +80,28 @@ struct task *copy_process() {
 	return child;
 }
 
-pid_t kernel_clone();
-pid_t kernel_thread();
-pid_t user_mode_thread();
+pid_t kernel_thread(int (*fn)(void*), const char* name, void* args){
+	struct task* task = task_create(name, 0);
+	if(!task){
+		return NO_MEMORY;
+	}
+
+	char* ksp = kmalloc(PROC_KERNEL_STACK_SIZE);
+	if(!ksp){
+		kfree(task);
+		return NO_MEMORY;
+	}
+
+	task->pid = pid_alloc();
+	if(task->pid == -1){
+		kfree(ksp);
+		kfree(task);
+		return LIST_FULL;
+	}
+
+	task->kstack = ksp;
+	copy_thread(0x0, task, fn, args);
+
+	scheduler_add(task);
+	return task->pid;
+}

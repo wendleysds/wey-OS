@@ -7,6 +7,7 @@
 #include <def/config.h>
 #include <def/init.h>
 #include <stdint.h>
+#include <lib/serial.h>
 
 static printk_echo_function _printk_ech = NULL;
 static char printk_circular_buffer[PRINTK_BUFFER_SIZE];
@@ -58,6 +59,7 @@ int printk(const char* restrict fmt, ...){
 
 	for(int i = 0; buffer[i] != '\0' || i > 1024; i++){
 		printk_write_char(buffer[i]);
+		serial_putchar(buffer[i]);
 	}
 
 	return c;

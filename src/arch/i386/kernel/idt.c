@@ -1,3 +1,4 @@
+#include <wey/sched.h>
 #include "asm/ptrace.h"
 #include <wey/interrupt.h>
 #include <wey/printk.h>
@@ -214,6 +215,9 @@ void __cdecl interrupt_handler(struct registers* regs){
 
 	int interrupt = regs->int_no;
 
+	if(likely(current))
+		current->regs = *regs;
+
 	struct irq_handler_node* h = irq_table[interrupt].handlers;
 
 	struct irq_info info;
@@ -250,6 +254,9 @@ void __cdecl interrupt_handler(struct registers* regs){
 
 	if(info.route.irq_id == IRQ_WR_TIMER)
 		need_resched = 1;
+
+	if(likely(current))
+		*regs = current->regs;
 }
 
 void interrupt_eoi(uint8_t interrupt){

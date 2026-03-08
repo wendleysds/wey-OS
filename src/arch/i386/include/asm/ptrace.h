@@ -1,3 +1,4 @@
+
 #ifndef _X86_PTRACE_H
 #define _X86_PTRACE_H
 
@@ -36,7 +37,11 @@ static __always_inline int regs_is_user_mode(struct registers *regs){
 }
 
 static inline unsigned long regs_get_kernel_stack_pointer(struct registers *regs){
-	return regs->sp;
+	return regs->ksp;
+}
+
+static inline void regs_set_kernel_stack_pointer(struct registers *regs, unsigned long val){
+	regs->ksp = val;
 }
 
 static inline unsigned long regs_get_instruction_pointer(struct registers *regs){

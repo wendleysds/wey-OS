@@ -2,7 +2,7 @@
 #define _SERIAL_H
 
 #include <io/ports.h>
-#include <lib/utils.h>
+#include <lib/stdio.h>
 #include <stdarg.h>
 
 #define COM1 0x3F8
@@ -26,41 +26,11 @@ void serial_putchar(char a) {
 	outb(COM1, a);
 }
 
-void serial_printf(const char* restrict format, ...){
+void serial_printf(const char* restrict fmt, ...){
+	char buffer[1024];
 	va_list args;
-	va_start(args, format);
-	char buffer[32];
-	for (const char *ptr = format; *ptr; ptr++) {
-		if (*ptr == '%') {
-			ptr++;
-			switch (*ptr) {
-				case 'c':
-					serial_putchar(va_arg(args, int));
-					break;
-				case 's':
-					for (char *s = va_arg(args, char*); *s; s++)
-						serial_putchar(*s);
-					break;
-				case 'd':
-					itoa(va_arg(args, int), buffer, 10);
-					for (char *s = buffer; *s; s++)
-						serial_putchar(*s);
-					break;
-				case 'x':
-					itoa(va_arg(args, int), buffer, 16);
-					for (char *s = buffer; *s; s++)
-						serial_putchar(*s);
-					break;
-				default:
-					serial_putchar('%');
-					serial_putchar(*ptr);
-					break;
-			}
-		} else {
-			serial_putchar(*ptr);
-		}
-	}
-
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
 }
 
