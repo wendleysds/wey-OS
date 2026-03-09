@@ -5,6 +5,7 @@
 #include <wey/vfs.h>
 #include <wey/mmu.h>
 #include <wey/sched.h>
+#include <wey/panic.h>
 #include <def/config.h>
 #include <def/err.h>
 #include <lib/string.h>
@@ -58,34 +59,22 @@ static int _copy_char_arr(void** stack, const char** arr) {
 
 static struct binprm* bprm_alloc(const char* filename){
 	struct binprm* bprm = kzalloc(sizeof(struct binprm));
+	int res = -1;
 
 	if(!bprm){
 		return ERR_PTR(NO_MEMORY);
 	}
 
-	pgd_t* pgd = mmu_create_page();
-	if(!pgd){
-		kfree(bprm);
-		return ERR_PTR(NO_MEMORY);
-	}
-	
-	if(mmu_page_switch(pgd) != SUCCESS){
-		mmu_destroy_page(pgd);
-	}
-
-	struct mm_struct* mm = vma_alloc(pgd);
+	struct mm_struct* mm = vma_alloc();
 	if(!mm){
 		kfree(bprm);
-		mmu_destroy_page(pgd);
 		return ERR_PTR(NO_MEMORY);
 	}
 
 	struct file* file = vfs_open(filename, 0x0);
 	if(IS_ERR_VALUE(file)){
-		kfree(bprm);
-		kfree(mm);
-		mmu_destroy_page(pgd);
-		return ERR_CAST(file);
+		res = PTR_ERR(file);
+		goto out_free;
 	}
 
 	bprm->filename = filename;
@@ -93,12 +82,18 @@ static struct binprm* bprm_alloc(const char* filename){
 	bprm->file = file;
 
 	return bprm;
+
+out_free:
+	vma_destroy(mm);	
+	kfree(bprm);
+	return ERR_PTR(res);
 }
 
 static void bprm_destroy(struct binprm* bprm){
-	mmu_destroy_page(bprm->mm->pgd);
-	vma_destroy(bprm->mm);
-	kfree(bprm->mm);
+	if(bprm->mm){
+		vma_destroy(bprm->mm);
+		bprm->mm = NULL;
+	}
 
 	vfs_close(bprm->file);
 	if(bprm->interpreter){
@@ -115,7 +110,7 @@ static inline void bprm_free(struct binprm* bprm){
 static int exec_binprm(struct binprm* bprm){
 	struct task* cur = current;
 
-	int res = vma_add(
+	struct mem_region* region = vma_add(
 		bprm->mm, 
 		PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE, 
 		PROC_USER_STACK_VIRUTAL_TOP, 
@@ -125,19 +120,18 @@ static int exec_binprm(struct binprm* bprm){
 		0x0
 	);
 
-	if(IS_ERR_VALUE(res)){
-		return res;
+	if(IS_ERR_VALUE(region)){
+		return PTR_ERR(region);
 	}
 
-	res = mmu_page_switch(bprm->mm->pgd);
+	int res = mmu_page_switch(bprm->mm->pgd);
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
 
 	if(cur->mm){
-		mmu_destroy_page(cur->mm->pgd);
 		vma_destroy(cur->mm);
-		kfree(cur->mm);
+		cur->mm = NULL;
 	}
 	
 	cur->mm = bprm->mm;

@@ -1,12 +1,14 @@
 global interrupt_pointer_table
 global ret_from_fork
 global ret_from_registers
+global kernel_thread_trampoline
 
 ; methods
 extern interrupt_handler
 extern interrupt_eoi
 extern schedule
-extern kernel_thread_trampoline
+extern task_exit
+extern panic
 
 ; vars
 extern need_resched
@@ -89,19 +91,42 @@ _ret_from_intr:
 	add esp, 8  ; clear err_code and int_no
 	iret        ; kachow
 
+; __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args)
+kernel_thread_trampoline:
+	pop eax ; fn
+	call eax
 
-; asmlinkage __no_return void ret_from_fork(bool from_user);
+	push eax
+	call task_exit
+
+	push _trampoline_return_msg
+	call panic
+
+; asmlinkage __no_return void ret_from_fork();
 ret_from_fork:
-	pop eax ; from_user flag
-	test eax,eax
-	jnz .user
+	mov ebp, esp
 
-.kernel:
-	call kernel_thread_trampoline
+	xor eax, eax
+	mov ax, cs
+	cmp eax, [ebp+44]
+	jne .not_same_priv
 
-.user:
+	; memmove 8 bytes up to clear ss and sp
+	lea esi, [ebp+48]
+	lea edi, [ebp+56]
+	mov ecx, 13
+
+	std
+	rep movsd
+	cld
+
+	add esp, 8
+
+; ss and sp is removed and kernel_thread_trampoline
+; access args correctly.
+.not_same_priv:
 	popad
-	add esp,8
+	add esp,8 ; clear err_code and int_no
 	iret
 
 _isr_common:
@@ -173,3 +198,6 @@ interrupt_pointer_table:
 	create_int i
 %assign i i+1
 %endrep
+
+section .data
+_trampoline_return_msg: db "kernel_thread_trampoline: returned from exit call!", 0xA, 0

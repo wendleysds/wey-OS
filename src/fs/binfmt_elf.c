@@ -64,7 +64,7 @@ static int load_elf_binarie(struct binprm *bprm){
 		if (phdr->p_flags & PF_W) flags |= MEM_WRITE;
 		if (phdr->p_flags & PF_X) flags |= MEM_EXEC;
 
-		res = vma_add(
+		struct mem_region* region = vma_add(
 			bprm->mm,
 			phdr->p_vaddr,
 			phdr->p_vaddr + phdr->p_memsz,
@@ -74,9 +74,9 @@ static int load_elf_binarie(struct binprm *bprm){
 			phdr->p_offset
 		);
 
-		if(res != SUCCESS){
-			vma_destroy(bprm->mm);
-			return res;
+		if(IS_ERR_VALUE(region)){
+			vma_clean(bprm->mm);
+			return PTR_ERR(region);
 		}
 	}
 

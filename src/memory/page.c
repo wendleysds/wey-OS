@@ -99,7 +99,7 @@ struct page_metadata* __init page_init(struct e820_entry* table, size_t table_le
 	for(size_t i = 0; i < total_pages; i++){
 		struct page* page = &metadata.pages[i];
 		page->flags = _FPAGE_FREE;
-		page->refcount = 0;
+		atomic_set(&page->refcount, 1);
 		page->slab = NULL;
 	}
 
@@ -161,7 +161,7 @@ try_again:
 		page->flags &= ~PAGE_FLAG_ALLOC_MASK;
 		page->flags |= (flags & PAGE_FLAG_TYPE_MASK);
 		page->flags |= _FPAGE_ALLOCADE;
-		page->refcount = 1;
+		atomic_set(&page->refcount, 1);
 		
 		if (i == 0)
 			page->flags |= _FPAGE_FIRST;
@@ -213,7 +213,7 @@ int page_free(struct page* page){
 			break;
 
 		cur_page->flags = _FPAGE_FREE;
-		page->refcount = 0;
+		atomic_set(&page->refcount, 0);
 		free_count++;
 
 		if(!(flag & _FPAGE_NEXT))

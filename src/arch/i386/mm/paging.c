@@ -26,13 +26,18 @@
 // *PDE_VADDR(d) == PGD_VADDR[d]
 #define PDE_VADDR(d) ((unsigned long*)(0xFFFFF000 + ((d) << 2))) 
 
+pgd_t* pgd_current(){
+	pgd_t* ret;
+	__asm__ volatile ("mov %%cr3, %0" : "=rm" (ret));
+	return (pgd_t*)__va(ret);
+}
+
 int pgd_load(pgd_t* pgd){
 	if(!pgd){
 		return NULL_PTR;
 	}
 
 	pgd_t* pgd_cur = pgd_current();
-	pgd_cur = (pgd_t*)__va(pgd_cur);
 
 	if(pgd_cur == pgd){
 		return SUCCESS;
@@ -69,6 +74,7 @@ pgd_t* pgd_alloc(){
 	}
 
 	if(pgd_direct_map_page(pgd_page, (_PAGE_P | _PAGE_RW)) != SUCCESS){
+		page_free(pgd_page);
 		return NULL;
 	}
 
@@ -80,7 +86,6 @@ pgd_t* pgd_alloc(){
 
 void pgd_free(pgd_t* pgd){
 	pgd_t* pgd_cur = pgd_current();
-	pgd_cur = (pgd_t*)__va(pgd_cur);
 
 	if(pgd_cur == pgd){
 		panic("pgd_free(): Trying to free current directory!");

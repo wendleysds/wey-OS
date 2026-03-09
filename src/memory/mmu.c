@@ -158,9 +158,11 @@ int mmu_page_switch(pgd_t* pgd){
 }
 
 int mmu_destroy_page(pgd_t* pgd){
-	int res = pgd_load(_kernel_pgd);
-	if(IS_STAT_ERR(res)){
-		return res;
+	if(pgd == pgd_current()){
+		int res = pgd_load(_kernel_pgd);
+		if(IS_STAT_ERR(res)){
+			return res;
+		}
 	}
 
 	pgd_remove_kernel(pgd);

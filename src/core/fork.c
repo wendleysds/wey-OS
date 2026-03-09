@@ -6,15 +6,10 @@
 #include <wey/syscall.h>
 #include <stdint.h>
 #include <wey/panic.h>
+#include <wey/interrupt.h>
 #include <def/err.h>
 #include <wey/sched.h>
-
-asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args){
-	int ret = fn(args);
-	// do exit
-	panic("DEBUG: process \"%s\" exit with status %d.\n", current->name, ret);
-	__builtin_unreachable();
-}
+#include <wey/printk.h>
 
 int __init fork_init() {
 	pid_init();
@@ -26,7 +21,7 @@ static struct task *copy_process() {
 
 	struct task *child = task_create(cur->name, cur->priority);
 	if (!child){
-		return NULL;
+		return ERR_PTR(NO_MEMORY);
 	}
 
 	pid_t child_pid = pid_alloc();
@@ -39,7 +34,7 @@ static struct task *copy_process() {
 	if (!new_kstack) {
 		kfree(child);
 		pid_free(child_pid);
-		return NULL;
+		return ERR_PTR(NO_MEMORY);
 	}
 
 	child->kstack = new_kstack;
@@ -50,7 +45,7 @@ static struct task *copy_process() {
 		kfree(new_kstack);
 		kfree(child);
 		pid_free(child_pid);
-		return NULL;
+		return ERR_CAST(c_mm);
 	}
 
 	child->mm = c_mm;

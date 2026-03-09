@@ -49,23 +49,10 @@ asmlinkage void schedule(){
 	struct task* prev_task = current;
 
 	if(next_task == 0x0){
-		if(prev_task->state == TASK_RUNNING){
-			printk("resuming: '%s'\n", prev_task->name);
-			return;
-		}
-
 		next_task = &idle_task;
-		//panic("no tasks!");
 	}
 
-	printk("Switching to '%s'\n", next_task->name);
-
-	if(likely(prev_task)){
-		if(prev_task->state != TASK_SLEEPING && 
-			prev_task->state != TASK_ZOMBIE){
-			scheduler_add(prev_task);
-		}
-	}
+	printk("Switching to \"[%d:%s]\"\n", next_task->pid, next_task->name);
 
 	context_switch(prev_task, next_task);
 }

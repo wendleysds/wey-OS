@@ -1,5 +1,7 @@
 global _switch_to
 
+extern task_handle_state
+
 ;struct registers {
 ;	// pushad regs order
 ;	unsigned long di (00), si (04), bp (08), ksp (12);
@@ -17,8 +19,14 @@ global _switch_to
 ;	unsigned long ss (56);
 ;} __packed;
 
+;struct task {
+;	pid_t pid; (00)
+;	struct registers regs; (04)
+;   ....
+;};
 
-; asmlinkage void _switch_to(struct registers* prev, struct registers* to);
+
+; asmlinkage void _switch_to(struct task* prev, struct task* to);
 _switch_to:
 	; esp+0 = return addr
 	; esp+4 = prev
@@ -28,10 +36,17 @@ _switch_to:
 	mov ecx, [esp+8]
 
 	cmp eax, 0
-	jz .skip_save
-	mov [eax+12], esp
+	jz .no_prev
 
-.skip_save:
-	mov esp, [ecx+12]
+	mov [eax+4+12], esp
+	mov esp, [ecx+4+12]
 
+	push eax
+	call task_handle_state
+	add esp, 4
+
+	ret
+
+.no_prev:
+	mov esp, [ecx+4+12]
 	ret

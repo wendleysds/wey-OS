@@ -1,7 +1,7 @@
 #ifndef _PID_H
 #define _PID_H
 
-typedef short pid_t;
+typedef int pid_t;
 
 pid_t pid_alloc();
 void pid_free(pid_t pid);

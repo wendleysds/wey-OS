@@ -75,6 +75,13 @@ static int init(void* args){
 	return kernel_exec("/init", 0x0, 0x0);
 }
 
+static int somw(void* args){
+	while(1){
+		cpu_relax();
+	}
+	return 0;
+}
+
 __no_return void kmain(){
 	setup_arch();
 
@@ -87,7 +94,7 @@ __no_return void kmain(){
 
 	printk("pages: %d/%d [%d KiB], range 0x%X - 0x%X [%d MiB]\n",
 		mt->pages_length, mt->allocated_pages,
-		(mt->pages_length / sizeof(struct page)) / KiB(1),
+		(mt->pages_length * sizeof(struct page)) / KiB(1),
 		mt->start_addr, mt->end_addr,
 		(mt->end_addr - mt->start_addr) / MiB(1)
 	);
@@ -105,8 +112,10 @@ __no_return void kmain(){
 
 	interrupts_enable();
 
-	pid_t pid = kernel_thread(init, "init", (void*)0xCAFE);
-	printk("kernel thread pid: %d\n", pid);
+	kernel_thread(init, "init", (void*)0xCAFE);
+	kernel_thread(somw, "Worker 1", 0x0);
+	kernel_thread(somw, "Worker 2", 0x0);
+	kernel_thread(somw, "Worker 3", 0x0);
 
 	scheduler_start();
 

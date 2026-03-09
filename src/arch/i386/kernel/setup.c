@@ -12,6 +12,8 @@ static struct cpu cpus[MAX_CPUS];
 static struct gdt_entry gdt[TOTAL_GDT_SEGMENTS];
 static struct gdt_descriptor gdt_descriptor;
 
+extern void fault_init();
+
 static inline void gdt_set_tss(int cpu, struct tss *tss){
 	int idx = GDT_TSS_BASE_INDEX + cpu;
 
@@ -84,6 +86,8 @@ __init void setup_arch(){
 	pic_init(TIMER_FREQUENCY);
 
 	idt_init();
+
+	fault_init();
 
 	syscalls_init();
 }

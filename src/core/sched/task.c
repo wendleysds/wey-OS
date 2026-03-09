@@ -1,6 +1,10 @@
-#include "asm/paging.h"
+#include "asm/process.h"
 #include "def/status.h"
 #include "lib/list.h"
+#include "wey/interrupt.h"
+#include "wey/mmu.h"
+#include "wey/printk.h"
+#include "wey/syscall.h"
 #include "wey/vfs.h"
 #include "wey/vma.h"
 #include <lib/string.h>
@@ -32,13 +36,7 @@ static void task_destroy_mm(struct task* task){
 		return;
 	}
 
-	if(task->mm->pgd){
-		pgd_free(task->mm->pgd);
-	}
-
-	vma_destroy(task->mm);
-
-	kfree(task->mm);
+	vma_put(task->mm);
 	task->mm = NULL;
 }
 
@@ -88,7 +86,7 @@ void __no_return task_exit(struct task* task, int status){
 }
 
 int task_destroy(struct task* task){
-	if(task->state != TASK_ZOMBIE){
+	if(task->state != TASK_FINISHED){
 		return INVALID_STATE;
 	}
 
@@ -96,4 +94,23 @@ int task_destroy(struct task* task){
 	pid_free(task->pid);
 	kfree(task);
 	return SUCCESS;
+}
+
+void task_handle_state(struct task* task){
+	printk("task_handle_state: task[%#x] state: \"%d\"\n", task, task->state);
+	switch (task->state) {
+		case TASK_ZOMBIE:
+			if(task->kstack){
+				kfree(task->kstack);
+				task->kstack = NULL;
+			}
+
+			// tmp, no waitpid wet to clear zombie task
+			task->state = TASK_FINISHED;
+			task_destroy(task);
+		return;
+		case TASK_FINISHED: task_destroy(task); return;
+		case TASK_SLEEPING: return;
+		default: scheduler_add(task); return;
+	}
 }

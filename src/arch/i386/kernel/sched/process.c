@@ -9,8 +9,9 @@
 #include <wey/fork.h>
 #include <lib/string.h>
 
-extern asmlinkage void _switch_to(struct registers* prev, struct registers* to);
-extern asmlinkage __no_return void ret_from_fork(unsigned long from_user);
+extern asmlinkage void _switch_to(struct task* prev, struct task* to);
+extern asmlinkage __no_return void ret_from_fork();
+extern asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args);
 
 static void start_thread_common(
 	struct registers* regs, void* entry_point, 
@@ -38,22 +39,25 @@ void copy_thread(struct task *p, struct task *c, int (*fn)(void*), void* args){
 
 	// Create kernel thread
 	if(!p){
+		start_thread_kernel(
+			&c->regs,
+			kernel_thread_trampoline,
+			0x0 // setted later
+		);
+
 		*(--ksp) = (unsigned long)args;
 		*(--ksp) = (unsigned long)fn;
-		*(--ksp) = 0;
 		goto out;
 	}
 
 	// Create user thread
-	ksp = (void*)((char*)ksp - sizeof(struct registers));
-
 	memcpy(&c->regs, &p->regs, sizeof(struct registers));
-
 	c->regs.ax = 0;
+
+out:
+	ksp = (unsigned long*)((uint8_t*)ksp - sizeof(struct registers));
 	memcpy(ksp, &c->regs, sizeof(struct registers));
 
-	*(--ksp) = 1;
-out:
 	*(--ksp) = (unsigned long)ret_from_fork;
 	c->regs.ksp = (unsigned long)ksp;
 	return;
@@ -77,16 +81,5 @@ void context_switch(struct task* prev, struct task* to){
 		mmu_page_switch(to->mm->pgd);
 	}
 
-	if(unlikely(!prev)){
-		_switch_to(NULL, &to->regs);
-	}
-
-	_switch_to(&prev->regs, &to->regs);
-
-	if(prev && prev->state == TASK_ZOMBIE){
-		if(prev->kstack){
-			kfree(prev->kstack);
-			prev->kstack = NULL;
-		}
-	}
+	_switch_to(prev, to);
 }
