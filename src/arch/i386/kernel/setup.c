@@ -8,6 +8,12 @@
 #include <arch/i386/pic.h>
 #include <lib/string.h>
 
+unsigned long max_low_pfn_mapped;
+unsigned long max_pfn_mapped;
+
+unsigned long _brk_start = (unsigned long)__brk_base;
+unsigned long _brk_end   = (unsigned long)__brk_base;
+
 static struct cpu cpus[MAX_CPUS];
 static struct gdt_entry gdt[TOTAL_GDT_SEGMENTS];
 static struct gdt_descriptor gdt_descriptor;

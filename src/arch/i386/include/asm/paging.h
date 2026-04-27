@@ -19,7 +19,9 @@
 #define _PAGE_P        0x1
 
 #define PAGE_MASK 0xFFFFF000
-#define FLAGS_MASK 0x00000FFF
+#define FLAGS_MASK (~PAGE_MASK)
+#define PAGE_SHIFT 12
+#define PGDIR_SHIFT 22
 
 typedef unsigned long pte_t;
 typedef unsigned long pgd_t;

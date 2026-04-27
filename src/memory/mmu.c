@@ -13,55 +13,7 @@
 static pgd_t* _kernel_pgd = NULL;
 
 int __init mmu_init(){
-	_kernel_pgd = pgd_alloc();
-	if(!_kernel_pgd){
-		return NO_MEMORY;
-	}
-
-	int res = pgd_dup_current(_kernel_pgd, 1);
-	if(IS_ERR_VALUE(res)){
-		goto out;
-	}
-
-	if(IS_ERR_VALUE(res = pgd_load(_kernel_pgd))){
-		goto out;
-	}
-
-	extern uintptr_t __kernel_text_start;
-	extern uintptr_t __kernel_text_end;
-
-	res = mmu_set_flags(
-		&__kernel_text_start,
-		(size_t)&__kernel_text_end - (size_t)&__kernel_text_start,
-		(MEM_READ | MEM_KERNEL)
-	);
-
-	if(IS_ERR_VALUE(res)){
-		goto out;
-	}
-
-	extern uintptr_t __kernel_rodata_start;
-	extern uintptr_t __kernel_rodata_end;
-
-	res = mmu_set_flags(
-		&__kernel_rodata_start,
-		(size_t)&__kernel_rodata_end - (size_t)&__kernel_rodata_start,
-		(MEM_READ | MEM_KERNEL)
-	);
-
-	if(IS_ERR_VALUE(res)){
-		goto out;
-	}
-
-	extern uintptr_t __boot_end;
-
-	res = mmu_munmap(
-		0x0,
-		(size_t)&__boot_end
-	);
-
-out:
-	return res;
+	return NOT_IMPLEMENTED;
 }
 
 int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags){

@@ -87,6 +87,10 @@ __no_return void kmain(){
 
 	interrupts_disable();
 
+	printk("OK\n");
+
+	while(1) cpu_relax();
+
 	struct page_metadata* mt = page_init(boot_header.e820_table, boot_header.e820_entries_count);
 	if(IS_ERR_VALUE(mt)){
 		panic("\"%s\" failed with status %d!", "page allocator", PTR_ERR(mt));

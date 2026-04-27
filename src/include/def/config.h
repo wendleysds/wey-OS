@@ -17,37 +17,18 @@
 #define GDT_USER_DATA    ((GDT_USER_DATA_INDEX << 3) | 3)
 #define GDT_TSS(index)   ((index) << 3)
 
-#ifndef __ASSEMBLY__
-extern unsigned long __kernel_phys_base;
-extern unsigned long __kernel_high_base;
-
-extern unsigned long __kernel_phys_start;
-extern unsigned long __kernel_phys_end;
-extern unsigned long __kernel_high_start;
-extern unsigned long __kernel_high_end;
-#else
-extern __kernel_phys_base
-extern __kernel_high_base
-
-extern __kernel_phys_start
-extern __kernel_phys_end
-extern __kernel_high_start
-extern __kernel_high_end
-#endif
+#include <def/linker.h>
 
 #ifndef __ASSEMBLY__
-#define PAGE_OFFSET      ((unsigned long)&__kernel_high_base)
-#define KERNEL_PHYS_BASE ((unsigned long)&__kernel_phys_base)
-
-#define KERNEL_PHYS_START ((unsigned long)&__kernel_phys_start)
-#define KERNEL_PHYS_END   ((unsigned long)&__kernel_phys_end)
-#define KERNEL_VIRT_START ((unsigned long)&__kernel_high_start + KERNEL_PHYS_BASE)
-#define KERNEL_VIRT_END   ((unsigned long)&__kernel_high_end   + KERNEL_PHYS_BASE)
+#define PAGE_OFFSET      ((unsigned long)__kernel_high_base)
+#define KERNEL_PHYS_BASE ((unsigned long)__kernel_phys_base)
+#define KERNEL_PHYS_START ((unsigned long)__kernel_phys_start)
+#define KERNEL_PHYS_END   ((unsigned long)__kernel_phys_end)
+#define KERNEL_VIRT_START ((unsigned long)__kernel_high_start + KERNEL_PHYS_BASE)
+#define KERNEL_VIRT_END   ((unsigned long)__kernel_high_end   + KERNEL_PHYS_BASE)
 #else
-
 #define PAGE_OFFSET      __kernel_high_base
 #define KERNEL_PHYS_BASE __kernel_phys_base
-
 #define KERNEL_PHYS_START __kernel_phys_start
 #define KERNEL_PHYS_END   __kernel_phys_end
 #define KERNEL_VIRT_START __kernel_high_start

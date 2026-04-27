@@ -1,30 +1,24 @@
 #include <asm-generic/linker.lds.h>
-#define LOAD_OFFSET KERNEL_VIRT_BASE + KERNEL_PHYS_BASE
-#define PAGE_SIZE 0x1000
+
+#define PAGE_SIZE 4096
 
 OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
-ENTRY(__start_32)
+ENTRY(phys_startup_32)
 
 KERNEL_PHYS_BASE = 0x00100000;
 KERNEL_VIRT_BASE = 0xC0000000;
+LOAD_OFFSET = KERNEL_VIRT_BASE;
 
 SECTIONS
 {
-	. = KERNEL_PHYS_BASE;
+	. = KERNEL_VIRT_BASE + KERNEL_PHYS_BASE;
 
-	.boot ALIGN(PAGE_SIZE) : AT(ADDR(.boot)) {
-		__boot_start = .;
-		*(.entry.boot*) *(.text.boot*) *(.rodata.boot*) *(.data.boot*) *(.bss.boot*) *(COMMON)
-		__boot_end = .;
-	}
-
-	__file_off_after_boot = . - KERNEL_PHYS_BASE;
-
-	. = KERNEL_VIRT_BASE + __file_off_after_boot;
+	phys_startup_32 = ABSOLUTE(__start_32 - LOAD_OFFSET);
 
 	.text ALIGN(PAGE_SIZE) : AT(ADDR(.text) - LOAD_OFFSET) {
 		__kernel_text_start = .;
+		*(.entry.boot*)
 		*(.text*)
 		__kernel_text_end = .;
 	}
@@ -47,7 +41,6 @@ SECTIONS
 	}
 
 	INIT_TEXT_SECTION(PAGE_SIZE)
-
 	INIT_DATA_SECTION(PAGE_SIZE)
 
 	.exit.text : AT(ADDR(.exit.text) - LOAD_OFFSET) {
@@ -65,20 +58,29 @@ SECTIONS
 
 	.bss ALIGN(PAGE_SIZE) (NOLOAD) : AT(ADDR(.bss) - LOAD_OFFSET) {
 		__kernel_bss_start = .;
-		*(COMMON) *(.bss*)
+		*(.bss*)
+		*(COMMON)
 		__kernel_bss_end = .;
 	}
 
 	__kernel_high_start = ADDR(.text);
 	__kernel_high_end   = .;
 
-	__kernel_phys_start = LOADADDR(.text);
-	__kernel_phys_end   = LOADADDR(.bss) + SIZEOF(.bss);
-
-	__kernel_size  = (__kernel_phys_end - __kernel_phys_start + 0xFFF) & ~0xFFF;
+	__kernel_size  = (__kernel_high_start - __kernel_high_end + 0xFFF) & ~0xFFF;
 
 	__kernel_high_base  = KERNEL_VIRT_BASE;
 	__kernel_phys_base  = KERNEL_PHYS_BASE;
+
+	_end_of_kernel_reserve = .;
+
+	.brk : AT(ADDR(.brk) - LOAD_OFFSET) {
+		__brk_base = .;
+		. += 64K;
+		*(.bss..brk)
+		__brk_limit = .;
+	}
+
+	_end = .;
 
 	DISCARDS
 }

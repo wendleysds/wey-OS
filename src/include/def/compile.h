@@ -20,6 +20,8 @@
 #define __packed __attribute__((packed))
 #define __cdecl __attribute__((cdecl))
 #define __regparm(x) __attribute__((regparm(x)))
+#define __no_stack_protector __attribute__((__no_stack_protector__))
+#define __aligned(x) __attribute__((aligned(x)));
 
 #define asmlinkage __attribute__((regparm(0)))
 #define notrace __attribute__((no_instrument_function))

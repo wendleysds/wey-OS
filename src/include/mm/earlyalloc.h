@@ -3,12 +3,7 @@
 
 #include <stddef.h>
 
-// used in .text.boot
-void early_alloc_init_boot();
 void* early_alloc_boot(size_t size);
-
-// used in .text
-void early_alloc_init();
 void* early_alloc(size_t size);
 
 #endif
