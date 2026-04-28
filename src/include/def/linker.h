@@ -17,10 +17,7 @@ extern char __init_end[];
 extern char __kernel_bss_start[];
 extern char __kernel_bss_end[];
 extern char __kernel_high_start[];
-extern char __kernel_high_end[];
 extern char __kernel_size[];
-extern char __kernel_high_base[];
-extern char __kernel_phys_base[];
 extern char _end_of_kernel_reserve[];
 extern char __brk_base[];
 extern char __brk_limit[];
@@ -41,10 +38,7 @@ extern __init_end
 extern __kernel_bss_start
 extern __kernel_bss_end
 extern __kernel_high_start
-extern __kernel_high_end
 extern __kernel_size
-extern __kernel_high_base
-extern __kernel_phys_base
 extern _end_of_kernel_reserve
 extern __brk_base
 extern __brk_limit

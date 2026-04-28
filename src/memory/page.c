@@ -1,4 +1,5 @@
 #include <def/config.h>
+#include <def/linker.h>
 #include <def/init.h>
 #include <def/err.h>
 #include <lib/list.h>
@@ -23,15 +24,15 @@ static struct page_metadata metadata;
 static size_t last_free_idx_hint;
 
 static inline uintptr_t align_up(uintptr_t val){
-    return (val + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
+    return (val + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 }
 
 static inline uintptr_t align_down(uintptr_t val){
-    return val & ~(PTE_PAGE_SIZE - 1);
+    return val & ~(PAGE_SIZE - 1);
 }
 
 static inline uint8_t ptr_aligned(uintptr_t ptr){
-	return (ptr & (PTE_PAGE_SIZE - 1)) == 0;
+	return (ptr & (PAGE_SIZE - 1)) == 0;
 }
 
 static inline size_t page_idx(struct page* page){
@@ -42,12 +43,12 @@ struct page* phys_to_page(uintptr_t phys_addr){
 	if(phys_addr < metadata.start_addr || phys_addr >= metadata.end_addr)
 		return NULL;
 
-	size_t idx = (phys_addr - metadata.start_addr) / PTE_PAGE_SIZE;
+	size_t idx = (phys_addr - metadata.start_addr) / PAGE_SIZE;
 	return &metadata.pages[idx];
 }
 
 uintptr_t page_to_phys(struct page* page){
-	return metadata.start_addr + (page_idx(page) * PTE_PAGE_SIZE);
+	return metadata.start_addr + (page_idx(page) * PAGE_SIZE);
 }
 
 struct page* virt_to_page(uintptr_t virt_addr){
@@ -63,7 +64,7 @@ uintptr_t page_to_virt(struct page* page){
 struct page_metadata* __init page_init(struct e820_entry* table, size_t table_length){
 	struct e820_entry* region = NULL;
 
-	uintptr_t page_phys_start = __pa(KERNEL_HEAP_START);
+	uintptr_t page_phys_start = __pa(0x0);
 	page_phys_start = align_up(page_phys_start);
 
 	for (size_t i = 0; i < table_length; i++) {
@@ -89,7 +90,7 @@ struct page_metadata* __init page_init(struct e820_entry* table, size_t table_le
 	if (phys_end <= phys_start)
 		return ERR_PTR(NO_MEMORY);
 
-	size_t total_pages = (phys_end - phys_start) / PTE_PAGE_SIZE;
+	size_t total_pages = (phys_end - phys_start) / PAGE_SIZE;
 
 	metadata.pages = (void*)early_alloc(sizeof(struct page) * total_pages);
 	if(!metadata.pages){
@@ -104,7 +105,7 @@ struct page_metadata* __init page_init(struct e820_entry* table, size_t table_le
 	}
 
 	metadata.start_addr = phys_start;
-	metadata.end_addr = phys_start + total_pages * PTE_PAGE_SIZE;
+	metadata.end_addr = phys_start + total_pages * PAGE_SIZE;
 	metadata.pages_length = total_pages;
 	metadata.allocated_pages = 0;
 
@@ -182,7 +183,7 @@ struct page* page_alloc_zeroed(size_t page_count, uint16_t flags){
 	struct page* page = page_alloc(page_count, flags);
 	if(page){
 		uintptr_t addr = page_to_virt(page);
-		memset((void*)addr, 0, page_count * PTE_PAGE_SIZE);
+		memset((void*)addr, 0, page_count * PAGE_SIZE);
 	}
 
 	return page;

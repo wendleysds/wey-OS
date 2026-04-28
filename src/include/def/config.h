@@ -17,34 +17,33 @@
 #define GDT_USER_DATA    ((GDT_USER_DATA_INDEX << 3) | 3)
 #define GDT_TSS(index)   ((index) << 3)
 
-#include <def/linker.h>
-
-#ifndef __ASSEMBLY__
-#define PAGE_OFFSET      ((unsigned long)__kernel_high_base)
-#define KERNEL_PHYS_BASE ((unsigned long)__kernel_phys_base)
-#define KERNEL_PHYS_START ((unsigned long)__kernel_phys_start)
-#define KERNEL_PHYS_END   ((unsigned long)__kernel_phys_end)
-#define KERNEL_VIRT_START ((unsigned long)__kernel_high_start + KERNEL_PHYS_BASE)
-#define KERNEL_VIRT_END   ((unsigned long)__kernel_high_end   + KERNEL_PHYS_BASE)
-#else
-#define PAGE_OFFSET      __kernel_high_base
-#define KERNEL_PHYS_BASE __kernel_phys_base
-#define KERNEL_PHYS_START __kernel_phys_start
-#define KERNEL_PHYS_END   __kernel_phys_end
-#define KERNEL_VIRT_START __kernel_high_start
-#define KERNEL_VIRT_END   __kernel_high_end
-#endif
-
-#define TOTAL_INTERRUPTS 256
+/* PIC */
 #define TIMER_FREQUENCY 20
+
+/* Interrupts */
+#define TOTAL_INTERRUPTS 256
+
+/* Kernel load bases */
+#define KERNEL_PHYS_BASE 0x00100000
+#define KERNEL_VIRT_BASE 0xC0000000
+#define PAGE_OFFSET KERNEL_VIRT_BASE
+
+/* MMU */
+#define PAGE_SIZE 0x1000
+
+/* Helpers */
+#ifndef __ASSEMBLY__
+#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
+#endif
 
 #define KiB(x) ((x) * 1024)
 #define MiB(x) ((x) * KiB(1024))
+#define GiB(x) ((x) * MiB(1024))
 
-#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
-/* Memory Layout
+/* Memory Layout */
 
+/*
 0x00000000  +----------------------------------------+
             | User Space                             |
 0xC0000000  +----------------------------------------+ 0x100000
@@ -66,35 +65,32 @@
 
 */
 
-#define PAGE_SIZE 0x1000
-
 #define RESERVED_SIZE       MiB(8)
 #define KERNEL_STACKS_SIZE  MiB(1)
 
 #define USER_SPACE_START    0x00000000UL
 #define USER_SPACE_END      0xBFFFFFFFUL
 
-/* Virual MMIO start addr */
+// Virual MMIO start addr
 #define KERNEL_MMIO_START   0xF0000000UL
 #define KERNEL_MMIO_END     0xFFFFFFFFUL
+#define KERNEL_MMIO_SIZE    (KERNEL_MMIO_END - KERNEL_MMIO_START)
 
-/* Virual reserved early alloc start addr */
+// Virual reserved early alloc start addr
 #define KERNEL_EARLY_START  (ALIGN(KERNEL_VIRT_END, PAGE_SIZE))
 #define KERNEL_EARLY_END    (KERNEL_EARLY_START + RESERVED_SIZE - 1)
 
-/* Virual stacks start addr */
+// Virual stacks start addr
 #define KERNEL_STACKS_START  (KERNEL_EARLY_END + 1)
 #define KERNEL_STACKS_END    (KERNEL_STACKS_START + KERNEL_STACKS_SIZE - 1)
 
-/* Virual heap start addr */
+// Virual heap start addr
 #define KERNEL_HEAP_START   (ALIGN(KERNEL_STACKS_END + 1, PAGE_SIZE))
 #define KERNEL_HEAP_END     (KERNEL_MMIO_START - 1)
 
-#define KERNEL_MMIO_SIZE    (KERNEL_MMIO_END - KERNEL_MMIO_START)
-
 #define EARLY_STACK_SIZE KiB(4)
 #define EARY_STACK_ADDR_BOTTOM 0x90000
-#define EARY_STACK_ADDR (EARY_STACK_ADDR_BOTTOM - EARLY_STACK_SIZE)
+#define EARY_STACK_ADDR (EARY_STACK_ADDR_BOTTOM + EARLY_STACK_SIZE)
 
 /*Printk*/
 #define PRINTK_BUFFER_SIZE KiB(16)

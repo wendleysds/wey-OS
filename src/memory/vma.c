@@ -72,8 +72,8 @@ struct mem_region* vma_add(
 		return ERR_PTR(INVALID_ARG);
 	}
 
-	uintptr_t aligned_start = ALIGN_DOWN(start, PTE_PAGE_SIZE);
-	uintptr_t aligned_end   = ALIGN_UP(end, PTE_PAGE_SIZE);
+	uintptr_t aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
+	uintptr_t aligned_end   = ALIGN_UP(end, PAGE_SIZE);
 
 	off_t aligned_offset = file_offset;
 

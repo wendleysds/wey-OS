@@ -4,6 +4,7 @@
 #include <wey/panic.h>
 #include <def/err.h>
 #include <def/init.h>
+#include <def/config.h>
 #include <asm/page.h>
 
 /**
@@ -24,8 +25,8 @@ int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags){
 	uintptr_t paddr = (uintptr_t)physaddr;
 	uintptr_t vaddr = (uintptr_t)virtaddr;
 
-	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
-	unsigned int count = alignedSize / PTE_PAGE_SIZE;
+	unsigned int alignedSize = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+	unsigned int count = alignedSize / PAGE_SIZE;
 
 	int pflags = mmu_flags_arch(mem_flags);
 	for(unsigned int i = 0; i < count; i++){
@@ -37,14 +38,14 @@ int mmu_mmap(void* physaddr, void* virtaddr, int size, mem_flags_t mem_flags){
 					panic("mmu_mmap(): failed to rollback map!\n");
 				}
 
-				vaddr += PTE_PAGE_SIZE;
+				vaddr += PAGE_SIZE;
 			}
 
 			return status;
 		}
 
-		vaddr += PTE_PAGE_SIZE;
-		paddr += PTE_PAGE_SIZE;
+		vaddr += PAGE_SIZE;
+		paddr += PAGE_SIZE;
 	}
 
 	return SUCCESS;
@@ -57,8 +58,8 @@ int mmu_munmap(void* virtaddr, int size){
 
 	uintptr_t vaddr = (uintptr_t)virtaddr;
 
-	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
-	unsigned int count = alignedSize / PTE_PAGE_SIZE;
+	unsigned int alignedSize = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+	unsigned int count = alignedSize / PAGE_SIZE;
 
 	for(unsigned int i = 0; i < count; i++){
 		int status = pgd_unmap(vaddr);
@@ -66,7 +67,7 @@ int mmu_munmap(void* virtaddr, int size){
 			return status;
 		}
 
-		vaddr += PTE_PAGE_SIZE;
+		vaddr += PAGE_SIZE;
 	}
 
 	return SUCCESS;
@@ -79,8 +80,8 @@ int mmu_set_flags(void* virtaddr, int size, mem_flags_t flags){
 
 	uintptr_t vaddr = (uintptr_t)virtaddr;
 
-	unsigned int alignedSize = (size + PTE_PAGE_SIZE - 1) & ~(PTE_PAGE_SIZE - 1);
-	unsigned int count = alignedSize / PTE_PAGE_SIZE;
+	unsigned int alignedSize = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+	unsigned int count = alignedSize / PAGE_SIZE;
 
 	int target_flags = mmu_flags_arch(flags);
 	int old_flags = pte_get_flags(vaddr);
@@ -93,13 +94,13 @@ int mmu_set_flags(void* virtaddr, int size, mem_flags_t flags){
 				if(pte_update_flags(vaddr, old_flags) != SUCCESS)
 					panic("mmu_set_flags(): failed to rollback flags!\n");
 
-				vaddr += PTE_PAGE_SIZE;
+				vaddr += PAGE_SIZE;
 			}
 
 			return status;
 		}
 
-		vaddr += PTE_PAGE_SIZE;
+		vaddr += PAGE_SIZE;
 	}
 
 	return SUCCESS;

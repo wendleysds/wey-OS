@@ -2,16 +2,15 @@
 #include <mm/page.h>
 #include <asm/paging.h>
 #include <lib/string.h>
+#include <def/config.h>
 #include <stdint.h>
-
-#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
 void* kmalloc(size_t size){
     if (size == 0)
         return NULL;
 
     if (size >= SLAB_MAX_SIZE) {
-        size_t pages = ALIGN(size, PTE_PAGE_SIZE) / PTE_PAGE_SIZE;
+        size_t pages = ALIGN(size, PAGE_SIZE) / PAGE_SIZE;
         struct page* page = page_alloc(pages, PAGE_KERNEL);
         if (!page)
             return NULL;
@@ -26,8 +25,8 @@ void* kmalloc(size_t size){
 				(_PAGE_P | _PAGE_RW)
 			);
 
-			virt += PTE_PAGE_SIZE;
-			phys += PTE_PAGE_SIZE;
+			virt += PAGE_SIZE;
+			phys += PAGE_SIZE;
 		}
 
         return (void*)page_to_virt(page);

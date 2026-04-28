@@ -1,13 +1,12 @@
 #include <asm-generic/linker.lds.h>
+#include <def/config.h>
 
-#define PAGE_SIZE 4096
+#undef ALIGN
 
 OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 ENTRY(phys_startup_32)
 
-KERNEL_PHYS_BASE = 0x00100000;
-KERNEL_VIRT_BASE = 0xC0000000;
 LOAD_OFFSET = KERNEL_VIRT_BASE;
 
 SECTIONS
@@ -63,22 +62,22 @@ SECTIONS
 		__kernel_bss_end = .;
 	}
 
+	__page_offset = KERNEL_VIRT_BASE;
+
 	__kernel_high_start = ADDR(.text);
-	__kernel_high_end   = .;
-
-	__kernel_size  = (__kernel_high_start - __kernel_high_end + 0xFFF) & ~0xFFF;
-
-	__kernel_high_base  = KERNEL_VIRT_BASE;
-	__kernel_phys_base  = KERNEL_PHYS_BASE;
 
 	_end_of_kernel_reserve = .;
 
-	.brk : AT(ADDR(.brk) - LOAD_OFFSET) {
+	__kernel_size = (_end_of_kernel_reserve - __kernel_high_start + 0xFFF) & ~0xFFF;
+
+	.brk ALIGN(PAGE_SIZE): AT(ADDR(.brk) - LOAD_OFFSET) {
 		__brk_base = .;
 		. += 64K;
 		*(.bss..brk)
 		__brk_limit = .;
 	}
+
+	. = ALIGN(PAGE_SIZE);
 
 	_end = .;
 

@@ -1,6 +1,7 @@
 #include "wey/printk.h"
 #include <def/init.h>
 #include <def/config.h>
+#include <def/linker.h>
 #include <asm/cpu.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>

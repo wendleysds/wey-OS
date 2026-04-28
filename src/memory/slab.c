@@ -44,7 +44,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 
 	uintptr_t obj_start = virt + sizeof(struct slab);
 	slab->start = (void*)obj_start;
-	slab->total_objects = (PTE_PAGE_SIZE - (obj_start - virt)) / 
+	slab->total_objects = (PAGE_SIZE - (obj_start - virt)) / 
 		cache->object_size;
 
 	// Initialize free list
@@ -69,7 +69,7 @@ static void slab_destroy(struct slab* slab){
 void __init slab_init(){
 	for (int i = 0; i < NUM_SLAB_SIZES; i++) {
 		slab_caches[i].object_size = slab_sizes[i];
-		slab_caches[i].slab_size = PTE_PAGE_SIZE;
+		slab_caches[i].slab_size = PAGE_SIZE;
 		INIT_LIST_HEAD(&slab_caches[i].slabs);
 	}
 }
