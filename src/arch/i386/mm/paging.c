@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <wey/panic.h>
 #include <mm/page.h>
 #include <wey/vma.h>
@@ -7,8 +8,8 @@
 #include <def/config.h>
 
 #define ADDRS_NOT_ALING(virt, phys) \
-	(((uintptr_t)(virt) & (PTE_PAGE_SIZE - 1)) || \
-	((uintptr_t)(phys) & (PTE_PAGE_SIZE - 1)))
+	(((uintptr_t)(virt) & (PAGE_SIZE - 1)) || \
+	((uintptr_t)(phys) & (PAGE_SIZE - 1)))
 
 #define SELF_PDE_INDEX 1023
 #define SELF_PDE_BASE  (SELF_PDE_INDEX << 22)
@@ -43,7 +44,7 @@ int pgd_load(pgd_t* pgd){
 		return SUCCESS;
 	}
 
-	if ((uintptr_t)(pgd) & (PTE_PAGE_SIZE - 1)) {
+	if ((uintptr_t)(pgd) & (PAGE_SIZE - 1)) {
 		return BAD_ALIGNMENT;
 	}
 
@@ -79,7 +80,7 @@ pgd_t* pgd_alloc(){
 	}
 
 	pgd = (pgd_t*)page_to_virt(pgd_page);
-	pgd[SELF_PDE_INDEX] = (pgd_t)page_to_phys(pgd_page) | _PAGE_P | _PAGE_RW;
+	pgd[SELF_PDE_INDEX].val = (uintptr_t)page_to_phys(pgd_page) | _PAGE_P | _PAGE_RW;
 
 	return pgd;
 }
@@ -93,11 +94,11 @@ void pgd_free(pgd_t* pgd){
 
 	struct page* p = NULL;
 
-	pgd[SELF_PDE_INDEX] = 0;
+	pgd[SELF_PDE_INDEX].val = 0;
 
-	for (int i = 0; i < PGD_MAX_PTE; i++) {
-		if (pgd[i] & _PAGE_P) {
-			p = phys_to_page(pgd[i] & PAGE_MASK);
+	for (int i = 0; i < PGD_MAX_ENTRIES; i++) {
+		if (pgd[i].val & _PAGE_P) {
+			p = phys_to_page(pgd[i].val & PAGE_MASK);
 			page_free(p);
 		}
 	}
@@ -113,18 +114,18 @@ static int _map(uintptr_t virtaddr, uintptr_t physaddr, int flags){
 	pgd_t* pde = PGD_VADDR;
 	pte_t* pte = PT_VADDR(dir_idx);
 
-	if (!(pde[dir_idx] & _PAGE_P)) {
+	if (!(pde[dir_idx].val & _PAGE_P)) {
 		struct page* pt_page = page_alloc(1, PAGE_KERNEL | PAGE_TABLE);
 		if(!pt_page){
 			return NO_MEMORY;
 		}
 
-		pde[dir_idx] = (pte_t)page_to_phys(pt_page) | flags | _PAGE_P;
+		pde[dir_idx].val = (uintptr_t)page_to_phys(pt_page) | flags | _PAGE_P;
 		pte = PT_VADDR(dir_idx);
-		memset(pte, 0x0, PTE_PAGE_SIZE);
+		memset(pte, 0x0, PAGE_SIZE);
 	}
 
-	pte[tbl_idx] = ((uintptr_t)physaddr & PAGE_MASK) | flags;
+	pte[tbl_idx].val = ((uintptr_t)physaddr & PAGE_MASK) | flags;
 
 	return SUCCESS;
 }
@@ -140,7 +141,7 @@ int pgd_map(uintptr_t virtaddr, uintptr_t physaddr, int flags){
 	pgd_t* pde = PGD_VADDR;
 	pte_t* pte = PT_VADDR(dir_idx);
 
-	if ((pde[dir_idx] & _PAGE_P) && (pte[tbl_idx] & _PAGE_P)) {
+	if ((pde[dir_idx].val & _PAGE_P) && (pte[tbl_idx].val & _PAGE_P)) {
 		return ALREADY_MAPD;
 	}
 
@@ -160,23 +161,23 @@ int pgd_unmap(uintptr_t virtaddr){
 	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
 
 	pgd_t* pde = PGD_VADDR;
-	if (!(pde[dir_idx] & _PAGE_P)) {
+	if (!(pde[dir_idx].val & _PAGE_P)) {
 		return ALREADY_UMAPD;
 	}
 
 	pte_t* pte = PT_VADDR(dir_idx);
-	if (!(pte[tbl_idx] & _PAGE_P)) {
+	if (!(pte[tbl_idx].val & _PAGE_P)) {
 		return ALREADY_UMAPD;
 	}
 
-	struct page* p = phys_to_page(pde[dir_idx] & PAGE_MASK);
+	struct page* p = phys_to_page(pde[dir_idx].val & PAGE_MASK);
 	if(!p) return INVALID_ARG;
 
-	pte[tbl_idx] = 0;
+	pte[tbl_idx].val = 0;
 	invlpg((void*)virtaddr);
 
 	for (int i = 0; i < PTE_MAX_ENTRIES; i++) {
-		if (pte[i] & _PAGE_P) {
+		if (pte[i].val & _PAGE_P) {
 			return SUCCESS;
 		}
 	}
@@ -188,11 +189,11 @@ int pgd_unmap(uintptr_t virtaddr){
 
 	status = page_free(p);
 	if(IS_ERR_VALUE(status)){
-		pgd_direct_map_page(p, pde[dir_idx] & FLAGS_MASK);
+		pgd_direct_map_page(p, pde[dir_idx].val & FLAGS_MASK);
 		return status;
 	}
 
-	pde[dir_idx] = 0;
+	pde[dir_idx].val = 0;
 
 	invlpg((void*)(dir_idx << 22));
 
@@ -204,18 +205,18 @@ int pte_update_flags(uintptr_t virtaddr, int flags){
 	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
 
 	pgd_t* pde = PGD_VADDR;
-	if (!(pde[dir_idx] & _PAGE_P)) {
+	if (!(pde[dir_idx].val & _PAGE_P)) {
 		return INVALID_ARG;
 	}
 
 	pte_t* pte = PT_VADDR(dir_idx);
-	if (!(pte[tbl_idx] & _PAGE_P)) {
+	if (!(pte[tbl_idx].val & _PAGE_P)) {
 		return INVALID_ARG;
 	}
 
-	uintptr_t physaddr = pte[tbl_idx] & PAGE_MASK;
+	uintptr_t physaddr = pte[tbl_idx].val & PAGE_MASK;
 
-	pte[tbl_idx] = physaddr | flags;
+	pte[tbl_idx].val = physaddr | flags;
 	invlpg((void*)virtaddr);
 
 	return SUCCESS;
@@ -226,16 +227,16 @@ int pte_get_flags(uintptr_t virtaddr){
 	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
 
 	pgd_t* pde = PGD_VADDR;
-	if (!(pde[dir_idx] & _PAGE_P)) {
+	if (!(pde[dir_idx].val & _PAGE_P)) {
 		return 0;
 	}
 
 	pte_t* pte = PT_VADDR(dir_idx);
-	if (!(pte[tbl_idx] & _PAGE_P)) {
+	if (!(pte[tbl_idx].val & _PAGE_P)) {
 		return 0;
 	}
 
-	return pte[tbl_idx] & FLAGS_MASK;
+	return pte[tbl_idx].val & FLAGS_MASK;
 }
 
 void* pgd_translate(void* virtaddr){
@@ -244,16 +245,16 @@ void* pgd_translate(void* virtaddr){
 	uint32_t offset  = (uintptr_t)virtaddr & 0xFFF;
 
 	pgd_t* pde = PGD_VADDR;
-	if (!(pde[dir_idx] & _PAGE_P)) {
+	if (!(pde[dir_idx].val & _PAGE_P)) {
 		return NULL;
 	}
 
 	pte_t* pte = PT_VADDR(dir_idx);
-	if (!(pte[tbl_idx] & _PAGE_P)) {
+	if (!(pte[tbl_idx].val & _PAGE_P)) {
 		return NULL;
 	}
 
-	uintptr_t physaddr = (pte[tbl_idx] & PAGE_MASK) | offset;
+	uintptr_t physaddr = (pte[tbl_idx].val & PAGE_MASK) | offset;
 	return (void*)physaddr;
 }
 
@@ -261,13 +262,13 @@ int pgd_dup_current(pgd_t* pgd, uint8_t copy_kernel_area){
 	pgd_t* src = PGD_VADDR;
 	struct page* p = NULL;
 
-	for (int i = 0; i < PGD_MAX_PTE; i++){
+	for (int i = 0; i < PGD_MAX_ENTRIES; i++){
 		if(i == SELF_PDE_INDEX){
 			continue;
 		}
 
-		if (!(src[i] & _PAGE_P)) {
-			pgd[i] = 0;
+		if (!(src[i].val & _PAGE_P)) {
+			pgd[i].val = 0;
 			continue;
 		}
 
@@ -276,13 +277,13 @@ int pgd_dup_current(pgd_t* pgd, uint8_t copy_kernel_area){
 			continue;
 		}
 
-		if (src[i] & _PAGE_P) {			
+		if (src[i].val & _PAGE_P) {			
 			pte_t* src_pt = PT_VADDR(i);
 			p = page_alloc(1, PAGE_KERNEL | PAGE_TABLE);
 			if (!p) {
 				for(int j = 0; j < i; j++){
-					if(pgd[j] & _PAGE_P){
-						p = phys_to_page(pgd[j] & PAGE_MASK);
+					if(pgd[j].val & _PAGE_P){
+						p = phys_to_page(pgd[j].val & PAGE_MASK);
 						page_free(p);
 					}
 				}
@@ -291,13 +292,13 @@ int pgd_dup_current(pgd_t* pgd, uint8_t copy_kernel_area){
 			}
 			
 			pte_t* dest_pt = (pte_t*)page_to_virt(p);
-			pgd_direct_map_page(p, src[i] & FLAGS_MASK);
+			pgd_direct_map_page(p, src[i].val & FLAGS_MASK);
 
 			for (int j = 0; j < PTE_MAX_ENTRIES; j++) {
 				dest_pt[j] = src_pt[j];
 			}
 
-			pgd[i] = (pgd_t)page_to_phys(p) | (src[i] & FLAGS_MASK);
+			pgd[i].val = (uintptr_t)page_to_phys(p) | (src[i].val & FLAGS_MASK);
 		}
 	}
 
@@ -305,23 +306,23 @@ int pgd_dup_current(pgd_t* pgd, uint8_t copy_kernel_area){
 }
 
 void pgd_copy(pgd_t* dest, pgd_t* src){
-	for (int i = 0; i < PGD_MAX_PTE; i++) {
+	for (int i = 0; i < PGD_MAX_ENTRIES; i++) {
 		if(i == SELF_PDE_INDEX) continue;
 		dest[i] = src[i];
 	}
 }
 
 void pgd_copy_kernel(pgd_t* kernel_pgd, pgd_t* pgd){
-	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_PTE; i++) {
+	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_ENTRIES; i++) {
 		if(i == SELF_PDE_INDEX) continue;
 		pgd[i] = kernel_pgd[i];
 	}
 }
 
 void pgd_remove_kernel(pgd_t* pgd){
-	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_PTE; i++) {
+	for (int i = (PAGE_OFFSET >> 22); i < PGD_MAX_ENTRIES; i++) {
 		if(i == SELF_PDE_INDEX) continue;
-		pgd[i] = 0;
+		pgd[i].val = 0;
 	}
 }
 

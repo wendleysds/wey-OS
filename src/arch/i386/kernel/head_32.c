@@ -1,3 +1,5 @@
+#include "def/linker.h"
+#include <stdint.h>
 #include <wey/printk.h>
 #include <mm/earlyalloc.h>
 #include <lib/string.h>
@@ -10,15 +12,15 @@
 
 #include <uapi/headers.h>
 
-#define PAGE_COUNT(size) (((size) + PTE_PAGE_SIZE - 1) / PTE_PAGE_SIZE)
-#define PAGE_TABLE_SIZE(pages) ((pages) / PGD_MAX_PTE)
+#define PAGE_COUNT(size) (((size) + PAGE_SIZE - 1) / PAGE_SIZE)
+#define PAGE_TABLE_SIZE(pages) ((pages) / PGD_MAX_ENTRIES)
 #define LOWMEM_PAGES (((2Ull << 31) - PAGE_OFFSET) >> PAGE_SHIFT)
 
 #define hlt() do { __asm__ volatile("hlt"); } while(1)
 
 struct boot_header boot_header;
 
-pgd_t initial_pgdir [PGD_MAX_PTE] __aligned(PTE_PAGE_SIZE);
+pgd_t initial_pgdir [PGD_MAX_ENTRIES] __aligned(PAGE_SIZE);
 
 extern int terminal_early_init();
 extern void kmain();
@@ -74,45 +76,40 @@ static __init void e820_sort(struct e820_entry* table, uint32_t count){
     }
 }
 
-static __init __no_stack_protector pte_t init_map(pgd_t *pgd, unsigned long limit) {
-	uintptr_t addr = 0; 
-	size_t pgd_index = 0; 
-	const size_t mirror_offset = PAGE_OFFSET >> PGDIR_SHIFT; 
+static __init __no_stack_protector pte_t init_map(pgd_t **pgdp, pte_t **ptep, pte_t pte, const unsigned long limit) {
+	while ((pte.val & PAGE_MASK) < limit) {
+		pgd_t pt = { .val = (unsigned long)*ptep | (_PAGE_P | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED) };
 
-	while (addr < limit) {
-		if (pgd_index >= PGD_MAX_PTE) {
-			break;
+		**pgdp = pt;
+		*(*pgdp + ((PAGE_OFFSET >> PGDIR_SHIFT))) = pt;
+
+		for (int i = 0; i < 1024; i++) {
+			**ptep = pte;
+			pte.val += PAGE_SIZE;
+			(*ptep)++;
 		}
 
-		pte_t *pt = (pte_t*)early_alloc_boot(PTE_PAGE_SIZE);
-		memset(pt, 0x0, PTE_PAGE_SIZE);
-
-		pgd[pgd_index] = (size_t)pt | (_PAGE_P | _PAGE_RW);
-
-		if (pgd_index + mirror_offset < PGD_MAX_PTE) { 
-			pgd[pgd_index + mirror_offset] = pgd[pgd_index]; 
-		}
-
-		for (int i = 0; i < PTE_MAX_ENTRIES && addr < limit; i++) {
-			pt[i] = (addr & PAGE_MASK) | (_PAGE_P | _PAGE_RW);
-			addr += PAGE_SIZE;
-		}
-
-		++pgd_index;
+		(*pgdp)++;
 	}
 
-	return addr;
+	return pte;
 }
 
 void __init __no_stack_protector mk_early_pgtbl_32(void){
-	pgd_t* pgd = (pgd_t*)__pa(initial_pgdir);
-	memset(pgd, 0x0, sizeof(initial_pgdir));
-
 	const unsigned long limit = __pa(_end) + (PAGE_TABLE_SIZE(LOWMEM_PAGES) << PAGE_SHIFT);
 
-	init_map(pgd, limit);
+	pte_t pte = { .val = 0 | (_PAGE_P | _PAGE_RW) };
 
-	pgd[1023] = ((pgd_t)initial_pgdir & PAGE_MASK) | (_PAGE_P | _PAGE_RW);
+	pte_t *ptep = (pte_t *)__pa(__brk_base);
+	pgd_t *pgdp = (pgd_t *)__pa(initial_pgdir);
+
+	pte = init_map(&pgdp, &ptep, pte, limit);
+
+	unsigned long *ptr = (unsigned long *)__pa(&max_pfn_mapped);
+	*ptr = (pte.val & PAGE_MASK) >> PAGE_SHIFT;
+
+	ptr = (unsigned long *)__pa(&_brk_end);
+	*ptr = (unsigned long)ptep + PAGE_OFFSET;
 }
 
 void __regparm(1) __init __no_return i386_start_kernel(struct boot_header* boot_header_ptr){
@@ -157,6 +154,8 @@ void __regparm(1) __init __no_return i386_start_kernel(struct boot_header* boot_
 
 		range_end_prev = range_end;
 	}
+
+	printk("boot: heap: 0x%p - 0x%p (%u KiB)\n", __brk_base, _brk_end, (_brk_end - (size_t)__brk_base) / KiB(1));
 
 	kmain();
 

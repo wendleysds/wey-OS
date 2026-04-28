@@ -1,4 +1,5 @@
 #include <def/config.h>
+#include <def/linker.h>
 #include <asm/gdt.h>
 
 #undef PAGE_OFFSET

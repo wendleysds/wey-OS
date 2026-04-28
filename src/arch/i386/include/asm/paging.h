@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define PGD_MAX_PTE 1024
+#define PGD_MAX_ENTRIES 1024
 #define PTE_MAX_ENTRIES 1024
 #define PTE_PAGE_SIZE 4096
 
@@ -23,8 +23,10 @@
 #define PAGE_SHIFT 12
 #define PGDIR_SHIFT 22
 
-typedef unsigned long pte_t;
-typedef unsigned long pgd_t;
+typedef struct { unsigned long val; } pte_t;
+typedef struct { unsigned long val; } pmd_t;
+typedef struct { unsigned long val; } pud_t;
+typedef struct { unsigned long val; } pgd_t;
 
 struct page;
 
