@@ -32,14 +32,9 @@
 #define PAGE_SIZE 0x1000
 
 /* Helpers */
-#ifndef __ASSEMBLY__
-#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
-#endif
-
 #define KiB(x) ((x) * 1024)
 #define MiB(x) ((x) * KiB(1024))
 #define GiB(x) ((x) * MiB(1024))
-
 
 /* Memory Layout */
 
@@ -47,50 +42,49 @@
 0x00000000  +----------------------------------------+
             | User Space                             |
 0xC0000000  +----------------------------------------+ 0x100000
-            | Kernel image (.text/.data/.bss)        |
-            |                                        |
-            | __kernel_high_start                    |
-            | __kernel_high_end                      |
+            | Direct Mapping                         |
             +----------------------------------------+
-            | Early allocator / init sections        |
-			| Early Pages & Tables                   |
-            | Page metadata (struct page[])          |
+            | Sparse Vmemmap                         |
             +----------------------------------------+
-            | Kernel stack + page guard (Per-CPU)    |
+            | Highmem                                |
             +----------------------------------------+
-            | Slab / kmalloc area (lowmem)           |
-0xEFFFFFFF  +----------------------------------------+
+            | Fixed Mapping                          |
+            +----------------------------------------+
             | NON-LINEAR / MMIO                      | ~256MiB
 0xFFFFFFFF  +----------------------------------------+
-
 */
+
+#define KERNEL_NONLINEAR_MMIO_START (0xF0000000UL)
+#define KERNEL_NONLINEAR_MMIO_END   (0xFFFFFFFFUL)
+
+#define KERNEL_NONLINEAR_MMIO_SIZE (KERNEL_NONLINEAR_MMIO_END - KERNEL_NONLINEAR_MMIO_START)
+#define KERNEL_HIGHMEM_SIZE MiB(16)
+#define KERNEL_FIXEDMAP_SIZE MiB(8)
+#define KERNEL_VMEMMAP_SIZE MiB(32)
+#define KERNEL_DIRECTMAP_SIZE ( \
+	GiB(1) - KERNEL_HIGHMEM_SIZE - KERNEL_FIXEDMAP_SIZE \
+	KERNEL_NONLINEAR_MMIO_SIZE - KERNEL_VMEMMAP_SIZE \
+)
 
 #define RESERVED_SIZE       MiB(8)
 #define KERNEL_STACKS_SIZE  MiB(1)
 
-#define USER_SPACE_START    0x00000000UL
-#define USER_SPACE_END      0xBFFFFFFFUL
+#define USER_SPACE_START (0x00000000)
+#define USER_SPACE_END   (KERNEL_VIRT_BASE - 1)
 
-// Virual MMIO start addr
-#define KERNEL_MMIO_START   0xF0000000UL
-#define KERNEL_MMIO_END     0xFFFFFFFFUL
-#define KERNEL_MMIO_SIZE    (KERNEL_MMIO_END - KERNEL_MMIO_START)
+#define KERNEL_DIRECTMAP_START (KERNEL_VIRT_BASE)
+#define KERNEL_DIRECTMAP_END   (KERNEL_DIRECTMAP_START + KERNEL_DIRECTMAP_SIZE - 1)
 
-// Virual reserved early alloc start addr
-#define KERNEL_EARLY_START  (ALIGN(KERNEL_VIRT_END, PAGE_SIZE))
-#define KERNEL_EARLY_END    (KERNEL_EARLY_START + RESERVED_SIZE - 1)
+#define KERNEL_VMEMMAP_START (KERNEL_DIRECTMAP_END + 1)
+#define KERNEL_VMEMMAP_END   (KERNEL_VMEMMAP_START + KERNEL_VMEMMAP_SIZE - 1)
 
-// Virual stacks start addr
-#define KERNEL_STACKS_START  (KERNEL_EARLY_END + 1)
-#define KERNEL_STACKS_END    (KERNEL_STACKS_START + KERNEL_STACKS_SIZE - 1)
+#define KERNEL_FIXEDMAP_START (KERNEL_VMEMMAP_END + 1)
+#define KERNEL_FIXEDMAP_END   (KERNEL_FIXEDMAP_START + KERNEL_FIXEDMAP_SIZE - 1)
 
-// Virual heap start addr
-#define KERNEL_HEAP_START   (ALIGN(KERNEL_STACKS_END + 1, PAGE_SIZE))
-#define KERNEL_HEAP_END     (KERNEL_MMIO_START - 1)
+#define KERNEL_HIGHMEM_START (KERNEL_FIXEDMAP_END + 1)
+#define KERNEL_HIGHMEM_END   (KERNEL_HIGHMEM_START + KERNEL_HIGHMEM_SIZE - 1)
 
-#define EARLY_STACK_SIZE KiB(4)
-#define EARY_STACK_ADDR_BOTTOM 0x90000
-#define EARY_STACK_ADDR (EARY_STACK_ADDR_BOTTOM + EARLY_STACK_SIZE)
+#define EARY_STACK_ADDR 0x94000
 
 /*Printk*/
 #define PRINTK_BUFFER_SIZE KiB(16)

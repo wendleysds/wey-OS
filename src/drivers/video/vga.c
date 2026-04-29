@@ -134,12 +134,12 @@ static void vga_cursor(struct vt_data *vt, uint8_t enabled){
 static void vga_exit_early(){
 	mmu_mmap(
 		(void*)vga_vram_base,
-		(void*)KERNEL_MMIO_START,
+		(void*)0x0,
 		vga_vram_size,
 		(MEM_DEVICE | MEM_KERNEL | MEM_READ | MEM_WRITE)
 	);
 
-	vga_vram_base = KERNEL_MMIO_START;
+	vga_vram_base = 0x0;
 	vga_vram_end = vga_vram_base + vga_vram_size;
 }
 

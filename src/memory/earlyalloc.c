@@ -3,10 +3,13 @@
 #include <def/linker.h>
 #include <asm/paging.h>
 #include <asm/page.h>
+#include <stdint.h>
 #include <stddef.h>
 
 // Early allocator
 // Synchronized boot and normal phases
+
+#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
 static size_t alloc_addr __initdata = (size_t)__brk_base;
 static size_t alloc_end __initdata = (size_t)__brk_limit;

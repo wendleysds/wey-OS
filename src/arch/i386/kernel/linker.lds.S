@@ -1,8 +1,6 @@
 #include <asm-generic/linker.lds.h>
 #include <def/config.h>
 
-#undef ALIGN
-
 OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 ENTRY(phys_startup_32)
