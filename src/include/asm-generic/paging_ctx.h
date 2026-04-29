@@ -6,8 +6,8 @@
 
 struct paging_ctx {
 	void *root; // pgd
-	struct paging_format* fmt;
-	struct paging_ops *ops;
+	const struct paging_format* fmt;
+	const struct paging_ops *ops;
 };
 
 #endif

@@ -86,7 +86,7 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 	struct page* page = page_alloc(1, PAGE_USER);
 	if (!page) return NO_MEMORY;
 
-	int res = pgd_remap(
+	/*int res = pgd_remap(
 		page_addr, 
 		page_to_phys(page), 
 		mmu_flags_arch(region->mem_flags)
@@ -95,7 +95,7 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 	if(IS_ERR_VALUE(res)){
 		page_free(page);
 		return res;
-	}
+	}*/
 
 	memset((void*)page_addr, 0x0, PAGE_SIZE);
 
@@ -119,7 +119,7 @@ static int vm_handle_stack(struct mem_region* region, uintptr_t addr){
 	struct page* page = page_alloc(1, PAGE_USER);
 	if (!page) return NO_MEMORY;
 
-	int res = pgd_remap(
+	/*int res = pgd_remap(
 		page_addr, 
 		page_to_phys(page), 
 		mmu_flags_arch(region->mem_flags)
@@ -128,7 +128,7 @@ static int vm_handle_stack(struct mem_region* region, uintptr_t addr){
 	if(IS_ERR_VALUE(res)){
 		page_free(page);
 		return res;
-	}
+	}*/
 
 	vma_page_hash_insert(region, page_addr, page);
 	memset((void*)page_addr, 0x0, PAGE_SIZE);
@@ -151,17 +151,17 @@ static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
 	}
 
 	if(atomic_read(&page->refcount) == 1){
-		int flags = pte_get_flags(page_addr);
+		/*int flags = pte_get_flags(page_addr);
 		flags |= mmu_flags_arch(MEM_WRITE);
 		pte_update_flags(page_addr, flags);
-		page->flags &= ~PAGE_COW;
+		page->flags &= ~PAGE_COW;*/
 		return SUCCESS;
 	}
 
 	struct page* new_page = page_alloc(1, PAGE_USER);
 	if (!new_page) return NOT_FOUND;
 
-	int res = pgd_map(
+	/*int res = pgd_map(
 		page_to_virt(new_page),
 		page_to_phys(new_page),
 		(_PAGE_P | _PAGE_RW)
@@ -195,7 +195,7 @@ static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
 
 	invlpg((void*)page_addr);
 
-	page_put(page);
+	page_put(page);*/
 
 	return SUCCESS;
 }

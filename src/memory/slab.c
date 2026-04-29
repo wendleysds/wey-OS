@@ -28,13 +28,12 @@ static struct slab* slab_create(struct slab_cache* cache){
 	if(!page)
 		return NULL;
 
-	uintptr_t phys = page_to_phys(page);
 	uintptr_t virt = page_to_virt(page);
 
-	if(pgd_map(virt, phys, _PAGE_P | _PAGE_RW)){
+	/*if(pgd_map(virt, phys, _PAGE_P | _PAGE_RW)){
 		page_free(page);
 		return NULL;
-	}
+	}*/
 
 	struct slab* slab = (struct slab*)virt;
 	memset(slab, 0x0, sizeof(*slab));
@@ -63,7 +62,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 
 static void slab_destroy(struct slab* slab){
 	page_free(slab->page);
-	pgd_unmap((uintptr_t)slab);
+	//pgd_unmap((uintptr_t)slab);
 }
 
 void __init slab_init(){
@@ -78,6 +77,7 @@ void *slab_alloc(size_t size){
 	if(size == 0)
 		return NULL;
 
+	void *obj = NULL;
 	int cache_idx = get_cache_index(size);
 	if(cache_idx < 0){
 		// May alloc page and return addr
@@ -99,7 +99,7 @@ void *slab_alloc(size_t size){
 	list_add(&slab->list, &cache->slabs);
 
 found:
-	void *obj = slab->free_list;
+	obj = slab->free_list;
 	slab->free_list = *(void **)obj;
 	slab->free_count--;
 	return obj;

@@ -203,8 +203,8 @@ static void set_mm_cow(struct mm_struct* mm, uint8_t increse_page_ref, pgd_t* cu
 				if((cur->mem_flags & MEM_WRITE) == 0) continue;
 
 				node->page->flags |= PAGE_COW;
-				int flags = mmu_flags_arch(cur->mem_flags & ~MEM_WRITE);
-				pte_update_flags(node->addr, flags);
+				//int flags = mmu_flags_arch(cur->mem_flags & ~MEM_WRITE);
+				//pte_update_flags(node->addr, flags);
 			}
 		}
 
@@ -220,10 +220,10 @@ struct mm_struct* vma_dup(struct mm_struct* mm){
 		return NULL;
 	}
 
-	if(pgd_dup_current(vma_get_pgd(new_mm),  0) != SUCCESS){
+	/*if(pgd_dup_current(vma_get_pgd(new_mm), 0) != SUCCESS){
 		vma_destroy(new_mm);
 		return NULL;
-	}
+	}*/
 
 	spin_lock(&mm->spinlock);
 	struct mem_region *cur = mm->vma;

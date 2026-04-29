@@ -46,29 +46,30 @@
             +----------------------------------------+
             | Sparse Vmemmap                         |
             +----------------------------------------+
-            | Highmem                                |
-            +----------------------------------------+
             | Fixed Mapping                          |
+            +----------------------------------------+
+            | Highmem                                |
             +----------------------------------------+
             | NON-LINEAR / MMIO                      | ~256MiB
 0xFFFFFFFF  +----------------------------------------+
 */
 
-#define KERNEL_NONLINEAR_MMIO_START (0xF0000000UL)
-#define KERNEL_NONLINEAR_MMIO_END   (0xFFFFFFFFUL)
-
-#define KERNEL_NONLINEAR_MMIO_SIZE (KERNEL_NONLINEAR_MMIO_END - KERNEL_NONLINEAR_MMIO_START)
+// Limits
+#define KERNEL_NONLINEAR_SIZE MiB(32)
 #define KERNEL_HIGHMEM_SIZE MiB(16)
-#define KERNEL_FIXEDMAP_SIZE MiB(8)
 #define KERNEL_VMEMMAP_SIZE MiB(32)
+#define KERNEL_FIXEDMAP_SIZE MiB(8)
 #define KERNEL_DIRECTMAP_SIZE ( \
 	GiB(1) - KERNEL_HIGHMEM_SIZE - KERNEL_FIXEDMAP_SIZE \
-	KERNEL_NONLINEAR_MMIO_SIZE - KERNEL_VMEMMAP_SIZE \
+	KERNEL_NONLINEAR_SIZE - KERNEL_VMEMMAP_SIZE \
 )
 
-#define RESERVED_SIZE       MiB(8)
-#define KERNEL_STACKS_SIZE  MiB(1)
+// Vmemmap
+#define VMEMMAP_SECTION_SHIFT 25
+#define VMEMMAP_SECTION_SIZE (1UL << VMEMMAP_SECTION_SHIFT)
+#define VMEMMAP_PFN_SECTION_MASK (~((VMEMMAP_SECTION_SIZE / PAGE_SIZE) - 1)) 
 
+// Addresses
 #define USER_SPACE_START (0x00000000)
 #define USER_SPACE_END   (KERNEL_VIRT_BASE - 1)
 
@@ -83,6 +84,9 @@
 
 #define KERNEL_HIGHMEM_START (KERNEL_FIXEDMAP_END + 1)
 #define KERNEL_HIGHMEM_END   (KERNEL_HIGHMEM_START + KERNEL_HIGHMEM_SIZE - 1)
+
+#define KERNEL_NONLINEAR_START (KERNEL_HIGHMEM_END)
+#define KERNEL_NONLINEAR_END ((KERNEL_NONLINEAR_START + KERNEL_NONLINEAR_SIZE) - 1) 
 
 #define EARY_STACK_ADDR 0x94000
 

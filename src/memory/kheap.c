@@ -5,6 +5,8 @@
 #include <def/config.h>
 #include <stdint.h>
 
+#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
+
 void* kmalloc(size_t size){
     if (size == 0)
         return NULL;
@@ -15,7 +17,7 @@ void* kmalloc(size_t size){
         if (!page)
             return NULL;
 
-		uintptr_t phys = page_to_phys(page);
+		/*uintptr_t phys = page_to_phys(page);
 		uintptr_t virt = page_to_virt(page);
 
 		for(size_t i = 0; i < pages; i++){
@@ -27,7 +29,7 @@ void* kmalloc(size_t size){
 
 			virt += PAGE_SIZE;
 			phys += PAGE_SIZE;
-		}
+		}*/
 
         return (void*)page_to_virt(page);
     }
