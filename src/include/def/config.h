@@ -1,24 +1,7 @@
 #ifndef _GLOBAL_CONFIG_H
 #define _GLOBAL_CONFIG_H
 
-/*GDT*/
-#define TOTAL_GDT_SEGMENTS 6
-
-#define GDT_NULL_INDEX        0 
-#define GDT_KERNEL_CODE_INDEX 1
-#define GDT_KERNEL_DATA_INDEX 2
-#define GDT_USER_CODE_INDEX   3
-#define GDT_USER_DATA_INDEX   4
-#define GDT_TSS_BASE_INDEX    5
-
-#define GDT_KERNEL_CODE  (GDT_KERNEL_CODE_INDEX << 3)
-#define GDT_KERNEL_DATA  (GDT_KERNEL_DATA_INDEX << 3)
-#define GDT_USER_CODE    ((GDT_USER_CODE_INDEX << 3) | 3)
-#define GDT_USER_DATA    ((GDT_USER_DATA_INDEX << 3) | 3)
-#define GDT_TSS(index)   ((index) << 3)
-
-/* PIC */
-#define TIMER_FREQUENCY 20
+#include <arch-config.h>
 
 /* Interrupts */
 #define TOTAL_INTERRUPTS 256
@@ -26,10 +9,9 @@
 /* Kernel load bases */
 #define KERNEL_PHYS_BASE 0x00100000
 #define KERNEL_VIRT_BASE 0xC0000000
-#define PAGE_OFFSET KERNEL_VIRT_BASE
 
 /* MMU */
-#define PAGE_SIZE 0x1000
+#define PAGE_OFFSET KERNEL_VIRT_BASE
 
 /* Helpers */
 #define KiB(x) ((x) * 1024)
@@ -44,13 +26,13 @@
 0xC0000000  +----------------------------------------+ 0x100000
             | Direct Mapping                         |
             +----------------------------------------+
-            | Sparse Vmemmap                         |
-            +----------------------------------------+
             | Fixed Mapping                          |
+            +----------------------------------------+
+            | Sparse Vmemmap                         |
             +----------------------------------------+
             | Highmem                                |
             +----------------------------------------+
-            | NON-LINEAR / MMIO                      | ~256MiB
+            | NON-LINEAR / MMIO                      |
 0xFFFFFFFF  +----------------------------------------+
 */
 
@@ -60,7 +42,7 @@
 #define KERNEL_VMEMMAP_SIZE MiB(32)
 #define KERNEL_FIXEDMAP_SIZE MiB(8)
 #define KERNEL_DIRECTMAP_SIZE ( \
-	GiB(1) - KERNEL_HIGHMEM_SIZE - KERNEL_FIXEDMAP_SIZE \
+	GiB(1) - KERNEL_HIGHMEM_SIZE - KERNEL_FIXEDMAP_SIZE - \
 	KERNEL_NONLINEAR_SIZE - KERNEL_VMEMMAP_SIZE \
 )
 
@@ -76,13 +58,13 @@
 #define KERNEL_DIRECTMAP_START (KERNEL_VIRT_BASE)
 #define KERNEL_DIRECTMAP_END   (KERNEL_DIRECTMAP_START + KERNEL_DIRECTMAP_SIZE - 1)
 
-#define KERNEL_VMEMMAP_START (KERNEL_DIRECTMAP_END + 1)
-#define KERNEL_VMEMMAP_END   (KERNEL_VMEMMAP_START + KERNEL_VMEMMAP_SIZE - 1)
-
-#define KERNEL_FIXEDMAP_START (KERNEL_VMEMMAP_END + 1)
+#define KERNEL_FIXEDMAP_START (KERNEL_DIRECTMAP_END + 1)
 #define KERNEL_FIXEDMAP_END   (KERNEL_FIXEDMAP_START + KERNEL_FIXEDMAP_SIZE - 1)
 
-#define KERNEL_HIGHMEM_START (KERNEL_FIXEDMAP_END + 1)
+#define KERNEL_VMEMMAP_START (KERNEL_FIXEDMAP_END + 1)
+#define KERNEL_VMEMMAP_END   (KERNEL_VMEMMAP_START + KERNEL_VMEMMAP_SIZE - 1)
+
+#define KERNEL_HIGHMEM_START (KERNEL_VMEMMAP_END + 1)
 #define KERNEL_HIGHMEM_END   (KERNEL_HIGHMEM_START + KERNEL_HIGHMEM_SIZE - 1)
 
 #define KERNEL_NONLINEAR_START (KERNEL_HIGHMEM_END)
