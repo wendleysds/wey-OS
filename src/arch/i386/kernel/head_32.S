@@ -15,9 +15,6 @@ DATA_SEG equ early_gdt_data - early_gdt_start
 extern i386_start_kernel
 extern mk_early_pgtbl_32
 
-; variables
-extern initial_pgdir
-
 section .entry.boot
 __start_32:
 	lgdt [pa(early_gdt_descriptor)]
@@ -97,3 +94,10 @@ early_gdt_end:
 early_gdt_descriptor:
 	dw early_gdt_end - early_gdt_start - 1
 	dd early_gdt_start - PAGE_OFFSET
+
+section .bss
+
+global initial_pgdir
+
+align PAGE_SIZE
+initial_pgdir resd PAGE_SIZE

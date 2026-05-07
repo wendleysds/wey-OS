@@ -25,7 +25,9 @@ typedef struct { unsigned long val; } pmd_t;
 typedef struct { unsigned long val; } pud_t;
 typedef struct { unsigned long val; } pgd_t;
 
-extern const struct paging_ops x86_ops;
-extern const struct paging_format x86_fmt;
+extern pgd_t initial_pgdir[PGD_MAX_ENTRIES];
+
+extern const struct paging_ops arch_paging_ops;
+extern const struct paging_format arch_paging_fmt;
 
 #endif
