@@ -64,9 +64,9 @@ SECTIONS
 
 	__kernel_high_start = ADDR(.text);
 
-	_end_of_kernel_reserve = .;
+	__end_of_kernel_reserve = .;
 
-	__kernel_size = (_end_of_kernel_reserve - __kernel_high_start + 0xFFF) & ~0xFFF;
+	__kernel_size = (__end - __kernel_high_start + 0xFFF) & ~0xFFF;
 
 	.brk ALIGN(PAGE_SIZE): AT(ADDR(.brk) - LOAD_OFFSET) {
 		__brk_base = .;
@@ -77,7 +77,7 @@ SECTIONS
 
 	. = ALIGN(PAGE_SIZE);
 
-	_end = .;
+	__end = .;
 
 	DISCARDS
 }

@@ -1,13 +1,22 @@
-#include "wey/printk.h"
+#include <wey/printk.h>
+#include <mm/memblock.h>
 #include <def/init.h>
 #include <def/config.h>
 #include <def/linker.h>
 #include <asm/cpu.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>
+#include <asm/page.h>
 #include <wey/syscall.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
+
+#include "e820.h"
+#include <uapi/headers.h>
+
+#define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
+
+struct boot_header boot_header;
 
 unsigned long max_low_pfn_mapped;
 unsigned long max_pfn_mapped;
@@ -61,13 +70,13 @@ __init void cpu_init(void){
 	tss_init(cpu->id);
 }
 
-__init void gdt_setup(){
+static __init void gdt_setup(){
 	struct gdt_entry _gdt[TOTAL_GDT_SEGMENTS] = {
-		GDT_ENTRY(0, 0, 0, 0),                                    // Null
-		GDT_ENTRY(0, 0xFFFFF, GDT_CODE_RING0, GDT_FLAGS_DEFAULT), // Kernel code
-		GDT_ENTRY(0, 0xFFFFF, GDT_DATA_RING0, GDT_FLAGS_DEFAULT), // Kernel data
-		GDT_ENTRY(0, 0xFFFFF, GDT_CODE_RING3, GDT_FLAGS_DEFAULT), // User code
-		GDT_ENTRY(0, 0xFFFFF, GDT_DATA_RING3, GDT_FLAGS_DEFAULT), // User data
+		[GDT_NULL_INDEX]        = GDT_ENTRY(0, 0, 0, 0),                                    // Null
+		[GDT_KERNEL_CODE_INDEX] = GDT_ENTRY(0, 0xFFFFF, GDT_CODE_RING0, GDT_FLAGS_DEFAULT), // Kernel code
+		[GDT_KERNEL_DATA_INDEX] = GDT_ENTRY(0, 0xFFFFF, GDT_DATA_RING0, GDT_FLAGS_DEFAULT), // Kernel data
+		[GDT_USER_CODE_INDEX]   = GDT_ENTRY(0, 0xFFFFF, GDT_CODE_RING3, GDT_FLAGS_DEFAULT), // User code
+		[GDT_USER_DATA_INDEX]   = GDT_ENTRY(0, 0xFFFFF, GDT_DATA_RING3, GDT_FLAGS_DEFAULT), // User data
 	};
 
 	memcpy(gdt, _gdt, sizeof(gdt));
@@ -80,7 +89,48 @@ __init void gdt_setup(){
 	printk("Setup: gdt: loaded \"%#lx\".\n", &gdt_descriptor);
 }
 
-__init void setup_arch(){
+static __init void setup_memblock(void){
+	// add usable memory
+	for (size_t idx = 0; idx < boot_header.e820_entries_count; idx++){
+		struct e820_entry* entry = &boot_header.e820_table[idx];
+
+		if(entry->type == E820_TYPE_SOFT_RESERVED){
+			memblock_reserve(entry->base_addr, entry->length);
+		}
+
+		if(entry->type != E820_TYPE_RAM){
+			continue;
+		}
+
+		memblock_add(entry->base_addr, entry->length);
+	}
+
+	// reserve kernel
+	memblock_reserve(
+		__pa(__kernel_text_start), 
+		(size_t)__end_of_kernel_reserve - (size_t)__kernel_text_start
+	);
+
+	// BIOS owned area
+	memblock_reserve(0x0, KiB(64));
+
+	// BRK
+	if(_brk_end > _brk_start){
+		memblock_reserve(__pa(_brk_start), _brk_end - _brk_start);
+	}
+}
+
+__init void* extend_brk(size_t size, size_t align){
+	_brk_end = ALIGN(_brk_end, align);
+
+	void* ret = (void*)_brk_end;
+	_brk_end += size;
+
+	memset(ret, 0, size);
+	return ret;
+}
+
+__init void setup_arch(void){
 	memset(cpus, 0x0, sizeof(cpus));
 	for(uint8_t i = 0; i < MAX_CPUS; i++){
 		cpus[i].id = -1;
@@ -95,6 +145,20 @@ __init void setup_arch(){
 	idt_init();
 
 	fault_init();
+
+	e820_init(
+		boot_header.e820_table, 
+		boot_header.e820_entries_count
+	);
+
+	printk("Setup: E820-provided physical RAM map:\n");
+	e820_print();
+
+	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);
+
+	setup_memblock();
+
+	memblock_dump_all();
 
 	syscalls_init();
 }
