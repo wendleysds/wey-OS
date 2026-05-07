@@ -1,1 +1,2 @@
-obj-y += mmu.o vma.o slab.o page.o kheap.o earlyalloc.o
+obj-y += earlyalloc.o memblock.o page.o slab.o kheap.o 
+obj-y += mmu.o vma.o init.o

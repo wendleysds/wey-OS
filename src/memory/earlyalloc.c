@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// Early allocator
+// Pre-Memblock early allocator
 // Synchronized boot and normal phases
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
