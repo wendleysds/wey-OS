@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-void* early_alloc_boot(size_t size);
-void* early_alloc(size_t size);
+void* early_alloc_boot(size_t size, size_t align);
+void* early_alloc(size_t size, size_t align);
 
 #endif

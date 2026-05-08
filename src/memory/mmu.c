@@ -1,4 +1,3 @@
-#include "arch-config.h"
 #include "mm/memblock.h"
 #include <wey/mmu.h>
 #include <def/err.h>
@@ -62,6 +61,45 @@ static inline pte_t* walk(struct paging_ctx *ctx, uintptr_t* vaddr) {
 	return walk_common(ctx, vaddr, 0);
 }
 
+#define SELF_PDE_INDEX 1023
+#define SELF_PDE_BASE  (SELF_PDE_INDEX << 22)
+#define PGD_VADDR ((uint32_t*)0xFFFFF000)
+#define PT_VADDR(d) ((void*)(SELF_PDE_BASE + ((d) << 12)))
+#define PTE_VADDR(d,t) ((void*)(SELF_PDE_BASE + ((d) << 12) + ((t) << 2)))
+#define PDE_VADDR(d) ((unsigned long*)(0xFFFFF000 + ((d) << 2))) 
+
+void* pgd_translate(uintptr_t virtaddr){
+	uint32_t dir_idx = (uintptr_t)virtaddr >> 22;
+	uint32_t tbl_idx = ((uintptr_t)virtaddr >> 12) & 0x3FF;
+	uint32_t offset  = (uintptr_t)virtaddr & 0xFFF;
+
+	uint32_t* pde = PGD_VADDR;
+	if (!(pde[dir_idx] & _PAGE_P)) {
+		return NULL;
+	}
+
+	uint32_t* pte = PT_VADDR(dir_idx);
+	if (!(pte[tbl_idx] & _PAGE_P)) {
+		return NULL;
+	}
+
+	uintptr_t physaddr = (pte[tbl_idx] & PAGE_MASK) | offset;
+	return (void*)(physaddr & PAGE_MASK);
+}
+
+int pgd_present(uintptr_t virtaddr){
+	uint32_t dir_idx = virtaddr >> 22;
+	uint32_t tbl_idx = (virtaddr >> 12) & 0x3FF;
+
+	uint32_t* pde = PGD_VADDR;
+	if (!(pde[dir_idx] & _PAGE_P)) {
+		return 0;
+	}
+
+	uint32_t* pte = PT_VADDR(dir_idx);
+	return (pte[tbl_idx] & _PAGE_P) != 0;
+}
+
 static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t* vaddr){
 	void *table = ctx->root;
 
@@ -75,14 +113,17 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t* vaddr){
 
 		// ensure
 		if(!ctx->ops->pte_present(*entry)){
-			void* new_tbl_phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
-			if(!new_tbl_phys) return NULL;
+			void* new_tbl = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+			if(!new_tbl) return NULL;
 
-			void* new_tbl_virt = (void*)__va(new_tbl_phys);
-		
-			memset(new_tbl_virt, 0, 4096);
-			pte_t e = ctx->ops->mk_table((uintptr_t)new_tbl_virt);
-			ctx->ops->set_pte(entry, e);
+			pte_t e = ctx->ops->mk_table((uintptr_t)new_tbl);
+
+			ctx->ops->set_pte(
+				entry,
+				e
+			);
+
+			memset((void*)__va(new_tbl), 0, 4096);
 		}
 
 		table = ctx->ops->pte_to_virt(*entry);

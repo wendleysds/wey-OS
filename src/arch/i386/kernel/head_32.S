@@ -35,7 +35,7 @@ __start_32:
 	shr ecx, 2
 	rep stosd
 
-	mov esp, EARY_STACK_ADDR
+	mov esp, EARLY_STACK_ADDR
 	mov ebp, esp
 
 	mov [pa(boot_hdr_ptr)], esi

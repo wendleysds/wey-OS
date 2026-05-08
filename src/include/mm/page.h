@@ -13,8 +13,6 @@
 #define PAGE_RESERVED 0x20
 
 struct slab;
-struct e820_entry;
-struct list_head;
 
 struct page {
 	uint16_t flags;
@@ -25,18 +23,9 @@ struct page {
 	};
 } __attribute__((aligned(16)));
 
-struct page_metadata {
-	uintptr_t start_addr;
-	uintptr_t end_addr;
+int page_init(void);
 
-	struct page* pages;
-	size_t allocated_pages;  /* Number of allocated pages */
-	size_t pages_length; /* Pages array size */
-};
-
-struct page_metadata* page_init(struct e820_entry* table, size_t table_length);
 struct page* page_alloc(size_t page_count, uint16_t flags);
-struct page* page_alloc_zeroed(size_t page_count, uint16_t flags);
 int page_free(struct page* page);
 
 struct page* phys_to_page(uintptr_t phys_addr);

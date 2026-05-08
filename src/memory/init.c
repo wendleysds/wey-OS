@@ -31,6 +31,8 @@ static void __init paging_map_ram(void){
 			KERNEL_DIRECTMAP_SIZE
 		);
 
+	uintptr_t last_phys_mapped = max_pfn_mapped << PAGE_SHIFT;
+
 	for(size_t i = 0; i < memblock.memory.count; i++){
 		struct memblock_region *r = &memblock.memory.regions[i];
 
@@ -42,10 +44,16 @@ static void __init paging_map_ram(void){
 
 		end = MIN(end, max_phys);
 
-		for(uintptr_t phys = start;
-			phys < end;
-			phys += PAGE_SIZE){
+		if(last_phys_mapped != 0){
+			if(end <= last_phys_mapped){
+				continue;
+			}
 
+			// continue from where we left off
+			start = MAX(start, last_phys_mapped);
+		}
+
+		for(uintptr_t phys = start; phys < end; phys += PAGE_SIZE){
 			if(mmu_early_mmap(
 				&kernel_ctx,
 				__va(phys),
@@ -62,7 +70,7 @@ static void __init paging_map_ram(void){
 
 	max_pfn_mapped = max_phys >> PAGE_SHIFT;
 
-	printk("Memory: Max PFN mapped = %u (0x%p)\n", max_pfn_mapped, max_phys);
+	printk("Memory: Max PFN mapped = %lu/%lu (0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
 }
 
 static __init int vmemmap_sections_init(void){
@@ -143,15 +151,20 @@ static __init int vmemmap_populate(void) {
 
 					if (cur_pfn < valid_start || cur_pfn >= valid_end) {
 						pages[i].flags = PAGE_RESERVED;
-					}else{
-						total_pages++;
 					}
+					
+					total_pages++;
 				}
 			}
 
 			pfn = MIN(end_pfn, (sec + 1) * PFN_PER_SECTION) + map_size - map_size;
 		}
 	}
+
+	printk("VMEMMAP: start=0x%p; end=0x%p\n", 
+		KERNEL_VMEMMAP_START, 
+		KERNEL_VMEMMAP_START + (total_pages * sizeof(struct page))
+	);
 
 	printk("VMEMMAP: pages %u, mem %#x (MiB), metadata %#x (KiB)\n",
 		total_pages, (total_pages * PAGE_SIZE) / MiB(1), (total_pages * sizeof(struct page)) / KiB(1)
@@ -172,8 +185,6 @@ int __init memory_init(void) {
 	if(IS_ERR_VALUE(res = vmemmap_populate())){
 		return res;
 	}
-
-	memblock_dump_all();
 
 	// init buddy system
 	// init slab

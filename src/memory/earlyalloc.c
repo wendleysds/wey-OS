@@ -1,44 +1,64 @@
 #include <def/init.h>
 #include <def/config.h>
 #include <def/linker.h>
+#include <lib/string.h>
 #include <asm/paging.h>
 #include <asm/page.h>
 #include <stdint.h>
 #include <stddef.h>
 
-// Pre-Memblock early allocator
+// Pre-memblock brk early allocator
 // Synchronized boot and normal phases
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
-static size_t alloc_addr __initdata = (size_t)__brk_base;
-static size_t alloc_end __initdata = (size_t)__brk_limit;
+extern unsigned long _brk_start;
+extern unsigned long _brk_ptr;
+extern unsigned long _brk_end;
 
-void* __init early_alloc_boot(size_t size){
-	size_t* alloc_addr_ptr = (size_t*)__pa(&alloc_addr);
-	size_t* alloc_end_ptr = (size_t*)__pa(&alloc_end);
-
-	uintptr_t ret = ALIGN(*alloc_addr_ptr, PAGE_SIZE);
-	size = ALIGN(size, PAGE_SIZE);
-
-	if(ret > *alloc_end_ptr){
+void* __init early_alloc_boot(size_t size, size_t align){
+	if(size == 0){
 		return NULL;
 	}
 
-	*alloc_addr_ptr = (ret + size);
+	size_t* p = (size_t*)__pa(_brk_ptr);
+	size_t* e = (size_t*)__pa(_brk_end);
 
-	return (void*)__pa(ret);
+	if(align == 0){
+		align = 1;
+	}
+
+	*p = ALIGN(*p, align);
+
+	if(*p + size > *e){
+		return NULL;
+	}
+
+	void* ret = (void*)*p;
+	*p += size;
+
+	memset(ret, 0, size);
+	return ret;
 }
 
-void* __init early_alloc(size_t size){
-	uintptr_t ret = ALIGN(alloc_addr, PAGE_SIZE);
-	size = ALIGN(size, PAGE_SIZE);
-
-	if(ret > alloc_end){
+void* __init early_alloc(size_t size, size_t align){
+	if(size == 0){
 		return NULL;
 	}
 
-	alloc_addr = (ret + size);
+	if(align == 0){
+		align = 1;
+	}
 
-	return (void*)ret;
+	_brk_ptr = ALIGN(_brk_ptr, align);
+
+	if(_brk_ptr + size > _brk_end){
+		return NULL;
+	}
+
+	void* ret = (void*)_brk_ptr;
+	_brk_ptr += size;
+
+	memset(ret, 0, size);
+	return ret;
 }

@@ -7,6 +7,8 @@
 #include <mm/slab.h>
 #include <mm/page.h>
 #include <mm/kheap.h>
+#include <mm/memory.h>
+#include <mm/memblock.h>
 #include <wey/interrupt.h>
 #include <wey/mmu.h>
 #include <wey/panic.h>
@@ -17,20 +19,16 @@
 #include <wey/fork.h>
 
 #include <asm/cpu.h>
-#include <uapi/headers.h>
 #include <stdint.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
-extern struct boot_header boot_header;
+extern void setup_arch();
 
-extern __init void setup_arch();
-
-typedef int (*module_func_t)(void);
-static inline void module_load(const char* module_name, module_func_t func){
+static inline void module_load(const char* module_name, int (*func)(void)){
 	int res;
 	if(IS_ERR_VALUE(res = func())){
-		panic("\"%s\" failed with status %d!", module_name, res);
+		panic("\"%s\" module failed with status %d!", module_name, res);
 	}
 }
 
@@ -83,30 +81,19 @@ static int somw(void* args){
 }
 
 __no_return void kmain(){
+	memblock_init();
+
 	setup_arch();
 
-	interrupts_disable();
+	module_load("MMU", mmu_init);
+
+	module_load("Memory", memory_init);
 
 	printk("OK\n");
 
 	while(1) cpu_relax();
 
-	struct page_metadata* mt = page_init(boot_header.e820_table, boot_header.e820_entries_count);
-	if(IS_ERR_VALUE(mt)){
-		panic("\"%s\" failed with status %d!", "page allocator", PTR_ERR(mt));
-	}
-
-	printk("pages: %d/%d [%d KiB], range 0x%X - 0x%X [%d MiB]\n",
-		mt->pages_length, mt->allocated_pages,
-		(mt->pages_length * sizeof(struct page)) / KiB(1),
-		mt->start_addr, mt->end_addr,
-		(mt->end_addr - mt->start_addr) / MiB(1)
-	);
-
-	slab_init();
-
-	module_load("MMU", mmu_init);
-	module_load("VTerminal", terminal_init);
+	module_load("Terminal", terminal_init);
 	module_load("Scheduler", scheduler_init);
 	module_load("Fork", fork_init);
 

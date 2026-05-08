@@ -43,8 +43,7 @@ static void* x86_to_virt(pte_t p) {
 	return (void*)__va(x86_pte_phys(p));
 }
 
-static pte_t x86_mk_table(uintptr_t virt) {
-	uintptr_t phys = __pa(virt);
+static pte_t x86_mk_table(uintptr_t phys) {
 	return (pte_t){ .val = phys | _PAGE_P | _PAGE_RW };
 }
 

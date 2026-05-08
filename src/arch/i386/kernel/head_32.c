@@ -25,7 +25,7 @@ extern void kmain();
 extern unsigned long max_pfn_mapped;
 extern unsigned long _brk_end;
 
-static __init __no_stack_protector pte_t init_map(pgd_t *pgd, pte_t **ptep, pte_t pte, unsigned long limit) {
+static __init __no_stack_protector pte_t init_map(pgd_t *pgd, pte_t pte, unsigned long limit) {
 	uintptr_t addr = pte.val & PAGE_MASK;
 	size_t pgd_index = 0;
 	const size_t mirror_offset = PAGE_OFFSET >> PGDIR_SHIFT;
@@ -34,7 +34,7 @@ static __init __no_stack_protector pte_t init_map(pgd_t *pgd, pte_t **ptep, pte_
 		if (pgd_index >= PGD_MAX_ENTRIES)
 			break;
 
-		pte_t *pt = (pte_t*)early_alloc_boot(PAGE_SIZE);
+		pte_t *pt = (pte_t*)early_alloc_boot(PAGE_SIZE, PAGE_SIZE);
 		memset(pt, 0x0, PAGE_SIZE);
 
 		pgd[pgd_index].val = (size_t)pt | (_PAGE_P | _PAGE_RW);
@@ -47,8 +47,6 @@ static __init __no_stack_protector pte_t init_map(pgd_t *pgd, pte_t **ptep, pte_
 
 			pte.val += PAGE_SIZE;
 			addr += PAGE_SIZE;
-
-			(*ptep)++;
 		}
 
 		pgd_index++;
@@ -62,18 +60,14 @@ void __init __no_stack_protector mk_early_pgtbl_32(void){
 	const unsigned long limit = __pa(__end) + (PAGE_TABLE_SIZE(LOWMEM_PAGES) << PAGE_SHIFT);
 
 	pte_t pte = { .val = 0 | (_PAGE_P | _PAGE_RW) };
-	pte_t *ptep = (pte_t *)ALIGN(__pa(__brk_base), PAGE_SIZE);
 	pgd_t *pgdp = (pgd_t *)ALIGN(__pa(initial_pgdir), PAGE_SIZE);
 
 	pgdp[1023].val = ((size_t)pgdp & PAGE_MASK) | (_PAGE_P | _PAGE_RW);
 
-	pte = init_map(pgdp, &ptep, pte, limit);
+	pte = init_map(pgdp, pte, limit);
 
 	unsigned long *ptr = (unsigned long *)__pa(&max_pfn_mapped);
 	*ptr = (pte.val & PAGE_MASK) >> PAGE_SHIFT;
-
-	ptr = (unsigned long *)__pa(&_brk_end);
-	*ptr = (unsigned long)ptep + PAGE_OFFSET;
 }
 
 void __regparm(1) __init __no_return i386_start_kernel(struct boot_header* boot_header_ptr){

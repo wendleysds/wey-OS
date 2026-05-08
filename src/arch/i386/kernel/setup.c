@@ -22,7 +22,8 @@ unsigned long max_low_pfn_mapped;
 unsigned long max_pfn_mapped;
 
 unsigned long _brk_start = (unsigned long)__brk_base;
-unsigned long _brk_end   = (unsigned long)__brk_base;
+unsigned long _brk_ptr = (unsigned long)__brk_base;
+unsigned long _brk_end = (unsigned long)__brk_limit;
 
 static struct cpu cpus[MAX_CPUS];
 static struct gdt_entry gdt[TOTAL_GDT_SEGMENTS];
@@ -111,12 +112,18 @@ static __init void setup_memblock(void){
 		(size_t)__end_of_kernel_reserve - (size_t)__kernel_text_start
 	);
 
+	// initial stack
+	memblock_reserve(
+		EARLY_STACK_BOTTOM,
+		EARLY_STACK_SIZE 
+	);
+
 	// BIOS owned area
 	memblock_reserve(0x0, KiB(64));
 
 	// BRK
-	if(_brk_end > _brk_start){
-		memblock_reserve(__pa(_brk_start), _brk_end - _brk_start);
+	if(_brk_ptr > _brk_start){
+		memblock_reserve(__pa(_brk_start), _brk_ptr - _brk_start);
 	}
 }
 
