@@ -202,7 +202,7 @@ static void set_mm_cow(struct mm_struct* mm, uint8_t increse_page_ref, pgd_t* cu
 				if(increse_page_ref) page_get(node->page);
 				if((cur->mem_flags & MEM_WRITE) == 0) continue;
 
-				node->page->flags |= PAGE_COW;
+				node->page->flags |= PG_COW;
 				//int flags = mmu_flags_arch(cur->mem_flags & ~MEM_WRITE);
 				//pte_update_flags(node->addr, flags);
 			}

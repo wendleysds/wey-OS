@@ -83,7 +83,7 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 	size_t region_offset = page_addr - region->start;
 	off_t file_offset = region->file_offset + region_offset;
 
-	struct page* page = page_alloc(1, PAGE_USER);
+	struct page* page = page_alloc(1, 0x0);
 	if (!page) return NO_MEMORY;
 
 	/*int res = pgd_remap(
@@ -116,7 +116,7 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 
 static int vm_handle_stack(struct mem_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
-	struct page* page = page_alloc(1, PAGE_USER);
+	struct page* page = page_alloc(1, 0x0);
 	if (!page) return NO_MEMORY;
 
 	/*int res = pgd_remap(
@@ -146,7 +146,7 @@ static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
 	struct page* page = vma_page_hash_lookup(region, page_addr);
 	if (!page) return NOT_FOUND;
 
-	if(!(page->flags & PAGE_COW)){
+	if((page->flags & PG_COW) == 0){
 		return INVALID_ARG;
 	}
 
@@ -158,7 +158,7 @@ static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
 		return SUCCESS;
 	}
 
-	struct page* new_page = page_alloc(1, PAGE_USER);
+	struct page* new_page = page_alloc(1, 0x0);
 	if (!new_page) return NOT_FOUND;
 
 	/*int res = pgd_map(

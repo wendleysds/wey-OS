@@ -13,7 +13,7 @@ void* kmalloc(size_t size){
 
     if (size >= SLAB_MAX_SIZE) {
         size_t pages = ALIGN(size, PAGE_SIZE) / PAGE_SIZE;
-        struct page* page = page_alloc(pages, PAGE_KERNEL);
+        struct page* page = page_alloc(pages, 0x0);
         if (!page)
             return NULL;
 
@@ -62,7 +62,7 @@ void kfree(void* ptr){
     if (!page)
         return;
 
-    if (page->slab) {
+    if (page->private) {
         slab_free(ptr);
     }else{
 		page_free(page);

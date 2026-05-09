@@ -1,27 +1,41 @@
 #ifndef _PAGE_ALLOCATOR_H
 #define _PAGE_ALLOCATOR_H
 
+#include <wey/atomic.h>
+#include <def/compile.h>
+#include <lib/list.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <wey/atomic.h>
 
-#define PAGE_SLAB     0x01
-#define PAGE_TABLE    0x02
-#define PAGE_KERNEL   0x04
-#define PAGE_USER     0x08
-#define PAGE_COW      0x10
-#define PAGE_RESERVED 0x20
-
-struct slab;
+// State
+#define PG_BUDDY      (1U << 0)
+#define PG_RESERVED   (1U << 1)
+#define PG_BAD        (1U << 2)
+// Ownership
+#define PG_KERNEL     (1U << 3)
+// Type
+#define PG_SLAB       (1U << 4)
+#define PG_TABLE      (1U << 5)
+#define PG_HIGHMEM    (1U << 6)
+#define PG_COMPOUND   (1U << 7)
+// Runtime Flags
+#define PG_DIRTY      (1U << 8)
+#define PG_LOCKED     (1U << 9)
+#define PG_REFERENCED (1U << 10)
+#define PG_COW        (1U << 11)
+#define PG_WRITEBACK  (1U << 12)
 
 struct page {
+	uint8_t order;
+	uint8_t pad;
+
 	uint16_t flags;
 	atomic_t refcount;
-	union {
-		void* private;
-		struct slab* slab;
-	};
-} __attribute__((aligned(16)));
+
+	void* private;
+
+	struct list_head list;
+} __aligned(32);
 
 int page_init(void);
 

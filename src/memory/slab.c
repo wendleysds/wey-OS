@@ -24,7 +24,7 @@ static int get_cache_index(size_t size){
 
 static struct slab* slab_create(struct slab_cache* cache){
 	// metadata + objs
-	struct page* page = page_alloc(1, PAGE_SLAB);
+	struct page* page = page_alloc(1, 0x0);
 	if(!page)
 		return NULL;
 
@@ -39,7 +39,7 @@ static struct slab* slab_create(struct slab_cache* cache){
 	memset(slab, 0x0, sizeof(*slab));
 
 	slab->page = page;
-	page->slab = slab;
+	page->private = slab;
 
 	uintptr_t obj_start = virt + sizeof(struct slab);
 	slab->start = (void*)obj_start;
@@ -110,11 +110,11 @@ void slab_free(void* ptr){
 		return;
 
 	struct page* page = virt_to_page((uintptr_t)ptr);
-	if(!(page->flags & PAGE_SLAB)){
+	if(!(page->flags & 0x0)){
 		return;
 	}
 
-	struct slab* slab = page->slab;
+	struct slab* slab = page->private;
 
 	if (!slab){
 		// May free page

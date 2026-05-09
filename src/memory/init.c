@@ -163,7 +163,7 @@ static __init int vmemmap_populate(void) {
 					size_t cur_pfn = sec_start + i;
 
 					if (cur_pfn < valid_start || cur_pfn >= valid_end) {
-						pages[i].flags = PAGE_RESERVED;
+						pages[i].flags = PG_RESERVED;
 					}
 					
 					total_pages++;
@@ -204,7 +204,10 @@ int __init memory_init(void) {
 		return res;
 	}
 
-	// init buddy system
+	if(IS_ERR_VALUE(res = page_init())){
+		return res;
+	}
+
 	// init slab
 	// return SUCCESS;
 

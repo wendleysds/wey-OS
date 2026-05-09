@@ -54,7 +54,7 @@ static int vt_alloc(int currcon){
 	struct vt_data *vt = NULL;
 
 	if(early){
-		vt = (struct vt_data*)early_alloc(sizeof(struct vt_data));
+		vt = (struct vt_data*)early_alloc(sizeof(struct vt_data), 0);
 	}else{
 		vt = (struct vt_data*)kzalloc(sizeof(struct vt_data));
 	}
@@ -79,7 +79,7 @@ static int vt_alloc(int currcon){
 	}
 
 	if(early){
-		vt->screenbuffer = (unsigned short*)early_alloc(vt->screenbuffer_size);
+		vt->screenbuffer = (unsigned short*)early_alloc(vt->screenbuffer_size, 0);
 	}else{
 		vt->screenbuffer = (unsigned short*)kmalloc(vt->screenbuffer_size);
 	}
