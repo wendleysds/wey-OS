@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <wey/printk.h>
 #include <wey/mmu.h>
 #include <mm/page.h>
@@ -23,6 +22,7 @@ struct paging_ctx* ctx = &kernel_ctx;
 extern unsigned long max_pfn_mapped;
 
 static struct page** sections __initdata;
+static size_t max_sections __initdata;
 
 static void __init paging_map_ram(void){
 	uintptr_t max_phys =
@@ -70,11 +70,11 @@ static void __init paging_map_ram(void){
 
 	max_pfn_mapped = max_phys >> PAGE_SHIFT;
 
-	printk("Memory: Max PFN mapped = %lu/%lu (0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
+	printk("Memory: Max PFN mapped = %#lx/%#lx (max_phys=0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
 }
 
 static __init int vmemmap_sections_init(void){
-	const size_t max_sections = pfn_to_section_nr(max_pfn) + 1;
+	max_sections = pfn_to_section_nr(max_pfn) + 1;
 	const size_t total_mem = sizeof(struct page**) * max_sections;
 
 	printk("VMEMMAP: max sections = %d\n", max_sections);
@@ -109,8 +109,21 @@ static __init int vmemmap_populate(void) {
 		size_t start_pfn = r->base >> PAGE_SHIFT;
 		size_t end_pfn   = (r->base + r->size) >> PAGE_SHIFT;
 
+		if (start_pfn >= max_pfn) {
+			continue;
+		}
+
+		if(end_pfn > max_pfn) {
+			end_pfn = max_pfn;
+		}
+
 		for (size_t pfn = start_pfn; pfn < end_pfn; ) {
 			size_t sec = pfn_to_section_nr(pfn);
+			if(sec >= max_sections) {
+				printk("VMEMMAP: section %lu out of range (max %lu)\n", sec, max_sections);
+				return OUT_OF_BOUNDS;
+			}
+
 			struct page *pages = sections[sec];
 
 			if (!pages) {
@@ -161,13 +174,18 @@ static __init int vmemmap_populate(void) {
 		}
 	}
 
-	printk("VMEMMAP: start=0x%p; end=0x%p\n", 
-		KERNEL_VMEMMAP_START, 
-		KERNEL_VMEMMAP_START + (total_pages * sizeof(struct page))
+	size_t vmemmap_size = total_pages * sizeof(struct page);
+
+	printk("VMEMMAP: start=0x%p;",
+		KERNEL_VMEMMAP_START
 	);
 
-	printk("VMEMMAP: pages %u, mem %#x (MiB), metadata %#x (KiB)\n",
-		total_pages, (total_pages * PAGE_SIZE) / MiB(1), (total_pages * sizeof(struct page)) / KiB(1)
+	printk(" end=0x%p\n", 
+		KERNEL_VMEMMAP_START + vmemmap_size
+	);
+
+	printk("VMEMMAP: pages %u, mem %luMiB, metadata %luKiB\n",
+		total_pages, (total_pages * PAGE_SIZE) / MiB(1), vmemmap_size / KiB(1)
 	);
 
 	return SUCCESS;
