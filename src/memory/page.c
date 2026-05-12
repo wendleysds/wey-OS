@@ -6,7 +6,6 @@
 #include <def/init.h>
 #include <def/config.h>
 
-#define MAX_ORDER 11
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 
 #define vmemmap ((struct page *)KERNEL_VMEMMAP_START)
@@ -157,7 +156,7 @@ int __init page_init(void){
 	return SUCCESS;
 }
 
-struct page* _page_alloc(uint8_t order, uint16_t flags) {
+struct page* page_alloc(uint8_t order, uint16_t flags) {
 	spin_lock(&global_zone.lock);
 
 	for (uint8_t cur = order; cur < MAX_ORDER; cur++) {
@@ -274,8 +273,4 @@ int page_free(struct page *page){
 out:
 	spin_unlock(&global_zone.lock);
 	return res;
-}
-
-struct page* page_alloc(size_t order, uint16_t flags){
-	return ERR_PTR(NOT_IMPLEMENTED);
 }

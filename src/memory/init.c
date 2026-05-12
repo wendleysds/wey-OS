@@ -1,6 +1,7 @@
 #include <wey/printk.h>
 #include <wey/mmu.h>
 #include <mm/page.h>
+#include <mm/slab.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
 #include <def/init.h>
@@ -194,6 +195,10 @@ static __init int vmemmap_populate(void) {
 int __init memory_init(void) {
 	int res = 0;
 
+	if(IS_ERR_VALUE(res = mmu_init())){
+		return res;
+	}
+
 	paging_map_ram();
 
 	if(IS_ERR_VALUE(res = vmemmap_sections_init())){
@@ -208,8 +213,7 @@ int __init memory_init(void) {
 		return res;
 	}
 
-	// init slab
-	// return SUCCESS;
+	slab_init();
 
-	return INVALID_STATE; // Not fully implemented yet
+	return SUCCESS;
 }

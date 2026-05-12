@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define MAX_ORDER 11
+
 // State
 #define PG_BUDDY      (1U << 0)
 #define PG_RESERVED   (1U << 1)
@@ -39,7 +41,7 @@ struct page {
 
 int page_init(void);
 
-struct page* page_alloc(size_t page_count, uint16_t flags);
+struct page* page_alloc(uint8_t order, uint16_t flags);
 int page_free(struct page* page);
 
 struct page* phys_to_page(uintptr_t phys_addr);

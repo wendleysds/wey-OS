@@ -4,13 +4,14 @@
 #include <def/init.h>
 #include <lib/string.h>
 #include <lib/list.h>
+#include <lib/assert.h>
 #include <asm/paging.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 #define NUM_SLAB_SIZES ARRAY_SIZE(slab_sizes)
 
 static const size_t slab_sizes[] = SLAB_SIZES;
-struct slab_cache slab_caches[NUM_SLAB_SIZES];
+static struct slab_cache slab_caches[NUM_SLAB_SIZES];
 
 static int get_cache_index(size_t size){
 	for (int i = 0; i < NUM_SLAB_SIZES; i++) {
@@ -24,16 +25,11 @@ static int get_cache_index(size_t size){
 
 static struct slab* slab_create(struct slab_cache* cache){
 	// metadata + objs
-	struct page* page = page_alloc(1, 0x0);
+	struct page* page = page_alloc(0, PG_KERNEL | PG_SLAB);
 	if(!page)
 		return NULL;
 
 	uintptr_t virt = page_to_virt(page);
-
-	/*if(pgd_map(virt, phys, _PAGE_P | _PAGE_RW)){
-		page_free(page);
-		return NULL;
-	}*/
 
 	struct slab* slab = (struct slab*)virt;
 	memset(slab, 0x0, sizeof(*slab));
@@ -62,13 +58,11 @@ static struct slab* slab_create(struct slab_cache* cache){
 
 static void slab_destroy(struct slab* slab){
 	page_free(slab->page);
-	//pgd_unmap((uintptr_t)slab);
 }
 
 void __init slab_init(){
 	for (int i = 0; i < NUM_SLAB_SIZES; i++) {
 		slab_caches[i].object_size = slab_sizes[i];
-		slab_caches[i].slab_size = PAGE_SIZE;
 		INIT_LIST_HEAD(&slab_caches[i].slabs);
 	}
 }
@@ -80,7 +74,6 @@ void *slab_alloc(size_t size){
 	void *obj = NULL;
 	int cache_idx = get_cache_index(size);
 	if(cache_idx < 0){
-		// May alloc page and return addr
 		return NULL;
 	}
 
@@ -110,16 +103,17 @@ void slab_free(void* ptr){
 		return;
 
 	struct page* page = virt_to_page((uintptr_t)ptr);
-	if(!(page->flags & 0x0)){
+	if(!(page->flags & PG_SLAB)){
 		return;
 	}
 
 	struct slab* slab = page->private;
 
 	if (!slab){
-		// May free page
 		return;
 	}
+
+	BUG_ON(slab->page != page);
 
 	*(void**)ptr = slab->free_list;
 	slab->free_list = ptr;

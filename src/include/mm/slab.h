@@ -1,9 +1,9 @@
 #ifndef _SLAB_H
 #define _SLAB_H
 
+#include <lib/list.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <lib/list.h>
 
 // Slab allocator for small objects
 
@@ -22,10 +22,7 @@ struct slab {
 struct slab_cache {
 	size_t object_size;
 	struct list_head slabs; // list of slabs
-	uint32_t slab_size;     // size of each slab (usually PTE_PAGE_SIZE)
 };
-
-extern struct slab_cache slab_caches[];
 
 void slab_init();
 void *slab_alloc(size_t size);
