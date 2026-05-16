@@ -1,0 +1,1 @@
+obj-y += earlyalloc.o memblock.o

@@ -9,6 +9,7 @@
 #include <def/config.h>
 #include <lib/string.h>
 
+#include <asm-generic/paging_ctx.h>
 #include <asm/page.h>
 
 #define PAGE_COUNT(size) (((size) + PAGE_SIZE - 1) / PAGE_SIZE)
@@ -195,11 +196,11 @@ static __init int vmemmap_populate(void) {
 int __init memory_init(void) {
 	int res = 0;
 
+	paging_map_ram();
+
 	if(IS_ERR_VALUE(res = mmu_init())){
 		return res;
 	}
-
-	paging_map_ram();
 
 	if(IS_ERR_VALUE(res = vmemmap_sections_init())){
 		return res;

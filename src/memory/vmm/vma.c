@@ -1,6 +1,3 @@
-#include "wey/mmu.h"
-#include "wey/panic.h"
-#include "wey/spinlock.h"
 #include <asm/paging.h>
 #include <stdint.h>
 #include <wey/vfs.h>
@@ -19,19 +16,19 @@ static inline size_t page_hash(uintptr_t vaddr){
 }
 
 struct mm_struct* vma_alloc(){
-	pgd_t *pgd = mmu_create_page();
-	if(!pgd){
+	struct paging_ctx *ctx = mmu_create_context();
+	if(!ctx){
 		return NULL;
 	}
 
 	struct mm_struct* mm = kmalloc(sizeof(struct mm_struct));
 	if(!mm){
-		mmu_destroy_page(pgd);
+		mmu_destroy_context(ctx);
 		return NULL;
 	}
 
 	memset(mm, 0x0, sizeof(struct mm_struct));
-	mm->pgd = pgd;
+	mm->ctx = ctx;
 	atomic_set(&mm->refcount, 1);
 	spinlock_init(&mm->spinlock);
 
@@ -180,18 +177,15 @@ void vma_clean(struct mm_struct* mm){
 void vma_destroy(struct mm_struct* mm){
 	if(mm->vma) vma_clean(mm);
 
-	if(mm->pgd){
-		int res = mmu_destroy_page(mm->pgd);
-		if(IS_ERR_VALUE(res)){
-			panic("vma: destroy: failed to free pgd! %d\n", res);
-		}
+	if(mm->ctx){
+		mmu_destroy_context(mm->ctx);
 	}
 
 	kfree(mm);
 }
 
-static void set_mm_cow(struct mm_struct* mm, uint8_t increse_page_ref, pgd_t* cur_pgd){
-	mmu_page_switch(mm->pgd);
+static void set_mm_cow(struct mm_struct* mm, uint8_t increse_page_ref, struct paging_ctx* cur_pgd){
+	mmu_context_switch(mm->ctx);
 	struct mem_region *cur = mm->vma;
 	while(cur){
 		for(int i = 0; i < MAX_VM_PAGE_HASH; i++){
@@ -203,15 +197,14 @@ static void set_mm_cow(struct mm_struct* mm, uint8_t increse_page_ref, pgd_t* cu
 				if((cur->mem_flags & MEM_WRITE) == 0) continue;
 
 				node->page->flags |= PG_COW;
-				//int flags = mmu_flags_arch(cur->mem_flags & ~MEM_WRITE);
-				//pte_update_flags(node->addr, flags);
+				mmu_set_flags(mm->ctx, node->addr, cur->mem_flags & ~MEM_WRITE);
 			}
 		}
 
 		cur = cur->next;
 	}
 
-	if(cur_pgd) mmu_page_switch(cur_pgd);
+	if(cur_pgd) mmu_context_switch(cur_pgd);
 }
 
 struct mm_struct* vma_dup(struct mm_struct* mm){

@@ -2,7 +2,6 @@
 #define _KERNEL_MEMORY_H
 
 #include <def/config.h>
-#include <stddef.h>
 
 #define PFN_SECTION_SHIFT (VMEMMAP_SECTION_SHIFT - PAGE_SHIFT)
 #define PFN_PER_SECTION (1UL << PFN_SECTION_SHIFT)

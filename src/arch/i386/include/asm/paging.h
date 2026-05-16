@@ -25,6 +25,16 @@ typedef struct { unsigned long val; } pmd_t;
 typedef struct { unsigned long val; } pud_t;
 typedef struct { unsigned long val; } pgd_t;
 
+static inline void paging_load_table(unsigned long paddr){
+	__asm__ volatile("mov %0, %%cr3\r\n" : : "r"(paddr) : "memory");
+}
+
+static inline unsigned long paging_current_table_phys(void){
+	unsigned long ret;
+	__asm__ volatile ("mov %%cr3, %0" : "=rm" (ret));
+	return ret;
+}
+
 extern pgd_t initial_pgdir[PGD_MAX_ENTRIES];
 
 extern const struct paging_ops arch_paging_ops;

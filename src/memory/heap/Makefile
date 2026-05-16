@@ -1,0 +1,1 @@
+obj-y += page.o slab.o kheap.o

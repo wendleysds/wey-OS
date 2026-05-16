@@ -7,6 +7,7 @@
 #include <def/config.h>
 
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
+#define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
 
 #define vmemmap ((struct page *)KERNEL_VMEMMAP_START)
 
@@ -273,4 +274,29 @@ int page_free(struct page *page){
 out:
 	spin_unlock(&global_zone.lock);
 	return res;
+}
+
+void __page_add_memory(uintptr_t vaddr, size_t size){
+	uintptr_t start = ALIGN_UP((uintptr_t)vaddr, PAGE_SIZE);
+    uintptr_t end = ALIGN_DOWN(start + size, PAGE_SIZE);
+    size_t pages_freed = 0;
+
+	if (size > UINTPTR_MAX - start) {
+		return; // overflow
+	}
+
+	for (uintptr_t addr = start; addr < end; addr += PAGE_SIZE) {
+        struct page *page = virt_to_page(addr);
+
+        page->flags = 0; 
+        page->order = 0;
+        atomic_set(&page->refcount, 0);
+
+        if (page_free(page) == SUCCESS) {
+            pages_freed++;
+            global_zone.managed_pages++;
+        }
+    }
+
+	printk("Buddy: Added \"%lx\" pages.\n", pages_freed);
 }
