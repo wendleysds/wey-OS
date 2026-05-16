@@ -108,7 +108,7 @@ ifdef DEBUG_KERNEL
 KBUILD_CFLAGS += -g
 endif
 
-KBUILD_CFLAGS += -ffreestanding -nostdlib -nostartfiles
+KBUILD_CFLAGS += -ffreestanding -nostdlib -nostdinc -nostartfiles -nodefaultlibs
 KBUILD_CFLAGS += -Wno-unused-function -Wno-unused-parameter \
 	-Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
 KBUILD_CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
