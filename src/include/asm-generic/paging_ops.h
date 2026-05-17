@@ -7,6 +7,7 @@
 struct paging_ops {
 	pte_t   (*mk_pte)(uintptr_t phys, uint32_t flags);
 	uintptr_t (*pte_phys)(pte_t pte);
+	uint32_t (*pte_flags)(pte_t pte);
 
 	int (*pte_present)(pte_t pte);
 	int (*pte_leaf)(pte_t pte);

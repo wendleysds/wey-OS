@@ -7,6 +7,7 @@
 #include <asm/gdt.h>
 #include <asm/idt.h>
 #include <asm/page.h>
+#include <asm/paging.h>
 #include <wey/syscall.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
@@ -90,6 +91,16 @@ static __init void gdt_setup(){
 	printk("Setup: gdt: loaded \"%#lx\".\n", &gdt_descriptor);
 }
 
+static __init void setup_swapper(void){
+	memset(swapper_pgdir, 0x0, PAGE_SIZE);
+
+	const size_t kernel_idx = KERNEL_VIRT_BASE >> PGDIR_SHIFT;
+
+	for(size_t i = kernel_idx; i < PGD_MAX_ENTRIES; i++){
+		swapper_pgdir[i] = initial_pgdir[i];
+	}
+}
+
 static __init void setup_memblock(void){
 	// add usable memory
 	for (size_t idx = 0; idx < boot_header.e820_entries_count; idx++){
@@ -152,6 +163,10 @@ __init void setup_arch(void){
 	idt_init();
 
 	fault_init();
+
+	setup_swapper();
+
+	paging_load_table(__pa(swapper_pgdir));
 
 	e820_init(
 		boot_header.e820_table, 

@@ -95,9 +95,14 @@ early_gdt_descriptor:
 	dw early_gdt_end - early_gdt_start - 1
 	dd early_gdt_start - PAGE_OFFSET
 
+
 section .bss
 
+global swapper_pgdir
 global initial_pgdir
 
 align PAGE_SIZE
-initial_pgdir resd PAGE_SIZE
+initial_pgdir resb PAGE_SIZE
+
+align PAGE_SIZE
+swapper_pgdir resb PAGE_SIZE

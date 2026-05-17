@@ -1,3 +1,5 @@
+#include <stddef.h>
+#include <stdint.h>
 #include <wey/mmu.h>
 #include <wey/printk.h>
 #include <mm/memblock.h>
@@ -19,13 +21,24 @@
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
+#ifndef walker
+#define USE_GENERIC_WALKER 1
+#define walker __generic_walker
+#endif
+
+enum destroy_mode {
+	DESTROY_TABLES_ONLY,
+	DESTROY_PUT_SHARED,
+	DESTROY_FREE_LEAF,
+};
+
 struct walk_level {
 	void *table;
 	pte_t *entry;
 };
 
 struct paging_ctx kernel_ctx = {
-	.root = initial_pgdir,
+	.root = swapper_pgdir,
 	.fmt = &arch_paging_fmt,
 	.ops = &arch_paging_ops,
 };
@@ -77,7 +90,7 @@ int __init mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t pad
 	return OK;
 }
 
-static struct paging_ctx* alloc_context(void){
+static inline struct paging_ctx* alloc_context(void){
 	struct paging_ctx* ctx = kzalloc(sizeof(struct paging_ctx));
 	if(ctx){
 		ctx->root = NULL;
@@ -88,8 +101,9 @@ static struct paging_ctx* alloc_context(void){
 	return ctx;
 }
 
-static void free_context(struct paging_ctx* ctx){
-	if(!ctx) return;
+static inline void free_context(struct paging_ctx* ctx){
+	if(!ctx || ctx->root) return;
+
 	kfree(ctx);
 }
 
@@ -147,7 +161,8 @@ static int walk_to(struct paging_ctx *ctx, uintptr_t va, struct walk_level *leve
 	return 0;
 }
 
-static pte_t* walk_common(const struct paging_ctx *restrict ctx, uintptr_t vaddr, int create) {
+#ifdef USE_GENERIC_WALKER
+static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, int create) {
 	const struct paging_format *restrict fmt = ctx->fmt;
 	const struct paging_ops *restrict ops = ctx->ops;
 
@@ -181,13 +196,245 @@ static pte_t* walk_common(const struct paging_ctx *restrict ctx, uintptr_t vaddr
 	}
 	return NULL;
 }
+#endif
+
+static void destroy_level(
+	const struct paging_ctx *restrict ctx,
+	const uintptr_t table,
+	const int level,
+	uintptr_t base_va,
+	enum destroy_mode destroy_mode
+) {
+	const struct paging_format *restrict fmt = ctx->fmt;
+	const struct paging_ops *restrict ops = ctx->ops;
+
+	typeof(ops->pte_present) pte_present = ops->pte_present;
+	typeof(ops->pte_leaf) pte_leaf = ops->pte_leaf;
+	typeof(ops->clear_pte) clear_pte = ops->clear_pte;
+
+	const size_t entries = fmt->lvl[level].mask + 1;
+	const uint8_t shift = fmt->lvl[level].shift;
+
+	for (size_t i = 0; i < entries; i++) {
+		pte_t *entry = &((pte_t*)table)[i];
+		const pte_t pte_val = *entry;
+
+		if (!pte_present(pte_val))
+			continue;
+
+		uintptr_t entry_va = base_va + (i << shift);
+		if (entry_va >= USER_SPACE_END) {
+			continue;
+		}
+
+		if (pte_leaf(pte_val) || level == fmt->levels - 1) {
+			uintptr_t phys = ops->pte_phys(pte_val);
+			struct page* page = phys_to_page(phys);
+
+			switch (destroy_mode) {
+				case DESTROY_FREE_LEAF:
+					page_free(page);
+					break;
+				case DESTROY_PUT_SHARED:
+					page_put(page);
+					break;
+				default: break;
+			}
+
+			clear_pte(entry);
+		} else {
+			const uintptr_t next = (uintptr_t)ops->pte_to_virt(pte_val);
+
+			destroy_level(ctx, next, level + 1, entry_va, destroy_mode);
+
+			page_free(virt_to_page(next));
+
+			clear_pte(entry);
+		}
+	}
+}
+
+static void rollback_clone_level(
+	const struct paging_ctx *restrict ctx, 
+	void *table, 
+	size_t max_entries, 
+	int level, 
+	uintptr_t base_va
+) {
+	const uint8_t shift = ctx->fmt->lvl[level].shift;
+
+	typeof(ctx->ops->pte_present) pte_present = ctx->ops->pte_present;
+	typeof(ctx->ops->pte_phys) pte_phys = ctx->ops->pte_phys;
+	typeof(ctx->ops->pte_leaf) pte_leaf = ctx->ops->pte_leaf;
+
+	for (size_t i = 0; i < max_entries; i++) {
+		pte_t *e = &((pte_t*)table)[i];
+		const pte_t pte_val = *e;
+		uintptr_t phys = pte_phys(pte_val);
+
+		if (!pte_present(pte_val))
+			continue;
+
+		uintptr_t entry_va = base_va + (i << shift);
+		if (entry_va >= USER_SPACE_END) {
+            ctx->ops->clear_pte(e);
+			page_put(
+				phys_to_page(phys)
+			);
+            continue;
+        }
+
+		/* If this entry is a leaf, drop the page reference we took during
+		 * cloning. If it's a table entry, recursively destroy the child
+		 * subtree and free the table page. In all cases clear the PTE so
+		 * the partially-built destination table does not reference freed
+		 * memory. 
+		 */
+		if (pte_leaf(pte_val) || level == ctx->fmt->levels - 1) {
+			struct page *page = phys_to_page(phys);
+			page_put(page);
+			ctx->ops->clear_pte(e);
+		} else {
+			void *child = ctx->ops->pte_to_virt(pte_val);
+			destroy_level(ctx, (uintptr_t)child, level + 1, entry_va, DESTROY_PUT_SHARED);
+
+			page_free(
+				phys_to_page(phys)
+			);
+
+			ctx->ops->clear_pte(e);
+		}
+	}
+}
+
+static inline void restore_src_mods(const struct paging_ctx *restrict src, pte_t **list, pte_t *orig_vals, size_t count) {
+	for (size_t i = 0; i < count; i++) {
+		pte_t *pte = list[i];
+		pte_t old = orig_vals[i];
+
+		/* revert the source PTE to its original value and drop the extra 
+		 * reference we took while cloning.
+		 */
+		src->ops->set_pte(pte, old);
+	}
+
+	src->ops->flush_all();
+}
+
+static void* clone_level(
+	const struct paging_ctx *restrict dst,
+	const struct paging_ctx *restrict src,
+	const void *src_table,
+	const int level,
+	uintptr_t base_va
+){
+	struct page* page = page_alloc(0, PG_KERNEL | PG_TABLE);
+	if(!page){
+		return NULL;
+	}
+
+	void* new_table = (void*)page_to_virt(page);
+	memset(new_table, 0, 4096);
+
+	typeof(src->ops->pte_leaf) pte_leaf = src->ops->pte_leaf;
+	typeof(src->ops->pte_present) pte_present = src->ops->pte_present;
+
+	const size_t entries = src->fmt->lvl[level].mask + 1;
+	const uint8_t shift = src->fmt->lvl[level].shift;
+
+	/* Track source PTEs we modify at this level so we can restore them on
+	* failure. */
+	pte_t **const modified_list = kzalloc(entries * sizeof(pte_t*));
+	pte_t *const orig_vals = kzalloc(entries * sizeof(pte_t));
+
+	if (!modified_list || !orig_vals) {
+		if(modified_list) kfree(modified_list);
+		if(orig_vals) kfree(orig_vals);
+		page_free(page);
+		return NULL;
+	}
+
+	size_t mod_count = 0;
+	for (size_t i = 0; i < entries; i++) {
+		pte_t *src_e = &((pte_t*)src_table)[i];
+		pte_t *dst_e = &((pte_t*)new_table)[i];
+		const pte_t pte_val = *src_e;
+
+		if (!pte_present(pte_val))
+			continue;
+
+		uintptr_t entry_va = base_va + (i << shift);
+
+		if (entry_va >= USER_SPACE_END) {
+			// share
+			dst->ops->set_pte(dst_e, pte_val);
+			page_get(
+				phys_to_page(
+					src->ops->pte_phys(pte_val)
+				)
+			);
+
+			continue;
+		}
+
+		if (pte_leaf(pte_val) || level == src->fmt->levels - 1) {
+			uintptr_t phys = src->ops->pte_phys(pte_val);
+			mem_flags_t flags = arch_mmu_flags(src->ops->pte_flags(pte_val));
+
+			page = phys_to_page(phys);
+			page_get(page);
+
+			/* record original src pte so we can restore it if cloning
+			* fails later */
+			modified_list[mod_count] = src_e;
+			orig_vals[mod_count] = pte_val;
+
+			pte_t new_pte = pte_val;
+
+			if ((flags & MEM_WRITE) && (flags & MEM_USER)) {
+				new_pte = src->ops->mk_pte(
+					phys, mmu_flags_arch(flags & ~MEM_WRITE)
+				);
+
+				src->ops->set_pte(src_e, new_pte);
+				src->ops->flush_tlb_one(entry_va);
+			}
+
+			dst->ops->set_pte(dst_e, new_pte);
+			mod_count++;
+		} else {
+			void *next = src->ops->pte_to_virt(pte_val);
+			void *child = clone_level(dst, src, next, level + 1, entry_va);
+
+			if (!child) {
+				if (mod_count){
+					restore_src_mods(src, modified_list, orig_vals, mod_count);
+				}
+
+				rollback_clone_level(dst, new_table, i, level, base_va);
+				kfree(modified_list);
+				kfree(orig_vals);
+				page_free(page);
+				return NULL;
+			}
+
+			pte_t table_entry = dst->ops->mk_table(__pa(child));
+			dst->ops->set_pte(dst_e, table_entry);
+		}
+	}
+
+	kfree(modified_list);
+	kfree(orig_vals);
+
+	return new_table;
+}
 
 static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr) {
-	return walk_common(ctx, vaddr, 1);
+	return walker(ctx, vaddr, 1);
 }
 
 static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr) {
-	return walk_common(ctx, vaddr, 0);
+	return walker(ctx, vaddr, 0);
 }
 
 int __init mmu_init(){
@@ -195,14 +442,14 @@ int __init mmu_init(){
 		&kernel_ctx,
 		(uintptr_t)__kernel_text_start,
 		(size_t)__kernel_text_end - (size_t)__kernel_text_start,
-		(MEM_READ | MEM_KERNEL)
+		(MEM_READ | MEM_GLOBAL)
 	);
 
 	mmu_set_flags_range(
 		&kernel_ctx,
 		(uintptr_t)__kernel_rodata_start,
 		(size_t)__kernel_rodata_end - (size_t)__kernel_rodata_start,
-		(MEM_READ | MEM_KERNEL)
+		(MEM_READ | MEM_GLOBAL)
 	);
 
 	kernel_ctx.ops->flush_all();
@@ -276,8 +523,7 @@ void mmu_munmap(struct paging_ctx *ctx, uintptr_t vaddr, size_t size) {
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr){
 	pte_t* pte = walk(ctx, vaddr);
 	if(pte){
-		uintptr_t phys = ctx->ops->pte_phys(*pte);
-		return phys & PAGE_MASK;
+		return ctx->ops->pte_phys(*pte);
 	}
 
 	return 0;
@@ -309,89 +555,34 @@ void mmu_set_flags_range(struct paging_ctx *ctx, uintptr_t vaddr, size_t size, m
 mem_flags_t mmu_get_flags(struct paging_ctx *ctx, uintptr_t vaddr){
 	pte_t* pte = walk(ctx, vaddr);
 	if(pte){
-		uintptr_t phys = ctx->ops->pte_phys(*pte);
-		uint32_t flags = phys & FLAGS_MASK;
-		return arch_mmu_flags(flags);
+		return arch_mmu_flags(ctx->ops->pte_flags(*pte));
 	}
 
 	return MEM_NOT_MAPPED;
 }
 
 struct paging_ctx* mmu_create_context(void){
-	struct page* page = page_alloc(0, PG_KERNEL | PG_TABLE);
-	if(!page){
-		return NULL;
-	}
-
-	struct paging_ctx* ctx = alloc_context();
-	if(!ctx){
-		page_free(page);
-		return NULL;
-	}
-
-	uintptr_t phys = page_to_phys(page);
-	pte_t table = arch_paging_ops.mk_table(phys);
-
-	ctx->root = arch_paging_ops.pte_to_virt(table);
-
-	return ctx;
-}
-
-/*static void* clone_level(
-	const struct paging_ctx *restrict dst,
-	const struct paging_ctx *restrict src,
-	void *src_table,
-	const int level)
-{
-	void *new_table = alloc_page();
-	memset(new_table, 0, 4096);
-
-	size_t entries = src->fmt->lvl[level].mask + 1;
-
-	for (size_t i = 0; i < entries; i++) {
-		pte_t *src_e = &((pte_t*)src_table)[i];
-		pte_t *dst_e = &((pte_t*)new_table)[i];
-
-		if (!src->ops->pte_present(*src_e))
-			continue;
-
-		if (level == src->fmt->levels - 1) {
-			// LEAF: aplicar COW
-			uintptr_t phys = src->ops->pte_phys(*src_e);
-
-			struct page* page = phys_to_page(phys);
-			page_get(page);
-
-			pte_t new_pte = *src_e;
-
-			if (pte_writable(new_pte)) {
-				new_pte = pte_mark_cow(new_pte);
-				src->ops->set_pte(src_e, new_pte); // pai vira RO também
-			}
-
-			dst->ops->set_pte(dst_e, new_pte);
-		} else {
-			void *next = src->ops->pte_to_virt(*src_e);
-
-			void *child = clone_level(dst, src, next, level + 1);
-
-			pte_t table_entry = dst->ops->mk_table((uintptr_t)child);
-			dst->ops->set_pte(dst_e, table_entry);
-		}
-	}
-
-	return new_table;
+	return mmu_clone_context(&kernel_ctx);
 }
 
 struct paging_ctx* mmu_clone_context(struct paging_ctx *src) {
 	struct paging_ctx *dst = alloc_context();
+	if(!dst) return ERR_PTR(NO_MEMORY);
 
-	dst->root = clone_level(dst, src, src->root, 0);
+	void* root = clone_level(dst, src, src->root, 0, 0);
+	if(!root){
+		free_context(dst);
+		return NULL;
+	}
+
+	dst->root = root;
 
 	return dst;
-}*/
+}
 
-int mmu_copy_context(struct paging_ctx *src, struct paging_ctx *dst);
+int mmu_copy_context(struct paging_ctx *src, struct paging_ctx *dst){
+	return NOT_IMPLEMENTED;
+}
 
 int mmu_context_switch(struct paging_ctx *ctx){
 	if(!ctx){
@@ -413,54 +604,16 @@ int mmu_context_switch(struct paging_ctx *ctx){
 	return OK;
 }
 
-/*static void destroy_level(
-	const struct paging_ctx *restrict ctx,
-	const void *table,
-	const int level,
-	const int free_leaf_pages
-) {
-	const struct paging_format *restrict fmt = ctx->fmt;
-	const struct paging_ops *restrict ops = ctx->ops;
-
-	typeof(ops->pte_present) pte_present = ops->pte_present;
-	typeof(ops->pte_leaf) pte_leaf = ops->pte_leaf;
-	typeof(ops->clear_pte) clear_pte = ops->clear_pte;
-
-	size_t entries = fmt->lvl[level].mask + 1;
-
-	for (size_t i = 0; i < entries; i++) {
-		pte_t *entry = &((pte_t*)table)[i];
-		const pte_t pte_val = *entry;
-
-		if (!pte_present(pte_val))
-			continue;
-
-		if (pte_leaf(pte_val) || level == fmt->levels - 1) {
-			if (free_leaf_pages) {
-				uintptr_t phys = ops->pte_phys(pte_val);
-				page_free(phys_to_page(phys));
-			}
-
-			clear_pte(entry);
-		} else {
-			const void *next = ops->pte_to_virt(pte_val);
-
-			destroy_level(ctx, next, level + 1, free_leaf_pages);
-
-			page_free(virt_to_page((uintptr_t)next));
-
-			clear_pte(entry);
-		}
-	}
-}
-
 void mmu_destroy_context(struct paging_ctx *ctx){
-	destroy_level(ctx, ctx->root, 0, 1);
-	page_free(virt_to_page((uintptr_t)ctx->root));
-	kfree(ctx);
-}*/
+	uintptr_t root = (uintptr_t)ctx->root;
 
-void mmu_destroy_context(struct paging_ctx *ctx){}
+	destroy_level(ctx, root, 0, 1, 0x0);
 
-int mmu_present(struct paging_ctx *ctx, uintptr_t vaddr);
-uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr);
+	page_free(
+		virt_to_page(root)
+	);
+
+	ctx->root = NULL;
+	
+	free_context(ctx);
+}

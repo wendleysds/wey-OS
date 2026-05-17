@@ -5,21 +5,21 @@
 #include <stddef.h>
 
 typedef enum {
-	// Memory flags
+	// Runtime flags
 	MEM_READ   = 1 << 0,
 	MEM_WRITE  = 1 << 1,
-	MEM_KERNEL = 1 << 2,
-	MEM_USER   = 1 << 3,
-	MEM_GLOBAL = 1 << 4,
-	MEM_DEVICE = 1 << 5,
-	MEM_CACHE  = 1 << 6,
-	MEM_GROWSDOWN = 1 << 7,
+	MEM_USER   = 1 << 2,
+	MEM_GLOBAL = 1 << 3,
+	MEM_DEVICE = 1 << 4,
+	MEM_CACHE  = 1 << 5,
+	MEM_HUGE_PAGE = 1 << 6,
 
-	// Process flags / flags for mem_region
-	MEM_EXEC   = 1 << 8,
-	MEM_SHARED = 1 << 9,
-	MEM_LOCKED = 1 << 10,
-	MEM_NOT_MAPPED = 1 << 11
+	// VMA flags
+	MEM_EXEC   = 1 << 12,
+	MEM_SHARED = 1 << 13,
+	MEM_LOCKED = 1 << 14,
+	MEM_GROWSDOWN = 1 << 15,
+	MEM_NOT_MAPPED = 1 << 16
 } mem_flags_t;
 
 struct paging_ctx;

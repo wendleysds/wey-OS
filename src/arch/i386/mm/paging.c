@@ -1,3 +1,4 @@
+#include "wey/mmu.h"
 #include <asm-generic/paging_ctx.h>
 #include <wey/vma.h>
 #include <asm/page.h>
@@ -27,8 +28,23 @@ static uintptr_t x86_pte_phys(pte_t p) {
 	return p.val & PAGE_MASK;
 }
 
+static uint32_t x86_pte_flags(pte_t p) {
+	return p.val & FLAGS_MASK;
+}
+
 static int x86_present(pte_t p) {
 	return p.val & _PAGE_P;
+}
+
+static int x86_leaf(pte_t p) {
+#ifdef X86_64
+	if (!(p.val & _PAGE_P))
+		return 0;
+
+	return p.val & _PAGE_PSIZE;
+#else
+	return 0;
+#endif
 }
 
 static void x86_set(pte_t *dst, pte_t v) {
@@ -50,8 +66,9 @@ static pte_t x86_mk_table(uintptr_t phys) {
 const struct paging_ops arch_paging_ops = {
 	.mk_pte = x86_mk_pte,
 	.pte_phys = x86_pte_phys,
+	.pte_flags = x86_pte_flags,
 	.pte_present = x86_present,
-	.pte_leaf = x86_present,
+	.pte_leaf = x86_leaf,
 	.set_pte = x86_set,
 	.clear_pte = x86_clear,
 	.pte_to_virt = x86_to_virt,
@@ -70,19 +87,23 @@ const struct paging_format arch_paging_fmt = {
 };
 
 int mmu_flags_arch(mem_flags_t flags){
-	int f = 0;
+	int f = _PAGE_P;
 
-	if(flags & MEM_READ)
-		f |= _PAGE_P;
 	if(flags & MEM_WRITE)
 		f |= _PAGE_RW;
+
 	if(flags & MEM_USER)
 		f |= _PAGE_US;
-	if (flags & MEM_GLOBAL) 
+
+	if(flags & MEM_GLOBAL)
 		f |= _PAGE_GLOBAL;
-	if (flags & MEM_DEVICE)
+
+	if(flags & MEM_HUGE_PAGE)
+		f |= _PAGE_PSIZE;
+
+	if(flags & MEM_DEVICE)
 		f |= _PAGE_PCD | _PAGE_PWT;
-	
+
 	return f;
 }
 
@@ -91,12 +112,21 @@ mem_flags_t arch_mmu_flags(int flags){
 
 	if(flags & _PAGE_P)
 		f |= MEM_READ;
+
 	if(flags & _PAGE_RW)
 		f |= MEM_WRITE;
-	if(flags & _PAGE_US)
-		f |= MEM_USER;
+
+	if (flags & (_PAGE_PCD | _PAGE_PWT))
+		f |= MEM_DEVICE;
+
 	if (flags & _PAGE_GLOBAL) 
 		f |= MEM_GLOBAL;
+
+	if(flags & _PAGE_PSIZE)
+		f |= MEM_HUGE_PAGE;
+
+	if(flags & _PAGE_US)
+		f |= MEM_USER;
 
 	return f;
 }

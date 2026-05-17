@@ -36,6 +36,7 @@ static inline unsigned long paging_current_table_phys(void){
 }
 
 extern pgd_t initial_pgdir[PGD_MAX_ENTRIES];
+extern pgd_t swapper_pgdir[PGD_MAX_ENTRIES];
 
 extern const struct paging_ops arch_paging_ops;
 extern const struct paging_format arch_paging_fmt;

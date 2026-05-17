@@ -60,7 +60,7 @@ static void __init paging_map_ram(void){
 				&kernel_ctx,
 				__va(phys),
 				phys,
-				(MEM_READ | MEM_WRITE | MEM_KERNEL)
+				(MEM_READ | MEM_WRITE)
 			)) {
 				printk("Failed to map RAM at %#lx\n", phys);
 				continue;
@@ -149,7 +149,7 @@ static __init int vmemmap_populate(void) {
 						ctx,
 						vaddr_base + off,
 						phys_meta + off,
-						(MEM_READ | MEM_WRITE | MEM_KERNEL)
+						(MEM_READ | MEM_WRITE)
 					)) {
 						return FAILED;
 					}
