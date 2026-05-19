@@ -10,6 +10,7 @@
 #include <def/config.h>
 #include <def/linker.h>
 #include <lib/string.h>
+#include <lib/assert.h>
 
 #include <asm-generic/paging_ctx.h>
 #include <asm/page.h>
@@ -102,7 +103,9 @@ static inline struct paging_ctx* alloc_context(void){
 }
 
 static inline void free_context(struct paging_ctx* ctx){
-	if(!ctx || ctx->root) return;
+	if(!ctx) return;
+
+	BUG_ON(ctx->root);
 
 	kfree(ctx);
 }
@@ -117,7 +120,7 @@ static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry) {
 		uintptr_t new_tbl = page_to_virt(page);
 		memset((void*)new_tbl, 0x0, PAGE_SIZE);
 
-		pte_t e = ops->mk_table(new_tbl);
+		pte_t e = ops->mk_table(page_to_phys(page));
 		ops->set_pte(entry, e);
 	}
 
@@ -211,6 +214,7 @@ static void destroy_level(
 	typeof(ops->pte_present) pte_present = ops->pte_present;
 	typeof(ops->pte_leaf) pte_leaf = ops->pte_leaf;
 	typeof(ops->clear_pte) clear_pte = ops->clear_pte;
+	typeof(ctx->ops->pte_phys) pte_phys = ctx->ops->pte_phys;
 
 	const size_t entries = fmt->lvl[level].mask + 1;
 	const uint8_t shift = fmt->lvl[level].shift;
@@ -218,9 +222,11 @@ static void destroy_level(
 	for (size_t i = 0; i < entries; i++) {
 		pte_t *entry = &((pte_t*)table)[i];
 		const pte_t pte_val = *entry;
+		uintptr_t phys = pte_phys(pte_val);
 
-		if (!pte_present(pte_val))
+		if (!pte_present(pte_val)){
 			continue;
+		}
 
 		uintptr_t entry_va = base_va + (i << shift);
 		if (entry_va >= USER_SPACE_END) {
@@ -228,7 +234,6 @@ static void destroy_level(
 		}
 
 		if (pte_leaf(pte_val) || level == fmt->levels - 1) {
-			uintptr_t phys = ops->pte_phys(pte_val);
 			struct page* page = phys_to_page(phys);
 
 			switch (destroy_mode) {
@@ -277,19 +282,16 @@ static void rollback_clone_level(
 
 		uintptr_t entry_va = base_va + (i << shift);
 		if (entry_va >= USER_SPACE_END) {
-            ctx->ops->clear_pte(e);
-			page_put(
-				phys_to_page(phys)
-			);
-            continue;
-        }
+			ctx->ops->clear_pte(e);
+			continue;
+		}
 
 		/* If this entry is a leaf, drop the page reference we took during
-		 * cloning. If it's a table entry, recursively destroy the child
-		 * subtree and free the table page. In all cases clear the PTE so
-		 * the partially-built destination table does not reference freed
-		 * memory. 
-		 */
+		* cloning. If it's a table entry, recursively destroy the child
+		* subtree and free the table page. In all cases clear the PTE so
+		* the partially-built destination table does not reference freed
+		* memory. 
+		*/
 		if (pte_leaf(pte_val) || level == ctx->fmt->levels - 1) {
 			struct page *page = phys_to_page(phys);
 			page_put(page);
@@ -313,8 +315,8 @@ static inline void restore_src_mods(const struct paging_ctx *restrict src, pte_t
 		pte_t old = orig_vals[i];
 
 		/* revert the source PTE to its original value and drop the extra 
-		 * reference we took while cloning.
-		 */
+		* reference we took while cloning.
+		*/
 		src->ops->set_pte(pte, old);
 	}
 
@@ -368,12 +370,6 @@ static void* clone_level(
 		if (entry_va >= USER_SPACE_END) {
 			// share
 			dst->ops->set_pte(dst_e, pte_val);
-			page_get(
-				phys_to_page(
-					src->ops->pte_phys(pte_val)
-				)
-			);
-
 			continue;
 		}
 
@@ -381,8 +377,8 @@ static void* clone_level(
 			uintptr_t phys = src->ops->pte_phys(pte_val);
 			mem_flags_t flags = arch_mmu_flags(src->ops->pte_flags(pte_val));
 
-			page = phys_to_page(phys);
-			page_get(page);
+			struct page* leaf_page = phys_to_page(phys);
+			page_get(leaf_page);
 
 			/* record original src pte so we can restore it if cloning
 			* fails later */
@@ -607,13 +603,14 @@ int mmu_context_switch(struct paging_ctx *ctx){
 void mmu_destroy_context(struct paging_ctx *ctx){
 	uintptr_t root = (uintptr_t)ctx->root;
 
-	destroy_level(ctx, root, 0, 1, 0x0);
+	destroy_level(ctx, root, 0,0, DESTROY_PUT_SHARED);
+
+	ctx->ops->flush_all();
 
 	page_free(
 		virt_to_page(root)
 	);
 
 	ctx->root = NULL;
-	
 	free_context(ctx);
 }

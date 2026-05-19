@@ -20,9 +20,8 @@ struct zone {
 	struct free_area free_area[MAX_ORDER];
 	spinlock_t lock;
 
-	unsigned long managed_pages;
-	unsigned long free_pages;
 	unsigned long reserved_pages;
+	unsigned long free_pages;
 };
 
 static struct zone global_zone;
@@ -77,8 +76,11 @@ static __init int pfn_range_reserved(uintptr_t start, uintptr_t pages){
 	return 0;
 }
 
+void print_free_pages(void){
+	printk("Free pages: %lu\n", global_zone.free_pages);
+}
+
 int __init page_init(void){
-	global_zone.managed_pages = 0;
 	global_zone.reserved_pages = 0;
 	global_zone.free_pages = 0;
 	spinlock_init(&global_zone.lock);
@@ -108,7 +110,6 @@ int __init page_init(void){
 			if (pfn_is_reserved(pfn)) {
 				struct page* page = pfn_to_page(pfn);
 				page->flags = PG_RESERVED;
-				global_zone.managed_pages++;
 				global_zone.reserved_pages++;
 				pfn++;
 				continue;
@@ -139,7 +140,6 @@ int __init page_init(void){
 
 			list_add(&page->list, &global_zone.free_area[order].free_list);
 			global_zone.free_area[order].nr_free++;
-			global_zone.managed_pages += num_pages;
 			global_zone.free_pages += num_pages;
 
 			pfn += num_pages;
@@ -147,11 +147,11 @@ int __init page_init(void){
 	}
 
 	printk("Buddy: Initialized with %lu managed pages\n",
-		global_zone.free_pages, global_zone.managed_pages, global_zone.reserved_pages
+		global_zone.free_pages + global_zone.reserved_pages
 	);
 
-	printk("Buddy: Pages: free=%lu managed=%lu reserved=%lu\n",
-		global_zone.free_pages, global_zone.managed_pages, global_zone.reserved_pages
+	printk("Buddy: Pages: free=%lu reserved=%lu\n",
+		global_zone.free_pages, global_zone.reserved_pages
 	);
 
 	return SUCCESS;
@@ -233,6 +233,7 @@ int page_free(struct page *page){
 
 	uintptr_t pfn = page_to_pfn(page);
 	uint8_t order = page->order;
+	uint8_t orig_order = order;
 
 	page->flags = PG_BUDDY;
 	atomic_set(&page->refcount, 0);
@@ -269,7 +270,7 @@ int page_free(struct page *page){
 	list_add(&merged->list, &global_zone.free_area[order].free_list);
 
 	global_zone.free_area[order].nr_free++;
-	global_zone.free_pages += (1UL << order);
+	global_zone.free_pages += (1UL << orig_order);
 
 out:
 	spin_unlock(&global_zone.lock);
@@ -294,7 +295,6 @@ void __page_add_memory(uintptr_t vaddr, size_t size){
 
         if (page_free(page) == SUCCESS) {
             pages_freed++;
-            global_zone.managed_pages++;
         }
     }
 
