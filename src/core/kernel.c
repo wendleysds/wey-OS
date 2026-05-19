@@ -93,57 +93,6 @@ __no_return void kmain(){
 
 	do_initcalls();
 
-	printk("-------------------------\n");
-
-	extern void print_free_pages();
-	print_free_pages();
-
-	struct paging_ctx* bkup = mmu_create_context();
-	BUG_MSG(!bkup, "Failed to create backup context!");
-
-	for(int i = 0; i < 1000; i++){
-		struct paging_ctx* ctx = mmu_create_context();
-		BUG_MSG(!ctx, "Failed to create test context!");
-
-		mmu_context_switch(ctx);
-
-		struct page* pages[32];
-		size_t p = 0;
-		for(int i = 0; i < 32; i++){
-			struct page* page = page_alloc(0, PG_TABLE);
-			BUG_MSG(!page, "Failed to allocate page!");
-
-			mmu_mmap(
-				ctx,
-				page_to_phys(page), 
-				0x1000 + (i * PAGE_SIZE), 
-				PAGE_SIZE, 
-				(MEM_USER | MEM_WRITE | MEM_READ)
-			);
-
-			// write test
-			memset((void*)(0x1000 + (i * PAGE_SIZE)), 0xAB, PAGE_SIZE);
-
-			pages[p++] = page;
-		}
-
-		for(int i = 0; i < p; i++){
-			page_free(pages[i]);
-		}
-
-		mmu_context_switch(bkup);
-		mmu_destroy_context(ctx);
-	}
-
-	extern struct paging_ctx kernel_ctx;
-	mmu_context_switch(&kernel_ctx);
-
-	mmu_destroy_context(bkup);
-
-	print_free_pages();
-
-	printk("-------------------------\n");
-
 	printk("OK\n");
 
 	while(1) cpu_relax();

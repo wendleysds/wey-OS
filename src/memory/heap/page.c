@@ -76,10 +76,6 @@ static __init int pfn_range_reserved(uintptr_t start, uintptr_t pages){
 	return 0;
 }
 
-void print_free_pages(void){
-	printk("Free pages: %lu\n", global_zone.free_pages);
-}
-
 int __init page_init(void){
 	global_zone.reserved_pages = 0;
 	global_zone.free_pages = 0;
