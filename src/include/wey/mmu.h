@@ -40,11 +40,12 @@ mem_flags_t mmu_get_flags(struct paging_ctx *ctx, uintptr_t vaddr);
 
 struct paging_ctx* mmu_create_context(void);
 struct paging_ctx* mmu_clone_context(struct paging_ctx *src);
-int mmu_copy_context(struct paging_ctx *src, struct paging_ctx *dst);
 
 int mmu_context_switch(struct paging_ctx *ctx);
 void mmu_destroy_context(struct paging_ctx *ctx);
 
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr);
+void mmu_invlpg(struct paging_ctx *ctx, uintptr_t vaddr);
+void mmu_flush_all(struct paging_ctx *ctx);
 
 #endif

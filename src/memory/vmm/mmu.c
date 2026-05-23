@@ -27,12 +27,6 @@
 #define walker __generic_walker
 #endif
 
-enum destroy_mode {
-	DESTROY_TABLES_ONLY,
-	DESTROY_PUT_SHARED,
-	DESTROY_FREE_LEAF,
-};
-
 struct walk_level {
 	void *table;
 	pte_t *entry;
@@ -183,10 +177,6 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 		const pte_t pte_val = *entry;
 
 		if (likely(pte_present(pte_val))) {
-			if (pte_leaf(pte_val) || i == (levels - 1)) {
-				return entry;
-			}
-
 			table = ops->pte_to_virt(pte_val);
 		} 
 		else if (create) {
@@ -196,7 +186,12 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 		else {
 			return NULL;
 		}
+
+		if (pte_leaf(pte_val) || i == (levels - 1)) {
+			return entry;
+		}
 	}
+
 	return NULL;
 }
 #endif
@@ -205,8 +200,7 @@ static void destroy_level(
 	const struct paging_ctx *restrict ctx,
 	const uintptr_t table,
 	const int level,
-	uintptr_t base_va,
-	enum destroy_mode destroy_mode
+	uintptr_t base_va
 ) {
 	const struct paging_format *restrict fmt = ctx->fmt;
 	const struct paging_ops *restrict ops = ctx->ops;
@@ -233,29 +227,15 @@ static void destroy_level(
 			continue;
 		}
 
-		if (pte_leaf(pte_val) || level == fmt->levels - 1) {
-			struct page* page = phys_to_page(phys);
+		struct page* page = phys_to_page(phys);
 
-			switch (destroy_mode) {
-				case DESTROY_FREE_LEAF:
-					page_free(page);
-					break;
-				case DESTROY_PUT_SHARED:
-					page_put(page);
-					break;
-				default: break;
-			}
-
-			clear_pte(entry);
-		} else {
+		if (!pte_leaf(pte_val) && level != fmt->levels - 1) {
 			const uintptr_t next = (uintptr_t)ops->pte_to_virt(pte_val);
-
-			destroy_level(ctx, next, level + 1, entry_va, destroy_mode);
-
-			page_free(virt_to_page(next));
-
-			clear_pte(entry);
+			destroy_level(ctx, next, level + 1, entry_va);
 		}
+
+		page_put(page);
+		clear_pte(entry);
 	}
 }
 
@@ -298,7 +278,7 @@ static void rollback_clone_level(
 			ctx->ops->clear_pte(e);
 		} else {
 			void *child = ctx->ops->pte_to_virt(pte_val);
-			destroy_level(ctx, (uintptr_t)child, level + 1, entry_va, DESTROY_PUT_SHARED);
+			destroy_level(ctx, (uintptr_t)child, level + 1, entry_va);
 
 			page_free(
 				phys_to_page(phys)
@@ -466,7 +446,7 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 			if(i > 0){
 				mmu_munmap(ctx, roolback_virt_addr, i * PAGE_SIZE);
 			}
-	
+
 			return NO_MEMORY;
 		}
 
@@ -563,7 +543,7 @@ struct paging_ctx* mmu_create_context(void){
 
 struct paging_ctx* mmu_clone_context(struct paging_ctx *src) {
 	struct paging_ctx *dst = alloc_context();
-	if(!dst) return ERR_PTR(NO_MEMORY);
+	if(!dst) return NULL;
 
 	void* root = clone_level(dst, src, src->root, 0, 0);
 	if(!root){
@@ -574,10 +554,6 @@ struct paging_ctx* mmu_clone_context(struct paging_ctx *src) {
 	dst->root = root;
 
 	return dst;
-}
-
-int mmu_copy_context(struct paging_ctx *src, struct paging_ctx *dst){
-	return NOT_IMPLEMENTED;
 }
 
 int mmu_context_switch(struct paging_ctx *ctx){
@@ -603,7 +579,7 @@ int mmu_context_switch(struct paging_ctx *ctx){
 void mmu_destroy_context(struct paging_ctx *ctx){
 	uintptr_t root = (uintptr_t)ctx->root;
 
-	destroy_level(ctx, root, 0,0, DESTROY_PUT_SHARED);
+	destroy_level(ctx, root, 0,0);
 
 	ctx->ops->flush_all();
 
@@ -613,4 +589,12 @@ void mmu_destroy_context(struct paging_ctx *ctx){
 
 	ctx->root = NULL;
 	free_context(ctx);
+}
+
+void mmu_invlpg(struct paging_ctx *ctx, uintptr_t vaddr){
+	ctx->ops->flush_tlb_one(vaddr);
+}
+
+void mmu_flush_all(struct paging_ctx *ctx){
+	ctx->ops->flush_all();
 }

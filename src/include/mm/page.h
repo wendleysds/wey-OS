@@ -5,7 +5,6 @@
 #include <def/compile.h>
 #include <lib/list.h>
 #include <stdint.h>
-#include <stddef.h>
 
 #define MAX_ORDER 11
 
@@ -24,8 +23,7 @@
 #define PG_DIRTY      (1U << 8)
 #define PG_LOCKED     (1U << 9)
 #define PG_REFERENCED (1U << 10)
-#define PG_COW        (1U << 11)
-#define PG_WRITEBACK  (1U << 12)
+#define PG_WRITEBACK  (1U << 11)
 
 struct page {
 	uint8_t order;
