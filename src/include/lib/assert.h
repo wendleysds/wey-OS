@@ -4,6 +4,7 @@
 #include <def/compile.h>
 #include <wey/printk.h>
 #include <wey/panic.h>
+#include <stdbool.h>
 
 __no_return void __assert_fail(
 	const char* expr,
@@ -29,33 +30,30 @@ __no_return void __assert_fail(
 
 #define ASSERT_STATIC(expr, msg) _Static_assert(expr, msg)
 
-#define BUG() panic("BUG at %s:%d in %s()", __FILE__, __LINE__, __func__)
-
 #define BUG_ON(cond) do { \
-	if (unlikely(cond)) BUG(); \
+	if (unlikely(cond)) panic("BUG at %s:%d in %s()", __FILE__, __LINE__, __func__); \
 } while(0)
 
 #define BUG_MSG(cond, msg, ...) do { \
 	if (unlikely(cond)) { \
-		printk("BUG: " msg "\n", ##__VA_ARGS__); \
-		BUG(); \
+		panic("BUG " msg " at %s:%d in %s()", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
 	} \
 } while(0)
 
-#define WARN_ON(cond) ({ \
+#define WARN_ON(cond, msg, ...) ({ \
 	int __ret = !!(cond); \
 	if (unlikely(__ret)) { \
-		printk("WARNING at %s:%d in %s()\n", __FILE__, __LINE__, __func__); \
+		printk("WARNING: " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
 	} \
 	__ret; \
 })
 
-#define WARN_ONCE(cond) ({ \
+#define WARN_ONCE(cond, msg, ...) ({ \
 	static bool __warned = false; \
 	int __ret = !!(cond); \
 	if (unlikely(__ret && !__warned)) { \
 		__warned = true; \
-		printk("WARNING (ONCE) at %s:%d in %s()\n", __FILE__, __LINE__, __func__); \
+		printk("WARNING (ONCE): " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
 	} \
 	__ret; \
 })

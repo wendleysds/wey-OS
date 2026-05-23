@@ -12,4 +12,6 @@ __no_return void __assert_fail(
 		"  in %s()\n",
 		expr, file, line, func
 	);
+
+	__builtin_unreachable();
 }
