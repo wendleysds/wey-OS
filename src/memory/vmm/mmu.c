@@ -54,7 +54,7 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr){
 			void* new_tbl = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
 			if(!new_tbl) return NULL;
 
-			pte_t e = ctx->ops->mk_table((uintptr_t)new_tbl);
+			pte_t e = ctx->ops->mk_table((uintptr_t)new_tbl, 0);
 
 			ctx->ops->set_pte(
 				entry,
@@ -104,7 +104,7 @@ static inline void free_context(struct paging_ctx* ctx){
 	kfree(ctx);
 }
 
-static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry) {
+static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry, uint8_t user_table) {
 	const struct paging_ops *restrict ops = ctx->ops;
 
 	if (!ops->pte_present(*entry)) {
@@ -114,7 +114,7 @@ static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry) {
 		uintptr_t new_tbl = page_to_virt(page);
 		memset((void*)new_tbl, 0x0, PAGE_SIZE);
 
-		pte_t e = ops->mk_table(page_to_phys(page));
+		pte_t e = ops->mk_table(page_to_phys(page), user_table);
 		ops->set_pte(entry, e);
 	}
 
@@ -159,7 +159,7 @@ static int walk_to(struct paging_ctx *ctx, uintptr_t va, struct walk_level *leve
 }
 
 #ifdef USE_GENERIC_WALKER
-static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, int create) {
+static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t create, uint8_t user_table) {
 	const struct paging_format *restrict fmt = ctx->fmt;
 	const struct paging_ops *restrict ops = ctx->ops;
 
@@ -180,7 +180,7 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 			table = ops->pte_to_virt(pte_val);
 		} 
 		else if (create) {
-			table = ensure_table(ctx, entry);
+			table = ensure_table(ctx, entry, user_table);
 			if (unlikely(!table)) return NULL;
 		} 
 		else {
@@ -320,6 +320,7 @@ static void* clone_level(
 
 	typeof(src->ops->pte_leaf) pte_leaf = src->ops->pte_leaf;
 	typeof(src->ops->pte_present) pte_present = src->ops->pte_present;
+	typeof(src->ops->pte_flags) pte_flags = src->ops->pte_flags;
 
 	const size_t entries = src->fmt->lvl[level].mask + 1;
 	const uint8_t shift = src->fmt->lvl[level].shift;
@@ -353,9 +354,9 @@ static void* clone_level(
 			continue;
 		}
 
-		if (pte_leaf(pte_val) || level == src->fmt->levels - 1) {
+		mem_flags_t flags = arch_mmu_flags(pte_flags(pte_val));
+		if (!pte_leaf(pte_val) && level != src->fmt->levels - 1) {
 			uintptr_t phys = src->ops->pte_phys(pte_val);
-			mem_flags_t flags = arch_mmu_flags(src->ops->pte_flags(pte_val));
 
 			struct page* leaf_page = phys_to_page(phys);
 			page_get(leaf_page);
@@ -394,7 +395,7 @@ static void* clone_level(
 				return NULL;
 			}
 
-			pte_t table_entry = dst->ops->mk_table(__pa(child));
+			pte_t table_entry = dst->ops->mk_table(__pa(child), flags & MEM_USER);
 			dst->ops->set_pte(dst_e, table_entry);
 		}
 	}
@@ -405,12 +406,12 @@ static void* clone_level(
 	return new_table;
 }
 
-static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr) {
-	return walker(ctx, vaddr, 1);
+static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t user_table) {
+	return walker(ctx, vaddr, 1, user_table);
 }
 
 static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr) {
-	return walker(ctx, vaddr, 0);
+	return walker(ctx, vaddr, 0, 0x0);
 }
 
 int __init mmu_init(){
@@ -438,9 +439,9 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 
 	uintptr_t roolback_virt_addr = vaddr;
 
-	uint32_t arch_flags = mmu_flags_arch(mem_flags);
+	const uint32_t arch_flags = mmu_flags_arch(mem_flags);
 	for(size_t i = 0; i < count; i++){
-		pte_t *pte = walk_create(ctx, vaddr);
+		pte_t *pte = walk_create(ctx, vaddr, mem_flags & MEM_USER);
 
 		if(unlikely(!pte)){
 			if(i > 0){
@@ -451,7 +452,6 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 		}
 
 		pte_t val = ctx->ops->mk_pte(paddr, arch_flags);
-
 		ctx->ops->set_pte(pte, val);
 		ctx->ops->flush_tlb_one(vaddr);
 

@@ -1,11 +1,8 @@
-#include <asm/paging.h>
-#include <stdint.h>
-#include <wey/vfs.h>
 #include <wey/vma.h>
 #include <def/err.h>
 #include <def/config.h>
-#include <mm/page.h>
-#include <lib/string.h>
+
+#include <asm/paging.h>
 
 #define ALIGN_DOWN(v,a) ((v) & ~((a)-1))
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
@@ -188,6 +185,8 @@ struct mm_struct* vma_dup(struct mm_struct* mm){
 			spin_unlock(&mm->spinlock);
 			goto out_free;
 		}
+
+		cur = cur->next;
 	}
 	spin_unlock(&mm->spinlock);
 

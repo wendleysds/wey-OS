@@ -1,4 +1,3 @@
-#include "wey/mmu.h"
 #include <asm-generic/paging_ctx.h>
 #include <wey/vma.h>
 #include <asm/page.h>
@@ -21,7 +20,7 @@ static void x86_invlpg_all(void){
 }
 
 static pte_t x86_mk_pte(uintptr_t phys, uint32_t flags) {
-	return (pte_t){ .val = (phys & PAGE_MASK) | flags | _PAGE_P };
+	return (pte_t){ .val = (phys & PAGE_MASK) | (flags & FLAGS_MASK) | _PAGE_P };
 }
 
 static uintptr_t x86_pte_phys(pte_t p) {
@@ -59,8 +58,10 @@ static void* x86_to_virt(pte_t p) {
 	return (void*)__va(x86_pte_phys(p));
 }
 
-static pte_t x86_mk_table(uintptr_t phys) {
-	return (pte_t){ .val = phys | _PAGE_P | _PAGE_RW };
+static pte_t x86_mk_table(uintptr_t phys, uint8_t user) {
+	uint8_t flags = _PAGE_P | _PAGE_RW;
+	if(user) flags |= _PAGE_US;
+	return (pte_t){ .val = (phys & PAGE_MASK) | (flags & FLAGS_MASK)};
 }
 
 const struct paging_ops arch_paging_ops = {

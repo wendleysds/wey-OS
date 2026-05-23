@@ -77,8 +77,21 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr){
 	size_t region_offset = page_addr - region->start;
 	off_t file_offset = region->file_offset + region_offset;
 
-	struct page* page = page_alloc(1, 0x0);
+	struct page* page = page_alloc(0, 0x0);
 	if (!page) return NO_MEMORY;
+
+	void* kernel_virt = (void*)page_to_virt(page);
+	memset(kernel_virt, 0x0, PAGE_SIZE);
+
+	if (region->file) {
+		vfs_lseek(region->file, file_offset, SEEK_SET);
+
+		int n = vfs_read(region->file, kernel_virt, PAGE_SIZE);
+		if (n < 0){
+			page_free(page);
+			return n;
+		}
+	}
 
 	int res = mmu_mmap(
 		current->mm->ctx,
@@ -93,17 +106,7 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr){
 		return res;
 	}
 
-	memset((void*)page_addr, 0x0, PAGE_SIZE);
-
-	if (region->file) {
-		vfs_lseek(region->file, file_offset, SEEK_SET);
-
-		int n = vfs_read(region->file, (void*)page_addr, PAGE_SIZE);
-		if (n < 0){
-			page_free(page);
-			return n;
-		}
-	}
+	mmu_invlpg(current->mm->ctx, page_addr);
 
 	return SUCCESS;
 }
@@ -113,6 +116,9 @@ static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
 	struct page* page = page_alloc(1, 0x0);
 	if (!page) return NO_MEMORY;
 
+	void* kernel_virt = (void*)page_to_virt(page);
+	memset(kernel_virt, 0x0, PAGE_SIZE);
+
 	int res = mmu_mmap(
 		current->mm->ctx,
 		page_to_phys(page),
@@ -126,8 +132,7 @@ static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
 		return res;
 	}
 
-	memset((void*)page_addr, 0x0, PAGE_SIZE);
-
+	mmu_invlpg(current->mm->ctx, page_addr);
 	return SUCCESS;
 }
 
@@ -140,24 +145,20 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 
 	uintptr_t phys = mmu_translate(
 		current->mm->ctx,
-		addr
+		page_addr
 	);
 
 	struct page* page = phys_to_page(phys);
 	if (!page) return NOT_FOUND;
 
 	if(atomic_read(&page->refcount) == 1){
-		mem_flags_t flags = mmu_get_flags(
-			current->mm->ctx,
-			page_addr
-		);
-
 		mmu_set_flags(
 			current->mm->ctx,
 			page_addr,
-			flags | MEM_WRITE
+			region->mem_flags
 		);
-	
+
+		mmu_invlpg(current->mm->ctx, page_addr);
 		return SUCCESS;
 	}
 
@@ -194,32 +195,21 @@ void page_fault_handler(struct registers* regs){
 		panic("Kernel page fault!");
 	}
 
+	printk("task info: pid=%d name=\"%s\"\n", current->pid, current->name);
+
 	struct vm_region* region = vma_lookup(current->mm, pf.addr);
+	if(!region){
+		goto segfault;
+	}
 
 	if(pf.present){
-		if (!region)
-			goto segfault;
-
-		if (pf.write && !(region->mem_flags & MEM_WRITE))
-			goto segfault;
-
-		if (!pf.write && !(region->mem_flags & MEM_READ))
-			goto segfault;
-
-		if (pf.exec && !(region->mem_flags & MEM_EXEC))
-			goto segfault;
-
 		if(pf.write && (region->mem_flags & MEM_WRITE)){
-
 			handle_res = vm_handle_cow(region, pf.addr);
 			goto check_res;
 		}
 		
 		goto segfault;
 	}
-
-	if (!region)
-		goto segfault;
 
 	if (pf.write && !(region->mem_flags & MEM_WRITE))
 		goto segfault;
@@ -246,6 +236,7 @@ check_res:
 	return; // OK
 
 segfault:
+	printk("Segmentation fault at address %#010lx\n", pf.addr);
 	dump_regs(regs);
 kill:
 	panic("Killed thread\n");

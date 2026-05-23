@@ -16,7 +16,7 @@ struct paging_ops {
 	void (*clear_pte)(pte_t *dst);
 
 	void* (*pte_to_virt)(pte_t pte);
-	pte_t (*mk_table)(uintptr_t table_phys);
+	pte_t (*mk_table)(uintptr_t phys, uint8_t user);
 
 	void (*flush_tlb_one)(uintptr_t vaddr);
 	void (*flush_all)(void);

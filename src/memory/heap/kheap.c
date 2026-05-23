@@ -8,8 +8,8 @@
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
 static inline int order_for_pages(size_t pages) {
-	if (pages == 0) return 0;
-	return pages == 1 ? 0 : (64 - __builtin_clzl(pages - 1));
+	if (pages <= 1) return 0;
+	return 64 - __builtin_clzll((uint64_t)(pages - 1));
 }
 
 void* kmalloc(size_t size) {
