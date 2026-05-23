@@ -1,19 +1,13 @@
-#include "asm/cpu.h"
-#include "asm/idt.h"
-#include "asm/paging.h"
-#include "asm/process.h"
-#include "asm/ptrace.h"
-#include "def/config.h"
-#include "def/err.h"
-#include "mm/page.h"
-#include "wey/mmu.h"
-#include "wey/printk.h"
 #include <wey/sched.h>
 #include <wey/vma.h>
 #include <wey/vfs.h>
 #include <wey/panic.h>
+#include <wey/printk.h>
 #include <wey/interrupt.h>
+#include <def/err.h>
+
 #include <mm/kheap.h>
+#include <mm/page.h>
 
 extern void page_fault_entry();
 
@@ -77,7 +71,7 @@ static inline void show_pf_info(pf_info_t* pf){
 	);
 }
 
-static int vm_handle_file(struct mem_region* region, uintptr_t addr){
+static int vm_handle_file(struct vm_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
 
 	size_t region_offset = page_addr - region->start;
@@ -86,20 +80,20 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 	struct page* page = page_alloc(1, 0x0);
 	if (!page) return NO_MEMORY;
 
-	/*int res = pgd_remap(
-		page_addr, 
-		page_to_phys(page), 
-		mmu_flags_arch(region->mem_flags)
+	int res = mmu_mmap(
+		current->mm->ctx,
+		page_to_phys(page),
+		page_addr,
+		PAGE_SIZE,
+		region->mem_flags
 	);
 
 	if(IS_ERR_VALUE(res)){
 		page_free(page);
 		return res;
-	}*/
+	}
 
 	memset((void*)page_addr, 0x0, PAGE_SIZE);
-
-	vma_page_hash_insert(region, page_addr, page);
 
 	if (region->file) {
 		vfs_lseek(region->file, file_offset, SEEK_SET);
@@ -114,57 +108,68 @@ static int vm_handle_file(struct mem_region* region, uintptr_t addr){
 	return SUCCESS;
 }
 
-static int vm_handle_stack(struct mem_region* region, uintptr_t addr){
+static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
 	struct page* page = page_alloc(1, 0x0);
 	if (!page) return NO_MEMORY;
 
-	/*int res = pgd_remap(
-		page_addr, 
-		page_to_phys(page), 
-		mmu_flags_arch(region->mem_flags)
+	int res = mmu_mmap(
+		current->mm->ctx,
+		page_to_phys(page),
+		page_addr,
+		PAGE_SIZE,
+		region->mem_flags
 	);
 
 	if(IS_ERR_VALUE(res)){
 		page_free(page);
 		return res;
-	}*/
+	}
 
-	vma_page_hash_insert(region, page_addr, page);
 	memset((void*)page_addr, 0x0, PAGE_SIZE);
 
 	return SUCCESS;
 }
 
-static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
+static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
 
 	if (page_addr < region->start || page_addr >= region->end){
 		return ACCESS_DENIED;
 	}
 
-	struct page* page = vma_page_hash_lookup(region, page_addr);
+	uintptr_t phys = mmu_translate(
+		current->mm->ctx,
+		addr
+	);
+
+	struct page* page = phys_to_page(phys);
 	if (!page) return NOT_FOUND;
 
-	if((page->flags & PG_COW) == 0){
-		return INVALID_ARG;
-	}
-
 	if(atomic_read(&page->refcount) == 1){
-		/*int flags = pte_get_flags(page_addr);
-		flags |= mmu_flags_arch(MEM_WRITE);
-		pte_update_flags(page_addr, flags);
-		page->flags &= ~PAGE_COW;*/
+		mem_flags_t flags = mmu_get_flags(
+			current->mm->ctx,
+			page_addr
+		);
+
+		mmu_set_flags(
+			current->mm->ctx,
+			page_addr,
+			flags | MEM_WRITE
+		);
+	
 		return SUCCESS;
 	}
 
 	struct page* new_page = page_alloc(1, 0x0);
 	if (!new_page) return NOT_FOUND;
 
-	/*int res = pgd_map(
-		page_to_virt(new_page),
+	int res = mmu_mmap(
+		current->mm->ctx,
 		page_to_phys(new_page),
-		(_PAGE_P | _PAGE_RW)
+		page_addr,
+		PAGE_SIZE,
+		region->mem_flags
 	);
 
 	if(IS_ERR_VALUE(res)){
@@ -172,30 +177,9 @@ static int vm_handle_cow(struct mem_region* region, uintptr_t addr){
 		return res;
 	}
 
-	// Sanity
-	invlpg((void*)page_to_virt(new_page));
+	mmu_invlpg(current->mm->ctx, page_addr);
 
-	memcpy(
-		(void*)page_to_virt(new_page),
-		(void*)page_addr,
-		PAGE_SIZE
-	);
-
-	res = pgd_remap(
-		page_addr, 
-		page_to_phys(new_page), 
-		mmu_flags_arch(region->mem_flags)
-	);
-
-	if(IS_ERR_VALUE(res)){
-		pgd_unmap(page_to_virt(new_page));
-		page_free(page);
-		return res;
-	}
-
-	invlpg((void*)page_addr);
-
-	page_put(page);*/
+	page_put(page);
 
 	return SUCCESS;
 }
@@ -210,7 +194,7 @@ void page_fault_handler(struct registers* regs){
 		panic("Kernel page fault!");
 	}
 
-	struct mem_region* region = vma_lookup(current->mm, pf.addr);
+	struct vm_region* region = vma_lookup(current->mm, pf.addr);
 
 	if(pf.present){
 		if (!region)
@@ -225,7 +209,7 @@ void page_fault_handler(struct registers* regs){
 		if (pf.exec && !(region->mem_flags & MEM_EXEC))
 			goto segfault;
 
-		if(pf.present && pf.write && (region->mem_flags & MEM_WRITE)){
+		if(pf.write && (region->mem_flags & MEM_WRITE)){
 
 			handle_res = vm_handle_cow(region, pf.addr);
 			goto check_res;
