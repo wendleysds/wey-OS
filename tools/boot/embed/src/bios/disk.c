@@ -31,7 +31,6 @@ struct bios_dap{
 static int _disk_read_chs(struct disk* disk, uint64_t lba, void* buffer, uint16_t seccount){
 	struct bios_disk_data* bdsk_data = (struct bios_disk_data*)disk->private;
 
-	// BIOS CHS limits – use 32-bit no matter what
 	if (lba > 0xFFFFFFFFULL || seccount > 255) {
         return OUT_OF_BOUNDS;
     }
@@ -41,7 +40,7 @@ static int _disk_read_chs(struct disk* disk, uint64_t lba, void* buffer, uint16_
 
 	uint8_t sector = (lba32 % bdsk_data->geo.sectorPerTrack) + 1;
 	uint8_t head = tmp % bdsk_data->geo.numHeads;
-	uint8_t cylinder = tmp / bdsk_data->geo.numHeads;
+	uint16_t cylinder = tmp / bdsk_data->geo.numHeads;
 
 	struct biosregs ireg, oreg;
 	ireg.ah = 0x02; // read
@@ -53,7 +52,7 @@ static int _disk_read_chs(struct disk* disk, uint64_t lba, void* buffer, uint16_
     ireg.es = SEG(buffer);
     ireg.bx = OFF(buffer);
 
-	intcall(0x10, &ireg, &oreg);
+	intcall(0x13, &ireg, &oreg);
 
 	if(oreg.eflags & X86_EFLAGS_CF){
 		return READ_FAIL;
