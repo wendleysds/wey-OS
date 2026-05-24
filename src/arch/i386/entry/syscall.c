@@ -1,16 +1,17 @@
 #include <wey/syscall.h>
 #include <wey/panic.h>
 #include <wey/sched.h>
+#include <wey/printk.h>
 #include <asm/idt.h>
 #include <def/err.h>
 #include <def/config.h>
 #include <lib/string.h>
 
-#define ll long long
+#define ARG(x) long arg##x
 
 #define __SYSCALL(no, name) \
 	case no:\
-		extern long __se_##name(ll, ll, ll, ll, ll, ll); \
+		extern asmlinkage long __se_##name(long, long, long, long, long, long); \
 		return (sys_fn_t) __se_##name; \
 
 extern void _entry_isr80h_32();
@@ -19,7 +20,7 @@ extern void _set_idt(uint8_t interrupt_num, void* address, uint8_t flags);
 extern void kernel_registers();
 extern void user_registers();
 
-static long _invsys(ll a, ll b, ll c, ll d, ll e, ll f){
+static long _invsys(long a, ...){
 	return NO_ENTRY;
 }
 
@@ -32,7 +33,7 @@ static inline sys_fn_t syscall(long no){
 	}
 }
 
-static inline long dispatch_syscall(long sys_no, long arg1, long arg2, long arg3, long arg4, long arg5, long arg6){
+static inline long dispatch_syscall(long sys_no, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6)){
     return syscall(sys_no)(arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
