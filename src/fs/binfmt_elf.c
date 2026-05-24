@@ -64,12 +64,12 @@ static int load_elf_binarie(struct binprm *bprm){
 		if (phdr->p_flags & PF_W) flags |= MEM_WRITE;
 		if (phdr->p_flags & PF_X) flags |= MEM_EXEC;
 
-		struct mem_region* region = vma_add(
+		struct vm_region* region = vma_add(
 			bprm->mm,
 			phdr->p_vaddr,
 			phdr->p_vaddr + phdr->p_memsz,
 			flags,
-			MAP_PRIVATE,
+			PROT_MAP_PRIVATE,
 			bprm->file,
 			phdr->p_offset
 		);

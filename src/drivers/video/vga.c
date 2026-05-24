@@ -9,6 +9,8 @@
 #include <def/config.h>
 #include <drivers/vga.h>
 
+#include <asm/page.h>
+
 #define CURSOR_START 0x0
 #define CUSOR_END 0xD
 
@@ -72,6 +74,7 @@ int vga_setup(struct video_info* video_info){
 		}
 	}
 
+	vga_vram_base = __va(vga_vram_base);
 	vga_vram_end = vga_vram_base + vga_vram_size;
 
 	if (vga_video_type == VIDEO_TYPE_EGAC ||
@@ -132,15 +135,7 @@ static void vga_cursor(struct vt_data *vt, uint8_t enabled){
 }
 
 static void vga_exit_early(){
-	mmu_mmap(
-		(void*)vga_vram_base,
-		(void*)0x0,
-		vga_vram_size,
-		(MEM_DEVICE | MEM_KERNEL | MEM_READ | MEM_WRITE)
-	);
-
-	vga_vram_base = 0x0;
-	vga_vram_end = vga_vram_base + vga_vram_size;
+	// do ioremap
 }
 
 static uint8_t vga_build_attr(struct vt_data* vt, uint8_t color, enum vt_intensity intensity){

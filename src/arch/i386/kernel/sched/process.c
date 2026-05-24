@@ -78,7 +78,7 @@ void context_switch(struct task* prev, struct task* to){
 	cpu->tss.esp0 = (unsigned long)(to->kstack + PROC_KERNEL_STACK_SIZE);
 
 	if(to->mm){
-		mmu_page_switch(to->mm->pgd);
+		mmu_context_switch(to->mm->ctx);
 	}
 
 	_switch_to(prev, to);

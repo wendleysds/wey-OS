@@ -1,14 +1,7 @@
-#include "wey/vma.h"
-#include <lib/list.h>
-#include <stdint.h>
 #include <wey/binfmts.h>
-#include <wey/vfs.h>
-#include <wey/mmu.h>
 #include <wey/sched.h>
-#include <wey/panic.h>
-#include <def/config.h>
+#include <lib/assert.h>
 #include <def/err.h>
-#include <lib/string.h>
 
 static LIST_HEAD(formats);
 
@@ -77,6 +70,14 @@ static struct binprm* bprm_alloc(const char* filename){
 		goto out_free;
 	}
 
+	struct paging_ctx* ctx = mmu_create_context();
+	if(!ctx){
+		vma_destroy(mm);
+		vfs_close(file);
+		return ERR_PTR(NO_MEMORY);
+	}
+
+	mm->ctx = ctx;
 	bprm->filename = filename;
 	bprm->mm = mm;
 	bprm->file = file;
@@ -110,12 +111,12 @@ static inline void bprm_free(struct binprm* bprm){
 static int exec_binprm(struct binprm* bprm){
 	struct task* cur = current;
 
-	struct mem_region* region = vma_add(
+	struct vm_region* region = vma_add(
 		bprm->mm, 
 		PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE, 
 		PROC_USER_STACK_VIRUTAL_TOP, 
 		(MEM_READ | MEM_WRITE | MEM_USER | MEM_GROWSDOWN), 
-		MAP_PRIVATE, 
+		PROT_MAP_PRIVATE, 
 		NULL, 
 		0x0
 	);
@@ -124,7 +125,7 @@ static int exec_binprm(struct binprm* bprm){
 		return PTR_ERR(region);
 	}
 
-	int res = mmu_page_switch(bprm->mm->pgd);
+	int res = mmu_context_switch(bprm->mm->ctx);
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
@@ -156,7 +157,7 @@ static int exec_binprm(struct binprm* bprm){
 	bprm_free(bprm);
 	ret_from_registers(&cur->regs);
 
-	__builtin_unreachable();
+	unreachable();
 }
 
 static int load_binprm(struct binprm* bprm){
