@@ -1,25 +1,14 @@
-#include "wey/syscall.h"
-#include "wey/vfs.h"
-#include <lib/list.h>
 #include <lib/font.h>
 #include <lib/assert.h>
-#include <def/init.h>
 #include <def/err.h>
-#include <mm/slab.h>
-#include <mm/page.h>
-#include <mm/kheap.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
+#include <wey/syscall.h>
 #include <wey/interrupt.h>
-#include <wey/mmu.h>
-#include <wey/panic.h>
 #include <wey/terminal_struct.h>
 #include <wey/terminal.h>
-#include <wey/printk.h>
 #include <wey/sched.h>
 #include <wey/fork.h>
-
-#include <asm/cpu.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
@@ -45,12 +34,10 @@ static initcall_entry_t* initcall_levels[] __initdata = {
 };
 
 static __init void _do_initcall_level(int level){
-	initcall_entry_t *fn;
-	
-	for(fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++){
+	for(initcall_entry_t* fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++){
 		int res = initcall_from_entry(fn)();
 		if(IS_STAT_ERR(res)){
-			panic("initcall '0x%X' returned status %d\n", 
+			panic("initcall '%#x' returned status %d\n", 
 				initcall_from_entry(fn), 
 				res
 			);
@@ -66,14 +53,20 @@ static __init void do_initcalls(){
 
 static int init(void* args){
 	int res = vfs_mount("/dev/hda1", "/", "vfat", 0x0);
-	if(res != SUCCESS){
-		panic("Failed to mount root! \"%d\"", res);
+	if(IS_ERR_VALUE(res)){
+		panic("Failed to mount root! %d", res);
 	}
 
-	return kernel_exec("/init", 0x0, 0x0);
+	res = kernel_exec("/init", 0x0, 0x0);
+	if(IS_ERR_VALUE(res)){
+		panic("init not found!");
+	}
+
+	unreachable();
 }
 
-static int somw(void* args){
+static int worker(void* args){
+	printk("OK\n");
 	while(1){
 		cpu_relax();
 	}
@@ -93,28 +86,19 @@ __no_return void kmain(){
 
 	do_initcalls();
 
-	printk("OK\n");
-
-	while(1) cpu_relax();
-
 	interrupts_enable();
 
-	kernel_thread(init, "init", (void*)0xCAFE);
-	kernel_thread(somw, "Worker 1", 0x0);
-	kernel_thread(somw, "Worker 2", 0x0);
-	kernel_thread(somw, "Worker 3", 0x0);
+	kernel_thread(worker, "Worker", 0x0);
+	kernel_thread(init, "Init", (void*)0xCAFE);
 
 	scheduler_start();
 
 	while(1) cpu_relax();
 
-	__builtin_unreachable();
+	unreachable();
 }
 
 SYSCALL_DEFINE2(tmp_vt_write, const char*, str, int, len){
-	for(int i = 0; i < len; i++){
-		printk("%c", str[i]);
-	}
-
+	printk("%.*s", len, str);
 	return len;
 }
