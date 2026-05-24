@@ -163,7 +163,13 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	}
 
 	struct page* new_page = page_alloc(1, 0x0);
-	if (!new_page) return NOT_FOUND;
+	if (!new_page) return NO_MEMORY;
+
+	memcpy(
+		(void*)page_to_virt(new_page),
+		(void*)page_to_virt(page),
+		PAGE_SIZE
+	);
 
 	int res = mmu_mmap(
 		current->mm->ctx,
@@ -174,7 +180,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	);
 
 	if(IS_ERR_VALUE(res)){
-		page_free(page);
+		page_free(new_page);
 		return res;
 	}
 
@@ -203,6 +209,15 @@ void page_fault_handler(struct registers* regs){
 	}
 
 	if(pf.present){
+		if (pf.write && !(region->mem_flags & MEM_WRITE))
+			goto segfault;
+
+		if (!pf.write && !(region->mem_flags & MEM_READ))
+			goto segfault;
+
+		if (pf.exec && !(region->mem_flags & MEM_EXEC))
+			goto segfault;
+
 		if(pf.write && (region->mem_flags & MEM_WRITE)){
 			handle_res = vm_handle_cow(region, pf.addr);
 			goto check_res;
@@ -237,8 +252,8 @@ check_res:
 
 segfault:
 	printk("Segmentation fault at address %#010lx\n", pf.addr);
-	dump_regs(regs);
 kill:
+	dump_regs(regs);
 	panic("Killed thread\n");
 	while(1) cpu_relax();
 }

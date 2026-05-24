@@ -355,7 +355,7 @@ static void* clone_level(
 		}
 
 		mem_flags_t flags = arch_mmu_flags(pte_flags(pte_val));
-		if (!pte_leaf(pte_val) && level != src->fmt->levels - 1) {
+		if (pte_leaf(pte_val) || level == src->fmt->levels - 1) {
 			uintptr_t phys = src->ops->pte_phys(pte_val);
 
 			struct page* leaf_page = phys_to_page(phys);
