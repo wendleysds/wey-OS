@@ -1,20 +1,7 @@
-#include "asm/process.h"
-#include "asm/ptrace.h"
-#include "def/compile.h"
-#include "def/config.h"
-#include "wey/pid.h"
-#include <wey/syscall.h>
-#include <stdint.h>
-#include <wey/panic.h>
-#include <wey/interrupt.h>
-#include <def/err.h>
 #include <wey/sched.h>
 #include <wey/printk.h>
-
-int __init fork_init() {
-	pid_init();
-	return SUCCESS;
-}
+#include <wey/syscall.h>
+#include <def/err.h>
 
 static struct task *copy_process() {
 	struct task *cur = current;
