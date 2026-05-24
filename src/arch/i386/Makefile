@@ -19,17 +19,11 @@ export boot-y
 
 kernelsecs := $(srctree)/$(boot-y)kernelsecs.h
 
-bzImage: all $(BIN_DIR)/kernel.bin $(kernelsecs)
+bzImage: $(BIN_DIR)/kernel.bin $(kernelsecs)
 	$(Q)$(MAKE) $(build)=$(boot-y)
-
 	@echo "  GEN        $@"
 	(dd if=$(BIN_DIR)/setup.bin bs=4k conv=sync status=none; cat $(BIN_DIR)/kernel.bin) > $(BUILD_DIR)/$@
 	@echo "  Kernel Ready: $(BUILD_DIR)/$@"
-
-$(BIN_DIR)/kernel.elf: $(core-builtins) | $(BIN_DIR)
-	@echo "  LD         $@"
-	@mkdir -p $(dir $@)
-	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $@ $^
 
 $(BIN_DIR)/kernel.bin: $(BIN_DIR)/kernel.elf | $(BIN_DIR)
 	@echo "  OBJCOPY    $@"
@@ -38,3 +32,8 @@ $(BIN_DIR)/kernel.bin: $(BIN_DIR)/kernel.elf | $(BIN_DIR)
 $(kernelsecs): $(BIN_DIR)/kernel.elf
 	@echo "  NM         $@"
 	$(Q)$(NM) $^ | sed -n 's/^\([0-9a-fA-F]*\) [A-Za-z] \(__kernel.*\)$$/#define \2 0x\1/p' > $@
+
+$(BIN_DIR)/kernel.elf: all | $(BIN_DIR)
+	@echo "  LD         $@"
+	@mkdir -p $(dir $@)
+	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $@ $(core-builtins)

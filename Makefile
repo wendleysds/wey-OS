@@ -133,11 +133,12 @@ core-builtins := $(foreach dir, $(all-y), $(OBJ_DIR)/$(dir)built-in.o)
 
 export core-builtins
 
-all: bzImage
+all: $(dirs) bzImage
 
 $(BUILD_DIRS):
 	$(Q)mkdir -p $@
 
+.PHONY: $(dirs) chksyscalls
 $(dirs): chksyscalls $(BUILD_DIRS)
 	$(Q)$(MAKE) $(build)=$@
 

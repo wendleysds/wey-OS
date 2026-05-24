@@ -67,15 +67,14 @@ obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
 
 subdir-files := $(addprefix $(OBJ_DIR)/, $(subdir-obj))
 
-compile-objs := $(sort $(obj-y) $(subdir-files))
+all: $(target)
 
-all: $(subdir-obj) $(target)
+$(subdir-files): $(subdir-obj) ;
 
-# Link all built-in.o subtargets and curdir object files into one top-level built-in.o
-$(target): $(compile-objs)
+$(target): $(subdir-files) $(obj-y)
 	@echo "  LD         $@"
-	$(Q)$(LD) $(KBUILD_LDFLAGS) $(relocflag) -o $@ $(filter-out %.lds, $(compile-objs))
+	$(Q)$(LD) $(KBUILD_LDFLAGS) $(relocflag) -o $@ $(filter-out %.lds, $(obj-y) $(subdir-files))
 
-# Make subtarget built-in.o
+.PHONY: $(subdir-obj)
 $(subdir-obj):
 	$(Q)$(MAKE) $(build)=$(dir $@)
