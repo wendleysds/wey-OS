@@ -35,15 +35,8 @@ static int x86_present(pte_t p) {
 	return p.val & _PAGE_P;
 }
 
-static int x86_leaf(pte_t p) {
-#ifdef X86_64
-	if (!(p.val & _PAGE_P))
-		return 0;
-
-	return p.val & _PAGE_PSIZE;
-#else
-	return 0;
-#endif
+static int x86_leaf(pte_t p, uint8_t level) {
+	return (p.val & _PAGE_PSIZE) || level == 1;
 }
 
 static void x86_set(pte_t *dst, pte_t v) {

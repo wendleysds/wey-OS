@@ -10,7 +10,7 @@ struct paging_ops {
 	uint32_t (*pte_flags)(pte_t pte);
 
 	int (*pte_present)(pte_t pte);
-	int (*pte_leaf)(pte_t pte);
+	int (*pte_leaf)(pte_t pte, uint8_t level);
 
 	void (*set_pte)(pte_t *dst, pte_t val);
 	void (*clear_pte)(pte_t *dst);

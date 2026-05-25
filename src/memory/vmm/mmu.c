@@ -45,7 +45,7 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr){
 		size_t idx = (vaddr >> ctx->fmt->lvl[i].shift) & ctx->fmt->lvl[i].mask;
 		pte_t *entry = &((pte_t*)table)[idx];
 
-		if (ctx->ops->pte_leaf(*entry) || i == (ctx->fmt->levels - 1)) {
+		if (ctx->ops->pte_leaf(*entry, i)) {
 			return entry;
 		}
 
@@ -177,18 +177,22 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 		const pte_t pte_val = *entry;
 
 		if (likely(pte_present(pte_val))) {
+			if (pte_leaf(pte_val, i)) {
+				return entry;
+			}
+
 			table = ops->pte_to_virt(pte_val);
 		} 
 		else if (create) {
 			table = ensure_table(ctx, entry, user_table);
 			if (unlikely(!table)) return NULL;
-		} 
+
+			if (pte_leaf(pte_val, i)) {
+				return entry;
+			}
+		}
 		else {
 			return NULL;
-		}
-
-		if (pte_leaf(pte_val) || i == (levels - 1)) {
-			return entry;
 		}
 	}
 
@@ -229,7 +233,7 @@ static void destroy_level(
 
 		struct page* page = phys_to_page(phys);
 
-		if (!pte_leaf(pte_val) && level != fmt->levels - 1) {
+		if (!pte_leaf(pte_val, level)) {
 			const uintptr_t next = (uintptr_t)ops->pte_to_virt(pte_val);
 			destroy_level(ctx, next, level + 1, entry_va);
 		}
@@ -272,7 +276,7 @@ static void rollback_clone_level(
 		* the partially-built destination table does not reference freed
 		* memory. 
 		*/
-		if (pte_leaf(pte_val) || level == ctx->fmt->levels - 1) {
+		if (pte_leaf(pte_val, level)) {
 			struct page *page = phys_to_page(phys);
 			page_put(page);
 			ctx->ops->clear_pte(e);
@@ -355,7 +359,7 @@ static void* clone_level(
 		}
 
 		mem_flags_t flags = arch_mmu_flags(pte_flags(pte_val));
-		if (pte_leaf(pte_val) || level == src->fmt->levels - 1) {
+		if (pte_leaf(pte_val, level)) {
 			uintptr_t phys = src->ops->pte_phys(pte_val);
 
 			struct page* leaf_page = phys_to_page(phys);
