@@ -12,6 +12,7 @@
 extern asmlinkage void _switch_to(struct task* prev, struct task* to);
 extern asmlinkage __no_return void ret_from_fork();
 extern asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args);
+extern void task_handle_state(struct task* task);
 
 static void start_thread_common(
 	struct registers* regs, void* entry_point, 
@@ -59,6 +60,12 @@ out:
 	memcpy(ksp, &c->regs, sizeof(struct registers));
 
 	*(--ksp) = (unsigned long)ret_from_fork;
+	*(--ksp) = (unsigned long)0; // ebp
+	*(--ksp) = (unsigned long)0; // ebx
+	*(--ksp) = (unsigned long)0; // esi
+	*(--ksp) = (unsigned long)0; // edi
+
+
 	c->regs.ksp = (unsigned long)ksp;
 	return;
 }
@@ -80,6 +87,8 @@ void context_switch(struct task* prev, struct task* to){
 	if(to->mm){
 		mmu_context_switch(to->mm->ctx);
 	}
+
+	task_handle_state(prev);
 
 	_switch_to(prev, to);
 }

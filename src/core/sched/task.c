@@ -1,19 +1,8 @@
-#include "asm/process.h"
-#include "def/status.h"
-#include "lib/list.h"
-#include "wey/interrupt.h"
-#include "wey/mmu.h"
-#include "wey/printk.h"
-#include "wey/syscall.h"
-#include "wey/vfs.h"
-#include "wey/vma.h"
-#include <lib/string.h>
+#include <wey/syscall.h>
 #include <wey/sched.h>
-#include <wey/pid.h>
 #include <wey/panic.h>
 #include <mm/kheap.h>
-#include <def/err.h>
-#include <def/compile.h>
+#include <lib/assert.h>
 
 struct task* task_create(const char* name, int priority){ 
 	struct task* new_task = kmalloc(sizeof(struct task)); 
@@ -61,56 +50,52 @@ static void task_close_files(struct task* task){
 	}
 }*/
 
-void __no_return task_exit(struct task* task, int status){
+void task_exit(struct task* task, int status){
 	task->exit_code = status;
+	task->state = TASK_ZOMBIE;
+
+	// wakeup_parent(task);
+}
+
+void task_destroy(struct task* task){
+	if(task->state != TASK_ZOMBIE){
+		panic("Attempting to destroy a non-zombie task (pid: %d, name: %s)", task->pid, task->name);
+	}
 
 	if(task->pwd){
 		kfree(task->pwd);
 		task->pwd = NULL;
 	}
 
-	// TODO: create init task
-	//reparent_children(task);
-
-	task_close_files(task);
-	task_destroy_mm(task);
-
-	task->state = TASK_ZOMBIE;
-
-	//TODO: wakeup parent if waiting PID
-
-	schedule();
-	panic("Finished task returned!");
-
-	__builtin_unreachable();
-}
-
-int task_destroy(struct task* task){
-	if(task->state != TASK_FINISHED){
-		return INVALID_STATE;
+	if(task->kstack){
+		kfree(task->kstack);
+		task->kstack = NULL;
 	}
+
+	task_destroy_mm(task);
+	task_close_files(task);
+
+	/*reparent_children(task);*/	
 
 	list_remove(&task->tasks);
 	pid_free(task->pid);
 	kfree(task);
-	return SUCCESS;
 }
 
 void task_handle_state(struct task* task){
-	printk("task_handle_state: task[%#x] state: \"%d\"\n", task, task->state);
 	switch (task->state) {
-		case TASK_ZOMBIE:
-			if(task->kstack){
-				kfree(task->kstack);
-				task->kstack = NULL;
+		case TASK_RUNNING:
+			if(likely(task->pid	!=0)){
+				task->state = TASK_READY;
+				scheduler_add(task); 
 			}
-
-			// tmp, no waitpid wet to clear zombie task
-			task->state = TASK_FINISHED;
-			task_destroy(task);
-		return;
-		case TASK_FINISHED: task_destroy(task); return;
-		case TASK_SLEEPING: return;
-		default: scheduler_add(task); return;
+			return;
+		default: return;
 	}
+}
+
+SYSCALL_DEFINE1(exit, int, status){
+	task_exit(current, status);
+	schedule();
+	unreachable();
 }

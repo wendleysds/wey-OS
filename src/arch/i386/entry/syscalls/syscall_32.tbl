@@ -1,5 +1,5 @@
 # <number> <abi> <name> <entry point>
-#1 i386 exit sys_exit
+1 i386 exit sys_exit
 #2 i386 read sys_read
 #3 i386 write sys_write
 #4 i386 open sys_open

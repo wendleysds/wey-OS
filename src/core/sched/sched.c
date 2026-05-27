@@ -48,8 +48,14 @@ asmlinkage void schedule(){
 	struct task* next_task = _next();
 	struct task* prev_task = current;
 
-	if(next_task == 0x0){
-		next_task = &idle_task;
+	if(next_task == NULL){
+		switch (prev_task->state) {
+			case TASK_SLEEPING:
+			case TASK_ZOMBIE:
+				next_task = &idle_task;
+			break;
+			default: next_task = prev_task;
+		}
 	}
 
 	printk("Switching to \"[%d:%s]\"\n", next_task->pid, next_task->name);
@@ -68,6 +74,8 @@ static int __init create_idle_task(){
 	idle_task.kstack = ksp;
 	copy_thread(0x0, &idle_task, idle_task_routine, 0x0);
 	idle_task.pid = 0;
+
+	current = &idle_task;
 
 	return SUCCESS;
 }

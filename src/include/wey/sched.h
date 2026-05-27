@@ -14,7 +14,7 @@ typedef enum {
 	TASK_READY,
 	TASK_RUNNING,
 	TASK_ZOMBIE,
-	TASK_FINISHED,
+	TASK_WAITING,
 	TASK_SLEEPING
 } task_state_t;
 
@@ -44,7 +44,7 @@ struct task {
 
 struct task* task_create(const char* name, int priority);
 void task_exit(struct task* task, int status);
-int task_destroy(struct task* task);
+void task_destroy(struct task* task);
 
 asmlinkage void schedule();
 

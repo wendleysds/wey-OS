@@ -89,7 +89,7 @@ __no_return void kmain(){
 	interrupts_enable();
 
 	kernel_thread(worker, "Worker", 0x0);
-	kernel_thread(init, "Init", (void*)0xCAFE);
+	kernel_thread(init, "init", (void*)0xCAFE);
 
 	scheduler_start();
 

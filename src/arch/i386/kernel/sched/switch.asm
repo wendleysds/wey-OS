@@ -35,18 +35,17 @@ _switch_to:
 	mov eax, [esp+4]
 	mov ecx, [esp+8]
 
-	cmp eax, 0
-	jz .no_prev
+	push ebp
+	push ebx
+	push esi
+	push edi
 
 	mov [eax+4+12], esp
 	mov esp, [ecx+4+12]
 
-	push eax
-	call task_handle_state
-	add esp, 4
+	pop edi
+	pop esi
+	pop ebx
+	pop ebp
 
-	ret
-
-.no_prev:
-	mov esp, [ecx+4+12]
 	ret
