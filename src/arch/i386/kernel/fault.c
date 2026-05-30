@@ -193,15 +193,14 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 
 void page_fault_handler(struct registers* regs){
 	pf_info_t pf = pf_decode(regs->err_code, cr2());
-	show_pf_info(&pf);
+	
 	int handle_res = -1;
 
 	if(!current || !pf.user){
 		dump_regs(regs);
+		show_pf_info(&pf);
 		panic("Kernel page fault!");
 	}
-
-	printk("task info: pid=%d name=\"%s\"\n", current->pid, current->name);
 
 	struct vm_region* region = vma_lookup(current->mm, pf.addr);
 	if(!region){

@@ -1,4 +1,4 @@
-#include "wey/spinlock.h"
+#include <wey/syscall.h>
 #include <wey/sched.h>
 #include <def/config.h>
 #include <def/status.h>
@@ -46,3 +46,40 @@ static int __init pid_init(){
 }
 
 core_initcall(pid_init);
+
+SYSCALL_DEFINE0(getpid){
+	return current->pid;
+}
+
+SYSCALL_DEFINE3(waitpid, pid_t, pid, int*, wstatus, int, options){
+	for (;;) {
+		struct task* child = NULL;
+	
+		if(pid > 0){
+			child = task_get_child(current, pid);
+			if(!child){
+				return NOT_FOUND;
+			}
+		}else{
+			child = task_find_zombie_child(current);
+		}
+
+		if(child){
+			if(child->state == TASK_ZOMBIE){
+				if(wstatus){
+					*wstatus = child->exit_code;
+				}
+
+				pid_t child_pid = child->pid;
+				task_destroy(child);
+				return child_pid;
+			}
+		}
+
+		if(options & WNOHANG){
+			return 0;
+		}
+
+		sleep_current();
+	}
+}

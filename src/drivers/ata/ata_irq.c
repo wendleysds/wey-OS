@@ -84,7 +84,7 @@ int ata_wait_irq(struct ATADevice* atadev){
 	channel->active = atadev;
 
 	scheduler_remove(t);
-	t->state = TASK_SLEEPING;
+	t->state = TASK_BLOCKED;
 	list_add(&t->queue, &atadev->sleepQueue);
 
 	spin_unlock(&channel->spinlock);

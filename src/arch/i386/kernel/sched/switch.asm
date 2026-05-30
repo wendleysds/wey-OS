@@ -1,6 +1,8 @@
 global _switch_to
 
 extern task_handle_state
+extern task_handle_prev_status
+extern cpu_update_current_task
 
 ;struct registers {
 ;	// pushad regs order
@@ -47,5 +49,14 @@ _switch_to:
 	pop esi
 	pop ebx
 	pop ebp
+
+	push eax
+	push ecx
+
+	call cpu_update_current_task
+	add esp, 4
+
+	call task_handle_prev_status
+	add esp, 4
 
 	ret

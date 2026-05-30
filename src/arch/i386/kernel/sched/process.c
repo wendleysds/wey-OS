@@ -1,18 +1,9 @@
-#include "wey/mmu.h"
-#include <def/config.h>
-#include <def/status.h>
-#include <asm/ptrace.h>
-#include <asm/cpuflags.h>
-#include <asm/cpu.h>
-#include <stdint.h>
 #include <wey/sched.h>
-#include <wey/fork.h>
-#include <lib/string.h>
+#include <asm/cpuflags.h>
 
 extern asmlinkage void _switch_to(struct task* prev, struct task* to);
 extern asmlinkage __no_return void ret_from_fork();
 extern asmlinkage __no_return void kernel_thread_trampoline(int (*fn)(void*), void* args);
-extern void task_handle_state(struct task* task);
 
 static void start_thread_common(
 	struct registers* regs, void* entry_point, 
@@ -80,15 +71,16 @@ void context_switch(struct task* prev, struct task* to){
 
 	// TODO: do some checks here, like if the tasks are valid or permissions
 
-	cpu->current = to;
-	cpu->current->state = TASK_RUNNING;
-	cpu->tss.esp0 = (unsigned long)(to->kstack + PROC_KERNEL_STACK_SIZE);
-
 	if(to->mm){
 		mmu_context_switch(to->mm->ctx);
 	}
 
-	task_handle_state(prev);
-
 	_switch_to(prev, to);
+}
+
+void asmlinkage cpu_update_current_task(struct task* cur){
+	struct cpu* cpu = get_cpu();
+	cpu->current = cur;
+	cpu->current->state = TASK_RUNNING;
+	cpu->tss.esp0 = (unsigned long)(cur->kstack + PROC_KERNEL_STACK_SIZE);
 }

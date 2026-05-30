@@ -48,13 +48,11 @@ asmlinkage void schedule(){
 	struct task* next_task = _next();
 	struct task* prev_task = current;
 
-	if(next_task == NULL){
-		switch (prev_task->state) {
-			case TASK_SLEEPING:
-			case TASK_ZOMBIE:
-				next_task = &idle_task;
-			break;
-			default: next_task = prev_task;
+	if(unlikely(next_task == NULL)){
+		if(prev_task->state == TASK_BLOCKED){
+			next_task = &idle_task;
+		} else{
+			next_task = prev_task;
 		}
 	}
 
