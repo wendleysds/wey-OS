@@ -11,7 +11,7 @@ struct mm_struct* vma_alloc(void){
 	struct mm_struct* mm = kzalloc(sizeof(struct mm_struct));
 
 	if(mm){
-		atomic_set(&mm->refcount, 0);
+		atomic_set(&mm->refcount, 1);
 		spinlock_init(&mm->spinlock);
 	}
 

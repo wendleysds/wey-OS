@@ -64,7 +64,7 @@ void task_reparent_children(struct task* task, struct task* new_parent){
 }
 
 void task_exit(struct task* task, int status){
-	if(unlikely(current->pid == 1)){
+	if(unlikely(task->pid == 1)){
 		panic("Attempting to exit init process");
 	}
 

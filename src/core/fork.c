@@ -12,7 +12,7 @@ static struct task *copy_process() {
 	}
 
 	pid_t child_pid = pid_alloc();
-	if(child_pid == -1){
+	if(child_pid < 0){
 		kfree(child);
 		return ERR_PTR(LIST_FULL);
 	}
@@ -28,11 +28,11 @@ static struct task *copy_process() {
 	copy_thread(cur, child, 0x0, 0x0);
 
 	struct mm_struct *c_mm = vma_dup(cur->mm);
-	if (IS_ERR_OR_NULL(c_mm)) {
+	if (!c_mm) {
 		kfree(new_kstack);
 		kfree(child);
 		pid_free(child_pid);
-		return ERR_CAST(c_mm);
+		return ERR_PTR(NO_MEMORY);
 	}
 
 	child->mm = c_mm;
@@ -73,6 +73,7 @@ pid_t kernel_thread(int (*fn)(void*), const char* name, void* args){
 	task->kstack = ksp;
 	copy_thread(0x0, task, fn, args);
 
+	task->state = TASK_READY;
 	scheduler_add(task);
 	return task->pid;
 }

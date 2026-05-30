@@ -93,7 +93,6 @@ void __init scheduler_start(){
 
 void scheduler_add(struct task* task){
 	spin_lock(&scheduler_spinlock);
-	task->state = TASK_READY;
 	list_add_tail(&task->queue, &_readyQueue);
 	spin_unlock(&scheduler_spinlock);
 }
