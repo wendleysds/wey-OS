@@ -1,3 +1,4 @@
+#include "def/status.h"
 #include <lib/font.h>
 #include <lib/string.h>
 #include <lib/stdio.h>
@@ -11,7 +12,7 @@
 #include <wey/printk.h>
 #include <uapi/headers.h>
 
-#define EARLY_VT_INDEX 0
+#define FIRST_VT_INDEX 0
 
 static struct vt terminals[TERMINALS_MAX];
 
@@ -39,56 +40,20 @@ static void update_attr(struct vt_data *vt){
 	vt->vt_erase_char = ' ' | (vt->vt_erase_attr << 8);
 }
 
-static int vt_alloc(int currcon){
-	if(currcon >= TERMINALS_MAX || (currcon < 0 && currcon != -1)){
-		return INVALID_ARG;
-	}
-
-	uint8_t early = currcon == -1;
-	if(early) currcon = EARLY_VT_INDEX;
-
-	if(terminals[currcon].data){
-		return SUCCESS;
-	}
-
-	struct vt_data *vt = NULL;
-
-	if(early){
-		vt = (struct vt_data*)early_alloc(sizeof(struct vt_data), 0);
-	}else{
-		vt = (struct vt_data*)kzalloc(sizeof(struct vt_data));
-	}
-
-	if(!vt){
-		return NO_MEMORY;
-	}
-
-	int res;
-	
-	terminals[currcon].data = vt;
-	
+static int vt_data_con_setup(struct vt_data *vt){
 	vt->vt_sw = &vgadrv_consw;
-
 	vgadrv_consw.init(vt);
 
 	vt->vt_size_row = vt->vt_cols << 1; // char + attr
 	vt->screenbuffer_size = vt->vt_rows * vt->vt_size_row;
 	if(!vt->screenbuffer_size){
-		res = INVALID_ARG;
-		goto out_free;
+		return INVALID_ARG;
 	}
 
-	if(early){
-		vt->screenbuffer = (unsigned short*)early_alloc(vt->screenbuffer_size, 0);
-	}else{
-		vt->screenbuffer = (unsigned short*)kmalloc(vt->screenbuffer_size);
-	}
-	
-	if(!vt->screenbuffer){
-		res = NO_MEMORY;
-		goto out_free;
-	}
+	return SUCCESS;
+}
 
+static void vt_data_setup(struct vt_data *vt){
 	vt->vt_screen_start = (unsigned long)vt->screenbuffer;
 	vt->vt_visible_origin = vt->vt_screen_start;
 	vt->vt_screen_end = vt->vt_screen_start + vt->screenbuffer_size;
@@ -100,15 +65,70 @@ static int vt_alloc(int currcon){
 	vt->state.color = TERMINAL_DEFAULT_COLOR;
 	vt->state.intensity = TERMINAL_INTENSITY_NORMAL;
 	update_attr(vt);
+}
 
-	vt->id = currcon;
+static __init int vt_early_alloc(){
+	struct vt* terminal = terminal_get(FIRST_VT_INDEX);
+	struct vt_data *vt = (struct vt_data*)early_alloc(sizeof(struct vt_data), 0);
+
+	if(!vt){
+		return NO_MEMORY;
+	}
+
+	int res = vt_data_con_setup(vt);
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	vt->screenbuffer = (unsigned short*)early_alloc(vt->screenbuffer_size, 0);
+	if(!vt->screenbuffer){
+		return NO_MEMORY;
+	}
+
+	vt_data_setup(vt);
+
+	vt->id = FIRST_VT_INDEX;
+	terminal->data = vt;
 
 	return SUCCESS;
+}
 
-out_free:
-	if(!early) kfree(vt);
-	terminals[currcon].data = NULL;
-	return res;
+static int vt_alloc(int currcon){
+	if(currcon >= TERMINALS_MAX || currcon < 0){
+		return INVALID_ARG;
+	}
+
+	struct vt* terminal = terminal_get(currcon);
+
+	if(terminal->data){
+		return SUCCESS;
+	}
+
+	struct vt_data *vt = (struct vt_data*)kzalloc(sizeof(struct vt_data));
+
+	if(!vt){
+		return NO_MEMORY;
+	}
+
+	int res = vt_data_con_setup(vt);
+	if(IS_ERR_VALUE(res)){
+		kfree(vt);
+		return res;
+	}
+
+	vt->screenbuffer = (unsigned short*)kmalloc(vt->screenbuffer_size);
+	
+	if(!vt->screenbuffer){
+		kfree(vt);
+		return NO_MEMORY;
+	}
+
+	vt_data_setup(vt);
+
+	vt->id = currcon;
+	terminals[currcon].data = vt;
+
+	return SUCCESS;
 }
 
 static void vt_putc(struct vt_data *vt, char ch){
@@ -232,69 +252,51 @@ static void _vt_console_write(const char *buf, int length){
 	_vt_console_write_impl(terminal_get(cur_vt)->data, buf, length);
 }
 
-static void __init _vt_early_console_write(const char* s, int length){
-	_vt_console_write_impl(terminals[EARLY_VT_INDEX].data, s, length);
-}
-
-int __init terminal_early_init(){
+static int __init terminal_common_init(int early){
 	memset(terminals, 0x0, sizeof(terminals));
 
 	int res = vgadrv_consw.setup(&boot_header.video_info);
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	if (early) {
+		res = vt_early_alloc();
+	} else {
+		res = vt_alloc(FIRST_VT_INDEX);
+	}
 
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
 
-	res = vt_alloc(-1);
-
-	if(IS_ERR_VALUE(res)){
-		return res;
+	if (early) {
+		terminals[FIRST_VT_INDEX].data->state.x = boot_header.video_info.orig_x;
+		terminals[FIRST_VT_INDEX].data->state.y = boot_header.video_info.orig_y;
+		terminals[FIRST_VT_INDEX].data->vt_is_text_mode = 1;
+	} else {
+		vgadrv_consw.exit_early();
 	}
 
-	terminals[EARLY_VT_INDEX].data->state.x = boot_header.video_info.orig_x;
-	terminals[EARLY_VT_INDEX].data->state.y = boot_header.video_info.orig_y;
-	terminals[EARLY_VT_INDEX].data->vt_is_text_mode = 1;
+	cur_vt = last_vt = FIRST_VT_INDEX;
 
-	cur_vt = last_vt = EARLY_VT_INDEX;
+	printk_set_echo(_vt_console_write);
 
-	printk_set_echo(_vt_early_console_write);
+	if (!early) printk_show_buffer();
+
 	return SUCCESS;
 }
 
+int __init terminal_early_init(){
+	return terminal_common_init(1);
+}
+
 int __init terminal_init(){
-	struct vt_data* old_data = terminals[EARLY_VT_INDEX].data;
-	memset(&terminals[EARLY_VT_INDEX], 0x0, sizeof(struct vt));
-
-	int res = vt_alloc(0);
-	if(IS_ERR_VALUE(res)){
-		return res;
+	if(terminal_get(FIRST_VT_INDEX)->data){
+		return SUCCESS;
 	}
 
-	struct vt_data* new_data = terminal_get(0)->data;
-
-	if(old_data->screenbuffer_size != new_data->screenbuffer_size){
-		return INVALID_ARG;
-	}
-
-	memcpy(
-		new_data->screenbuffer, 
-		old_data->screenbuffer, 
-		new_data->screenbuffer_size
-	);
-
-	new_data->state = old_data->state;
-	new_data->vt_attr = old_data->vt_attr;
-	new_data->vt_erase_attr = old_data->vt_erase_attr;
-	new_data->vt_erase_char = old_data->vt_erase_char;
-	new_data->vt_is_text_mode = old_data->vt_is_text_mode;
-	new_data->scrennbuffer_pos = old_data->scrennbuffer_pos;
-	
-	vgadrv_consw.exit_early();
-
-	//TODO: switch to definitive
-
-	printk_set_echo(_vt_console_write);
-	return SUCCESS;
+	return terminal_common_init(0);
 }
 
 void terminal_clean(struct vt_data* vt){
