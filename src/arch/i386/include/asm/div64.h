@@ -1,6 +1,8 @@
 #ifndef _X86_DIV64_H
 #define _X86_DIV64_H
 
+#include <stdint.h>
+
 static inline uint32_t __do_div_arch(uint64_t *n, uint32_t base){
 	uint32_t low = (uint32_t)(*n);
 	uint32_t high = (uint32_t)(*n >> 32);

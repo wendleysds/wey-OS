@@ -1,11 +1,8 @@
 #ifndef _VMA_H
 #define _VMA_H
 
-#include <wey/mmu.h>
-#include <wey/vfs.h>
-#include <wey/spinlock.h>
-#include <lib/list.h>
-#include <stdint.h>
+#include <mm/mmu.h>
+#include <fs/vfs.h>
 
 typedef enum {
 	PROT_MAP_POPULATE  = 1 << 0,

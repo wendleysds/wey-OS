@@ -1,13 +1,12 @@
 #ifndef _BINARY_FORMATS_H
 #define _BINARY_FORMATS_H
 
-#include <wey/vfs.h>
-#include <wey/vma.h>
+#include <lib/list.h>
 #include <stdint.h>
 
 #define BINPRM_BUFF_SIZE 512
 
-struct list_head;
+struct file;
 
 struct binprm{
 	int argc, envc;

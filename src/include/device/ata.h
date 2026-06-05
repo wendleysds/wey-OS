@@ -1,11 +1,11 @@
 #ifndef _ATA_LBA_H
 #define _ATA_LBA_H
 
-#include <wey/device.h>
-#include <wey/spinlock.h>
+#include <kernel/device.h>
+#include <sync/spinlock.h>
+#include <lib/string.h>
 #include <stdint.h>
 
-struct list_head;
 struct ATAChannel;
 
 struct ATADeviceInfo {

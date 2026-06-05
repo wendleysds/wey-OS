@@ -12,7 +12,6 @@ typedef struct {
 
 typedef void(*keyboard_callback_t)(char); 
 
-void keyboard_init();
 void keyboard_set_callback(keyboard_callback_t callback);
 kb_state_t* keyboard_get_state();
 

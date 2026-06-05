@@ -1,6 +1,8 @@
 #ifndef _TERMINAL_STRUCT_H
 #define _TERMINAL_STRUCT_H
 
+#include <lib/font.h>
+
 enum vt_intensity {
 	TERMINAL_INTENSITY_HALF_BRIGHT,
 	TERMINAL_INTENSITY_NORMAL,

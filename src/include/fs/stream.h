@@ -2,9 +2,11 @@
 #define _STREAM_H
 
 #include <lib/list.h>
-#include <wey/blkdev.h>
-#include <wey/vfs.h>
+#include <device/blkdev.h>
+#include <fs/vfs.h>
 #include <stdint.h>
+
+struct blkdev;
 
 struct Stream{
 	uint8_t* sector_cache;

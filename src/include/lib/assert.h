@@ -1,9 +1,9 @@
 #ifndef _ASSERTS_H
 #define _ASSERTS_H
 
+#include <kernel/printk.h>
+#include <kernel/panic.h>
 #include <def/compile.h>
-#include <wey/printk.h>
-#include <wey/panic.h>
 #include <stdbool.h>
 
 __no_return void __assert_fail(

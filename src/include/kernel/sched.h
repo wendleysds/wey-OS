@@ -3,11 +3,12 @@
 
 #include <asm/ptrace.h>
 #include <asm/process.h>
-#include <wey/vma.h>
-#include <wey/pid.h>
+#include <kernel/pid.h>
 #include <def/config.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <lib/list.h>
+
+struct mm_struct;
 
 typedef enum {
 	TASK_NEW,

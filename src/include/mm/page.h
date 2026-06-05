@@ -1,7 +1,7 @@
 #ifndef _PAGE_ALLOCATOR_H
 #define _PAGE_ALLOCATOR_H
 
-#include <wey/atomic.h>
+#include <sync/atomic.h>
 #include <def/compile.h>
 #include <lib/list.h>
 #include <stdint.h>

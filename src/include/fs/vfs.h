@@ -1,10 +1,8 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
-#include <wey/spinlock.h>
-#include <wey/device.h>
-#include <wey/stat.h>
-#include <wey/atomic.h>
+#include <sync/spinlock.h>
+#include <kernel/device.h>
 #include <mm/kheap.h>
 #include <lib/list.h>
 #include <stdint.h>

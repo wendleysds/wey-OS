@@ -1,7 +1,7 @@
 #ifndef _PID_H
 #define _PID_H
 
-#define WNOHANG    0x1
+#define WNOHANG 0x1
 
 typedef int pid_t;
 

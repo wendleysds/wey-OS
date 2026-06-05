@@ -1,7 +1,7 @@
 #ifndef _SPINLOCK_H
 #define _SPINLOCK_H
 
-#include <wey/atomic.h>
+#include <sync/atomic.h>
 
 typedef struct {
     atomic_t locked;

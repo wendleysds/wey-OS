@@ -1,5 +1,6 @@
 #ifndef _IO_PORTS_H
 #define _IO_PORTS_H
+
 #include <stdint.h>
 
 static inline uint8_t inb (uint16_t port){

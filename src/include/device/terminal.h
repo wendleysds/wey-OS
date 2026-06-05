@@ -1,8 +1,8 @@
 #ifndef _TERMINAL_H
 #define _TERMINAL_H
 
+#include <device/terminal_struct.h>
 #include <stdint.h>
-#include <stdarg.h>
 
 #define TERMINAL_DEFAULT_COLOR TERMINAL_COLOR_LIGHT_GREY
 

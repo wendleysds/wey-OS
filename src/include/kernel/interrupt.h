@@ -2,10 +2,9 @@
 #define _INTERRUPTS_H
 
 #include <def/config.h>
-
-#include <asm/idt.h>
-#include <asm/ptrace.h>
 #include <stdint.h>
+
+struct registers;
 
 typedef enum {
 	IRQ_WR_TIMER,

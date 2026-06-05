@@ -1,15 +1,15 @@
 #ifndef _BLKDEV_H
 #define _BLKDEV_H
 
+#include <sync/spinlock.h>
+#include <lib/list.h>
 #include <stdint.h>
-#include <wey/spinlock.h>
 
 #define BLK_READ 0
 #define BLK_WRITE 1
 
 struct file_operations;
 struct elevator_ops;
-struct list_head;
 struct blkdev;
 struct bio;
 

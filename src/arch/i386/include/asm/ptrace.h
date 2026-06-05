@@ -3,7 +3,6 @@
 #define _X86_PTRACE_H
 
 #include <def/compile.h>
-#include <stdint.h>
 
 struct registers {
 	// pushad regs order
