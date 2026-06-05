@@ -1,18 +1,11 @@
-#include <io/ports.h>
-#include <def/err.h>
-#include <def/init.h>
-#include <wey/panic.h>
-#include <wey/printk.h>
-#include <wey/vfs.h>
-#include <wey/blkdev.h>
-#include <wey/device.h>
-#include <drivers/ata.h>
-#include <lib/string.h>
+#include <kernel/init.h>
+#include <kernel/printk.h>
+#include <device/ata.h>
 #include <lib/stdio.h>
-#include <lib/list.h>
+#include <def/err.h>
+#include <fs/vfs.h>
 
 #include "ata_internal.h"
-#include "def/status.h"
 
 struct ATAChannel _ata_primary;
 struct ATAChannel _ata_secondary;

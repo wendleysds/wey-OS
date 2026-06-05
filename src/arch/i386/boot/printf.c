@@ -1,5 +1,4 @@
 #include "boot.h"
-#include <lib/string.h>
 
 #define ZERODAP_FLAG      0x01
 #define SHOW_SIGN_FLAG    0x02
@@ -18,6 +17,15 @@
 	n = ((unsigned long) n) / (unsigned) b;    \
 	_res;                                      \
 })
+
+static inline int strnlen(const char *s, int maxlen){
+	int i = 0;
+	for(; i < maxlen; i++){
+		if(!s[i]) break;
+	}
+
+	return i;
+}
 
 static char* stoi(char* str, long number, int base, int size, int precision, int flag){
 	static const char digits[] = "0123456789ABCDEF";

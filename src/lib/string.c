@@ -1,4 +1,3 @@
-#include <lib/string.h>
 #include <mm/kheap.h>
 
 void* memset(void* ptr, int c, unsigned long size){

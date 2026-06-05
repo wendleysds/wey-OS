@@ -1,4 +1,4 @@
-#include <wey/vma.h>
+#include <mm/vma.h>
 #include <def/err.h>
 #include <def/config.h>
 

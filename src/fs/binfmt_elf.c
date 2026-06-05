@@ -1,9 +1,9 @@
-#include <wey/elf.h>
-#include <wey/binfmts.h>
-#include <wey/vfs.h>
-#include <wey/vma.h>
-#include <def/init.h>
+#include <kernel/init.h>
+#include <exec/binfmts.h>
+#include <exec/elf.h>
+#include <mm/vma.h>
 #include <def/err.h>
+#include <lib/string.h>
 
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
 	if (!ehdr) {

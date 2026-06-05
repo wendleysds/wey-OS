@@ -1,9 +1,5 @@
-#include <stdint.h>
-#include <wey/vfs.h>
+#include <device/ata.h>
 #include <def/err.h>
-#include <lib/div64.h>
-#include <io/ports.h>
-#include <drivers/ata.h>
 
 #include "ata_internal.h"
 

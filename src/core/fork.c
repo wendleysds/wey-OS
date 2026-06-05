@@ -1,7 +1,7 @@
-#include <wey/sched.h>
-#include <wey/printk.h>
-#include <wey/syscall.h>
+#include <kernel/sched.h>
+#include <kernel/syscall.h>
 #include <def/err.h>
+#include <mm/vma.h>
 
 static struct task *copy_process() {
 	struct task *cur = current;

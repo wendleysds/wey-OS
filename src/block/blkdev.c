@@ -1,12 +1,10 @@
-#include "wey/printk.h"
-#include <lib/list.h>
-#include <wey/device.h>
-#include <wey/vfs.h>
-#include <wey/blkdev.h>
+#include <device/blkdev.h>
+#include <kernel/printk.h>
+#include <kernel/init.h>
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <def/init.h>
+#include <fs/vfs.h>
 
 static struct blk_major_name{
 	char name[32];

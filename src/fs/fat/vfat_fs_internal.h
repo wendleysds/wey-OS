@@ -1,8 +1,8 @@
 #ifndef _FAT_INTERNALS_H
 #define _FAT_INTERNALS_H
 
-#include <wey/stream.h>
-#include <wey/vfs.h>
+#include <fs/stream.h>
+#include <fs/vfs.h>
 #include <stdint.h>
 
 #define FAT_INVAL 0xFFFFFFFF

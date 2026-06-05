@@ -1,7 +1,7 @@
-#include <wey/vfs.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <lib/string.h>
+#include <fs/vfs.h>
 
 // /some/path/to/file.txt -> outdirs = "/some/path/to", outfname = "file.txt"
 static inline void _extract_dirs_fname(char* path, char** outdirs, char** outfname) {

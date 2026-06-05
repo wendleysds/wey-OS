@@ -1,13 +1,7 @@
-#include <lib/font.h>
-#include <lib/string.h>
-#include <lib/stdio.h>
-#include <wey/terminal_struct.h>
-#include <wey/terminal.h>
-#include <wey/printk.h>
+#include <kernel/printk.h>
 #include <def/config.h>
-#include <def/init.h>
-#include <stdint.h>
 #include <lib/serial.h>
+#include <stddef.h>
 
 static printk_echo_function _printk_ech = NULL;
 static char printk_circular_buffer[PRINTK_BUFFER_SIZE];

@@ -1,7 +1,6 @@
 #include <lib/string.h>
 #include <lib/div64.h>
 #include <stdarg.h>
-#include <stdint.h>
 
 #define ZERODAP_FLAG      0x01
 #define SHOW_SIGN_FLAG    0x02

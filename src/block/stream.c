@@ -1,9 +1,7 @@
-#include <wey/stream.h>
-#include <mm/kheap.h>
+#include <fs/stream.h>
 #include <lib/string.h>
 #include <lib/div64.h>
 #include <def/err.h>
-#include <stdint.h>
 
 #define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))

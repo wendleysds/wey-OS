@@ -1,6 +1,7 @@
-#include "vfat_fs_internal.h"
+#include <lib/string.h>
 #include <def/err.h>
-#include <wey/mmu.h>
+
+#include "vfat_fs_internal.h"
 
 static int fat12_load(struct FAT* fat, struct Stream* stream, const uint8_t* sector0Buffer){
     memcpy(

@@ -1,6 +1,5 @@
 #include <lib/string.h>
 #include <lib/stdio.h>
-#include <stdint.h>
 
 /*
  * FAT32 short name generation

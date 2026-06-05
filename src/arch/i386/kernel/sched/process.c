@@ -1,5 +1,7 @@
-#include <wey/sched.h>
+#include <kernel/sched.h>
+#include <lib/string.h>
 #include <asm/cpuflags.h>
+#include <mm/vma.h>
 
 extern asmlinkage void _switch_to(struct task* prev, struct task* to);
 extern asmlinkage __no_return void ret_from_fork();

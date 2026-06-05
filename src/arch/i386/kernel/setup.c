@@ -1,14 +1,13 @@
-#include <wey/printk.h>
+#include <kernel/printk.h>
 #include <mm/memblock.h>
-#include <def/init.h>
-#include <def/config.h>
+#include <kernel/init.h>
 #include <def/linker.h>
 #include <asm/cpu.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>
 #include <asm/page.h>
 #include <asm/paging.h>
-#include <wey/syscall.h>
+#include <kernel/syscall.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
 

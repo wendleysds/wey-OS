@@ -1,8 +1,5 @@
-#include <wey/interrupt.h>
+#include <kernel/init.h>
 #include <io/ports.h>
-#include <def/config.h>
-#include <def/init.h>
-#include <stdint.h>
 
 #define PIC1		0x20
 #define PIC2		0xA0

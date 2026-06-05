@@ -1,10 +1,8 @@
-#include <wey/sched.h>
-#include "asm/ptrace.h"
-#include <wey/interrupt.h>
-#include <wey/printk.h>
+#include <kernel/sched.h>
+#include <kernel/interrupt.h>
+#include <kernel/printk.h>
 #include <mm/kheap.h>
-#include <def/config.h>
-#include <def/init.h>
+#include <asm/idt.h>
 #include <def/err.h>
 #include <lib/string.h>
 #include <arch/i386/pic.h>

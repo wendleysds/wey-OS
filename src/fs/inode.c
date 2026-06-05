@@ -1,7 +1,5 @@
-#include <wey/vfs.h>
-#include <wey/panic.h>
-#include <lib/list.h>
-#include <mm/kheap.h>
+#include <kernel/panic.h>
+#include <fs/vfs.h>
 
 struct inode* inode_alloc(struct super_block* sb){
 	struct inode* inode = NULL;

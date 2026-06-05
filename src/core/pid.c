@@ -1,6 +1,6 @@
-#include <wey/syscall.h>
-#include <wey/sched.h>
-#include <def/config.h>
+#include <kernel/syscall.h>
+#include <kernel/sched.h>
+#include <sync/spinlock.h>
 #include <def/status.h>
 
 #define PID_FREE 0

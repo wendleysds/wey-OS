@@ -1,10 +1,9 @@
-#include <wey/printk.h>
+#include <kernel/printk.h>
 #include <mm/earlyalloc.h>
 #include <lib/string.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <def/config.h>
 #include <def/linker.h>
-#include <stddef.h>
 
 #include <asm/paging.h>
 #include <asm/page.h>

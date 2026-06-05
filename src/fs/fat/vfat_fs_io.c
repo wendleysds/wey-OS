@@ -1,5 +1,6 @@
-#include "vfat_fs_internal.h"
 #include <def/status.h>
+
+#include "vfat_fs_internal.h"
 
 static int fat_entry_update(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry){
     if(!entry || dirCluster < 2){

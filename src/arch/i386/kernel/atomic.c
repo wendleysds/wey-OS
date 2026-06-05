@@ -1,4 +1,4 @@
-#include <wey/atomic.h>
+#include <sync/atomic.h>
 
 int atomic_read(const atomic_t* v){
 	return arch_atomic_read(v);

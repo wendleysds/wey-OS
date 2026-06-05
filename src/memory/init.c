@@ -1,10 +1,10 @@
-#include <wey/printk.h>
-#include <wey/mmu.h>
+#include <kernel/printk.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/slab.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <def/err.h>
 #include <def/config.h>
 #include <lib/string.h>

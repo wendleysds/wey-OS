@@ -1,7 +1,8 @@
 #ifndef _ATA_INTERNAL_H
 #define _ATA_INTERNAL_H
 
-#include "wey/blkdev.h"
+#include <device/blkdev.h>
+#include <io/ports.h>
 #include <stdint.h>
 
 #define TRIES 100000

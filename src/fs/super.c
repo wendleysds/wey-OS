@@ -1,8 +1,7 @@
-#include <wey/vfs.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <lib/string.h>
-#include <mm/kheap.h>
+#include <fs/vfs.h>
 
 static struct file_system_type* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
 struct mount* mnt_root = 0x0;

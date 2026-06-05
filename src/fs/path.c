@@ -1,8 +1,7 @@
-#include <wey/vfs.h>
-#include <def/err.h>
-#include <mm/kheap.h>
 #include <lib/string.h>
 #include <def/config.h>
+#include <def/err.h>
+#include <fs/vfs.h>
 
 static struct inode *_find_mount_for_path(const char *path, const char **out_relative){
     size_t best_match_len = 0;

@@ -1,13 +1,8 @@
-#include <wey/spinlock.h>
-#include <wey/device.h>
-#include <wey/vfs.h>
-#include <wey/printk.h>
-#include <wey/chrdev.h>
+#include <kernel/init.h>
 #include <lib/string.h>
-#include <lib/stdio.h>
 #include <def/config.h>
 #include <def/err.h>
-#include <def/init.h>
+#include <fs/vfs.h>
 
 struct chrdev{
 	const struct file_operations *ops;

@@ -1,7 +1,9 @@
-#include <wey/binfmts.h>
-#include <wey/sched.h>
+#include <exec/binfmts.h>
+#include <kernel/sched.h>
 #include <lib/assert.h>
+#include <lib/string.h>
 #include <def/err.h>
+#include <mm/vma.h>
 
 static LIST_HEAD(formats);
 

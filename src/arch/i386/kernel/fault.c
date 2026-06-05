@@ -1,13 +1,11 @@
-#include <wey/sched.h>
-#include <wey/vma.h>
-#include <wey/vfs.h>
-#include <wey/panic.h>
-#include <wey/printk.h>
-#include <wey/interrupt.h>
-#include <def/err.h>
-
-#include <mm/kheap.h>
+#include <kernel/sched.h>
+#include <kernel/panic.h>
+#include <kernel/printk.h>
 #include <mm/page.h>
+#include <mm/vma.h>
+#include <def/err.h>
+#include <lib/string.h>
+#include <asm/idt.h>
 
 extern void page_fault_entry();
 

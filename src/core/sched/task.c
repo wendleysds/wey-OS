@@ -1,8 +1,8 @@
-#include <wey/syscall.h>
-#include <wey/sched.h>
-#include <wey/panic.h>
-#include <mm/kheap.h>
+#include <kernel/syscall.h>
+#include <kernel/sched.h>
 #include <lib/assert.h>
+#include <lib/string.h>
+#include <mm/vma.h>
 
 struct task* init_task;
 

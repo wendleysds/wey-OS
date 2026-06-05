@@ -1,5 +1,5 @@
-#include <wey/spinlock.h>
-#include <wey/barrier.h>
+#include <sync/spinlock.h>
+#include <sync/barrier.h>
 
 void spinlock_init(spinlock_t* lock) {
     atomic_set(&lock->locked, 0);

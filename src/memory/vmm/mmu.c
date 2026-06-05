@@ -1,12 +1,12 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <wey/mmu.h>
-#include <wey/printk.h>
+#include <mm/mmu.h>
+#include <kernel/printk.h>
 #include <mm/memblock.h>
 #include <mm/page.h>
 #include <mm/kheap.h>
 #include <def/err.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <def/config.h>
 #include <def/linker.h>
 #include <lib/string.h>

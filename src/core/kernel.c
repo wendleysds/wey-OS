@@ -1,14 +1,13 @@
-#include <lib/font.h>
+#include <kernel/syscall.h>
+#include <kernel/interrupt.h>
+#include <kernel/sched.h>
+#include <kernel/fork.h>
+#include <device/terminal.h>
 #include <lib/assert.h>
 #include <def/err.h>
+#include <fs/vfs.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
-#include <wey/syscall.h>
-#include <wey/interrupt.h>
-#include <wey/terminal_struct.h>
-#include <wey/terminal.h>
-#include <wey/sched.h>
-#include <wey/fork.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 

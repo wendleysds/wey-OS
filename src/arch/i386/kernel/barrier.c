@@ -1,5 +1,5 @@
 #include <asm/barrier.h>
-#include <wey/barrier.h>
+#include <sync/barrier.h>
 
 void smp_mb(void){
 	arch_mb();

@@ -1,6 +1,6 @@
-#include <wey/binfmts.h>
+#include <exec/binfmts.h>
 #include <def/status.h>
-#include <def/init.h>
+#include <kernel/init.h>
 
 static int load_script(struct binprm *bprm){
     return NOT_IMPLEMENTED;

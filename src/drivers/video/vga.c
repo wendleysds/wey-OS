@@ -1,13 +1,9 @@
-#include <lib/font.h>
-#include <lib/string.h>
-#include <wey/terminal_struct.h>
-#include <wey/terminal.h>
-#include <wey/mmu.h>
+#include <device/terminal.h>
+#include <kernel/init.h>
 #include <uapi/headers.h>
-#include <def/init.h>
+#include <device/vga.h>
 #include <def/err.h>
-#include <def/config.h>
-#include <drivers/vga.h>
+#include <lib/string.h>
 
 #include <asm/page.h>
 
@@ -25,7 +21,7 @@ static uint8_t vga_video_type;
 static uint8_t vga_cursor_enabled = 1;
 static uint8_t vga_support_color = 0;
 
-int vga_setup(struct video_info* video_info){
+int __init vga_setup(struct video_info* video_info){
 	if (!video_info)
 		return INVALID_ARG;
 

@@ -1,7 +1,7 @@
-#include <wey/vfs.h>
-#include <def/err.h>
-#include <def/config.h>
 #include <lib/string.h>
+#include <def/config.h>
+#include <def/err.h>
+#include <fs/vfs.h>
 
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
     if(!path || !statbuf){

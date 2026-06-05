@@ -1,9 +1,9 @@
-#include <wey/interrupt.h>
-#include <wey/printk.h>
+#include <kernel/interrupt.h>
+#include <kernel/printk.h>
 #include <lib/stdio.h>
 #include <def/compile.h>
 
-void __no_return panic(const char* fmt, ...){
+asmlinkage __no_return void panic(const char* fmt, ...){
 	interrupts_disable();
 
 	char buffer[1024];

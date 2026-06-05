@@ -1,10 +1,9 @@
-#include <wey/printk.h>
-#include <wey/device.h>
+#include <kernel/printk.h>
+#include <kernel/device.h>
+#include <kernel/init.h>
+#include <lib/string.h>
 #include <def/config.h>
 #include <def/status.h>
-#include <wey/panic.h>
-#include <lib/string.h>
-#include <def/init.h>
 
 struct device* devices[DEVICES_MAX] = { 0 };
 uint16_t next_id = 1;

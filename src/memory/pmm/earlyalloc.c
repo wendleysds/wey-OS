@@ -1,4 +1,4 @@
-#include <def/init.h>
+#include <kernel/init.h>
 #include <def/config.h>
 #include <def/linker.h>
 #include <lib/string.h>

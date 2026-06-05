@@ -1,9 +1,9 @@
-#include <drivers/keyboard.h>
-#include <drivers/terminal.h>
-#include <arch/i386/idt.h>
-#include <io/ports.h>
+#include <kernel/interrupt.h>
+#include <kernel/init.h>
+#include <device/keyboard.h>
+#include <device/terminal.h>
 #include <lib/string.h>
-#include <stdint.h>
+#include <io/ports.h>
 
 /*
  * Simple PS/2 keyboard driver
@@ -107,17 +107,20 @@ static inline void _keyboard_handle_scancode(uint8_t sc){
 	}
 }
 
-static void _iqr_keyboard_handler(struct InterruptFrame* frame){
+static void _iqr_keyboard_handler(struct irq_info* unused){
 	uint8_t scancode = inb(_PS2_INPUT_PORT);
 	_keyboard_handle_scancode(scancode);
 }
 
-void keyboard_init(){
+static int __init keyboard_init(){
 	outb(_PS2_COMMAND_PORT, _PS2_ENABLE_FIRST_PORT);
-	idt_register_callback(_IQR_KEYBOARD_INTERRUPT, _iqr_keyboard_handler);
+
+	interrupt_register(IRQ_KEYBOARD, _iqr_keyboard_handler, NULL);
 
 	_kb_callback = 0x0;
 	memset(&_kb_state, 0, sizeof(kb_state_t));
+
+	return 0;
 }
 
 void keyboard_set_callback(keyboard_callback_t callback){
@@ -127,3 +130,5 @@ void keyboard_set_callback(keyboard_callback_t callback){
 kb_state_t* keyboard_get_state(){
 	return &_kb_state;
 }
+
+device_initcall(keyboard_init);

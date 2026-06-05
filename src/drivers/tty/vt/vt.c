@@ -1,16 +1,12 @@
-#include "def/status.h"
-#include <lib/font.h>
-#include <lib/string.h>
-#include <lib/stdio.h>
-#include <wey/terminal_struct.h>
-#include <wey/terminal.h>
+#include <device/terminal.h>
+#include <kernel/init.h>
+#include <kernel/printk.h>
 #include <mm/kheap.h>
 #include <mm/earlyalloc.h>
-#include <def/init.h>
 #include <def/err.h>
 #include <def/config.h>
-#include <wey/printk.h>
 #include <uapi/headers.h>
+#include <lib/string.h>
 
 #define FIRST_VT_INDEX 0
 

@@ -1,9 +1,9 @@
 #include <mm/page.h>
 #include <mm/memblock.h>
-#include <wey/spinlock.h>
-#include <wey/printk.h>
+#include <sync/spinlock.h>
+#include <kernel/printk.h>
 #include <def/err.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <def/config.h>
 
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))

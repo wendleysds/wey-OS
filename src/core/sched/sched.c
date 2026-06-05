@@ -1,13 +1,10 @@
-#include "asm/process.h"
-#include "def/config.h"
-#include "wey/spinlock.h"
-#include <wey/printk.h>
-#include <wey/sched.h>
-#include <wey/panic.h>
+#include <kernel/sched.h>
+#include <kernel/printk.h>
+#include <sync/spinlock.h>
 #include <def/compile.h>
 #include <def/status.h>
 #include <lib/string.h>
-#include <wey/interrupt.h>
+#include <mm/kheap.h>
 
 static LIST_HEAD(_readyQueue);
 static LIST_HEAD(_terminateQueue);

@@ -1,7 +1,7 @@
 #include <mm/slab.h>
 #include <mm/page.h>
 #include <def/config.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <lib/string.h>
 #include <lib/list.h>
 #include <lib/assert.h>

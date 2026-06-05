@@ -1,7 +1,8 @@
-#include "vfat_fs_internal.h"
-#include "wey/vfs.h"
-#include <mm/kheap.h>
+#include <lib/string.h>
+#include <fs/stat.h>
 #include <def/err.h>
+
+#include "vfat_fs_internal.h"
 
 static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
     if(dirCluster < 2){

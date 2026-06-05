@@ -1,9 +1,6 @@
-#include <lib/list.h>
-#include <wey/blkdev.h>
+#include <device/blkdev.h>
 #include <mm/kheap.h>
 #include <def/err.h>
-#include <def/config.h>
-#include <stddef.h>
 
 static struct request* bio_to_request(struct bio *bio){
 	if (!bio || !bio->bdev || !bio->bdev->disk){

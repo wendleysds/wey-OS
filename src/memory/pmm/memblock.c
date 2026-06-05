@@ -1,6 +1,6 @@
 #include <mm/memblock.h>
-#include <wey/printk.h>
-#include <def/init.h>
+#include <kernel/printk.h>
+#include <kernel/init.h>
 
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 

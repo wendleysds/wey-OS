@@ -1,6 +1,6 @@
+#include <device/ata.h>
 #include <io/ports.h>
 #include <def/err.h>
-#include <drivers/ata.h>
 
 #include "ata_internal.h"
 

@@ -1,9 +1,9 @@
-#include "vfat_fs_internal.h"
-#include <wey/vfs.h>
-#include <wey/mmu.h>
-#include <def/err.h>
-#include <def/init.h>
+#include <kernel/init.h>
 #include <lib/string.h>
+#include <def/err.h>
+#include <fs/stat.h>
+
+#include "vfat_fs_internal.h"
 
 static void vfat_destroy_inode(struct inode* inode){
 	if(inode->private_data){

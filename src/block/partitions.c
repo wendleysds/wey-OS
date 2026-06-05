@@ -1,12 +1,9 @@
-#include "def/status.h"
-#include "wey/printk.h"
-#include <lib/list.h>
+#include <device/blkdev.h>
+#include <kernel/printk.h>
 #include <lib/string.h>
 #include <def/err.h>
-#include <stdint.h>
 #include <mm/kheap.h>
-#include <wey/blkdev.h>
-#include <wey/partition.h>
+#include <fs/partition.h>
 
 #define GPT_PARTITION -1
 

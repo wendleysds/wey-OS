@@ -1,9 +1,7 @@
 #include <asm-generic/paging_ctx.h>
-#include <wey/vma.h>
+#include <mm/vma.h>
 #include <asm/page.h>
 #include <def/config.h>
-
-#include <stdint.h>
 
 #define ADDR_NOT_ALING(addr) ((uintptr_t)(addr) & (PAGE_SIZE - 1))
 

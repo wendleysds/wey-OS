@@ -1,8 +1,5 @@
-#include "def/status.h"
-#include "wey/atomic.h"
-#include <wey/vfs.h>
 #include <def/err.h>
-#include <mm/kheap.h>
+#include <fs/vfs.h>
 
 struct file* vfs_open(const char *restrict path, uint32_t flags){
 	if(!path){

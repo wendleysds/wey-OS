@@ -1,8 +1,6 @@
-#include <wey/printk.h>
-#include <def/init.h>
+#include <kernel/printk.h>
+#include <kernel/init.h>
 #include <def/config.h>
-#include <stddef.h>
-#include <stdint.h>
 
 #include <uapi/headers.h>
 

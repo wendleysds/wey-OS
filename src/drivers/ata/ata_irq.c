@@ -1,7 +1,6 @@
-#include <wey/sched.h>
-#include <wey/interrupt.h>
-#include <drivers/ata.h>
-#include <io/ports.h>
+#include <kernel/sched.h>
+#include <kernel/interrupt.h>
+#include <device/ata.h>
 #include <def/err.h>
 
 #include "ata_internal.h"

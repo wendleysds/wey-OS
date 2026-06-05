@@ -1,11 +1,7 @@
-#include <wey/syscall.h>
-#include <wey/panic.h>
-#include <wey/sched.h>
-#include <wey/printk.h>
+#include <kernel/syscall.h>
+#include <kernel/sched.h>
 #include <asm/idt.h>
 #include <def/err.h>
-#include <def/config.h>
-#include <lib/string.h>
 
 #define ARG(x) long arg##x
 

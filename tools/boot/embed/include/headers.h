@@ -2,7 +2,7 @@
 #define _BOOT_HEADER_H
 
 #include <def/compile.h>
-#include <wey/videoinfo.h>
+#include <device/videoinfo.h>
 #include <stdint.h>
 
 #define E820_MAX_ENTRIES 32

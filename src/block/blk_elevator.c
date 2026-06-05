@@ -1,6 +1,4 @@
-#include <lib/list.h>
-#include <wey/blkdev.h>
-#include <stddef.h>
+#include <device/blkdev.h>
 
 static void fifo_insert(struct request_queue *q, struct request *rq){
 	rq->next = NULL;
