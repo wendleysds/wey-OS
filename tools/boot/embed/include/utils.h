@@ -7,10 +7,6 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 #define TO_SECTORS(bytes) (((bytes) + 511) >> 9)
 
-#ifndef NULL
-#define NULL ((void*)0x0)
-#endif
-
 #define __hlt while(1) asm volatile("hlt")
 
 // cpu flags
