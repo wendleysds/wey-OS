@@ -3,7 +3,7 @@
 
 #include <def/compile.h>
 #include <lib/list.h>
-#include <stdint.h>
+#include <sys/types.h>
 
 #define DEVMEM_MAJOR    1
 #define DEVCHAR_MAJOR   2
@@ -15,8 +15,6 @@
 #define MKDEV(ma,mi) (((ma) << MINOR_BITS) | (mi))
 #define MINOR(devt) ((unsigned int)((devt) & MINOR_MASK))
 #define MAJOR(devt) ((unsigned int)((devt) >> MINOR_BITS))
-
-typedef unsigned int dev_t;
 
 struct device {
 	uint16_t id;

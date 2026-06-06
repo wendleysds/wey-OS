@@ -2,6 +2,7 @@
 #define _BLKDEV_H
 
 #include <sync/spinlock.h>
+#include <sys/types.h>
 #include <lib/list.h>
 #include <stdint.h>
 
@@ -12,9 +13,6 @@ struct file_operations;
 struct elevator_ops;
 struct blkdev;
 struct bio;
-
-/*1 sector = 1 LBA*/
-typedef uint64_t sector_t;
 
 typedef void (bio_end_io_t) (struct bio*);
 

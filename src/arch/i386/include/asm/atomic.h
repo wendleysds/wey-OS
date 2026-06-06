@@ -1,11 +1,8 @@
 #ifndef _X86_ATOMIC_H
 #define _X86_ATOMIC_H
 
+#include <sys/types.h>
 #include <def/compile.h>
-
-typedef struct {
-	volatile int value;
-} atomic_t;
 
 static __always_inline int arch_atomic_fetch_add(atomic_t* v, int inc) {
 	__asm__ volatile(

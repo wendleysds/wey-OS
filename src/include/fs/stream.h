@@ -2,9 +2,7 @@
 #define _STREAM_H
 
 #include <lib/list.h>
-#include <device/blkdev.h>
-#include <fs/vfs.h>
-#include <stdint.h>
+#include <sys/types.h>
 
 struct blkdev;
 

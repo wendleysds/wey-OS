@@ -14,10 +14,12 @@ typedef struct {
 typedef uint64_t paddr_t;
 typedef uintptr_t vaddr_t;
 
+/*1 sector = 1 LBA*/
 typedef uint64_t sector_t;
 typedef uint64_t pfn_t;
 
 typedef uint32_t dev_t;
+typedef int64_t off_t;
 
 typedef int32_t pid_t;
 typedef int32_t tid_t;

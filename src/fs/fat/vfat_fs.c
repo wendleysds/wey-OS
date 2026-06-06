@@ -1,3 +1,4 @@
+#include <device/blkdev.h>
 #include <kernel/init.h>
 #include <lib/string.h>
 #include <def/err.h>

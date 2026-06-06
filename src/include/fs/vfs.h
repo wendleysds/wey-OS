@@ -2,10 +2,8 @@
 #define _VIRTUAL_FILE_SYSTEM_H
 
 #include <sync/spinlock.h>
-#include <kernel/device.h>
-#include <mm/kheap.h>
 #include <lib/list.h>
-#include <stdint.h>
+#include <mm/kheap.h>
 
 #define FMODE_READ   0x1
 #define FMODE_WRITE  0x2
@@ -15,8 +13,6 @@
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
-
-typedef long long off_t;
 
 struct inode {
 	uint32_t ino;

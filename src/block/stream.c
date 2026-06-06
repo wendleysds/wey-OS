@@ -1,6 +1,9 @@
+#include <device/blkdev.h>
 #include <fs/stream.h>
 #include <lib/string.h>
 #include <lib/div64.h>
+#include <mm/kheap.h>
+#include <fs/vfs.h>
 #include <def/err.h>
 
 #define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
