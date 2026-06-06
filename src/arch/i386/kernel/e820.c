@@ -9,7 +9,7 @@ static struct e820_table {
 	size_t length;
 } e820_table;
 
-static __init void e820_sort(){
+static __init void e820_sort(void){
 	size_t i, j;
 	struct e820_entry* entries = e820_table.entries;
 	for (i = 1; i < e820_table.length; i++) {
@@ -24,6 +24,93 @@ static __init void e820_sort(){
 
 		entries[j] = key;
 	}
+}
+
+static __init void e820_merge(void){
+	struct e820_entry* map = e820_table.entries;
+	size_t* count = &e820_table.length;
+
+	int merged = 0;
+	size_t new_count = 0;
+
+	while(1){
+		// Resolve conflicts
+		for (size_t i = 0; i < *count; i++) {
+			struct e820_entry current = map[i];
+
+			if (i + 1 < *count) {
+				struct e820_entry* next = &map[i+1];
+
+				if (current.base_addr + current.length > next->base_addr) {
+					if (current.type == next->type) {
+						uint64_t end = (current.base_addr + current.length > next->base_addr + next->length) 
+									? current.base_addr + current.length 
+									: next->base_addr + next->length;
+						next->base_addr = current.base_addr;
+						next->length = end - next->base_addr;
+						continue;
+					} 
+					else {
+						current.length = next->base_addr - current.base_addr;
+					}
+				}
+			}
+
+			if (current.length > 0) {
+				map[new_count++] = current;
+			}
+		}
+		*count = new_count;
+
+		// Merge
+		new_count = 0;
+		for (size_t i = 0; i < *count; i++) {
+			struct e820_entry current = map[i];
+
+			if (i + 1 < *count) {
+				struct e820_entry* next = &map[i+1];
+
+				if (current.base_addr + current.length == next->base_addr &&
+					current.type == next->type) {
+					current.length += next->length;
+					i++;
+				}
+				else if ((current.base_addr + current.length + 1) == next->base_addr &&
+					current.type == next->type) {
+					current.length += next->length + 1;
+					i++;
+				}
+			}
+
+			map[new_count++] = current;
+		}
+		*count = new_count;
+
+		// Everything merged?
+		merged = 0;
+		for (size_t i = 0; i < *count - 1; i++) {
+			struct e820_entry* current = &map[i];
+			struct e820_entry* next = &map[i+1];
+			if (current->base_addr + current->length == next->base_addr &&
+				current->type == next->type) {
+				merged = 1;
+				break;
+			}else if ((current->base_addr + current->length + 1) == next->base_addr &&
+				current->type == next->type) {
+				merged = 1;
+				break;
+			}
+		}
+
+		if (!merged) {
+			break;
+		}
+	}
+}
+
+static __init inline void e820_sanitize(){
+	e820_sort();
+	e820_merge();
 }
 
 static __init void e820_print_type(enum e820_type type)
@@ -60,7 +147,7 @@ static __init void e820_print_type(enum e820_type type)
 __init void e820_init(struct e820_entry* entries, size_t length){
 	e820_table.entries = entries;
 	e820_table.length = length;
-	e820_sort();
+	e820_sanitize();
 }
 
 __init void e820_print(){
