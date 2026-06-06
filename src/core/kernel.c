@@ -14,10 +14,13 @@
 extern void setup_arch();
 
 static inline void module_load(const char* module_name, int (*func)(void)){
-	int res;
-	if(IS_ERR_VALUE(res = func())){
+	int res = func();
+
+	if(IS_ERR_VALUE(res)){
 		panic("\"%s\" module failed with status %d!", module_name, res);
 	}
+
+	printk("Module \"%s\" OK\n", module_name);
 }
 
 static initcall_entry_t* initcall_levels[] __initdata = {

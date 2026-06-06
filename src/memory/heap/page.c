@@ -11,6 +11,8 @@
 
 #define vmemmap ((struct page *)KERNEL_VMEMMAP_START)
 
+extern unsigned long max_pfn_mapped;
+
 struct free_area {
 	struct list_head free_list;
 	unsigned long nr_free;
@@ -90,15 +92,15 @@ int __init page_init(void){
 		uintptr_t start_pfn = ALIGN_UP(mem->regions[i].base, PAGE_SIZE) >> PAGE_SHIFT;
 		uintptr_t end_pfn = (mem->regions[i].base + mem->regions[i].size) >> PAGE_SHIFT;
 
-		if (start_pfn >= max_pfn) {
+		if (start_pfn >= max_pfn_mapped) {
 			continue;
 		}
 
-		if(end_pfn > max_pfn) {
-			end_pfn = max_pfn;
+		if(end_pfn > max_pfn_mapped) {
+			end_pfn = max_pfn_mapped;
 		}
 
-		if (start_pfn >= max_pfn) {
+		if (start_pfn >= max_pfn_mapped) {
 			continue;
 		}
 
@@ -237,7 +239,7 @@ int page_free(struct page *page){
 	while (order < MAX_ORDER - 1) {
 		uintptr_t buddy_pfn = pfn ^ (1UL << order);
 
-		if (buddy_pfn >= max_pfn)
+		if (buddy_pfn >= max_pfn_mapped)
 			break;
 
 		struct page *buddy = pfn_to_page(buddy_pfn);
