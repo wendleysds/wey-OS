@@ -3,7 +3,7 @@
 #include <def/err.h>
 #include <fs/vfs.h>
 
-static struct file_system_type* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
+static struct file_system_type const* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
 struct mount* mnt_root = 0x0;
 
 static inline void _register_mount(struct mount* mount){
@@ -39,7 +39,7 @@ static inline int _unregister_mount(struct mount* mount){
     return NOT_FOUND;
 }
 
-int vfs_register_filesystem(struct file_system_type* fs){
+int vfs_register_filesystem(const struct file_system_type* fs){
     for (int i = 0; i < FILESYSTEMS_MAX; i++){
         if(!_registered_filesystems[i]){
             _registered_filesystems[i] = fs;
@@ -50,7 +50,7 @@ int vfs_register_filesystem(struct file_system_type* fs){
     return OUT_OF_BOUNDS;
 }
 
-int vfs_unregister_filesystem(struct file_system_type* fs){
+int vfs_unregister_filesystem(const struct file_system_type* fs){
     for (int i = 0; i < FILESYSTEMS_MAX; i++){
         if(_registered_filesystems[i] == fs){
             _registered_filesystems[i] = 0x0;
@@ -61,7 +61,7 @@ int vfs_unregister_filesystem(struct file_system_type* fs){
     return NOT_FOUND;
 }
 
-struct file_system_type* _find_fs_by_name(const char* name){
+static const struct file_system_type* _find_fs_by_name(const char* name){
     for (int i = 0; i < FILESYSTEMS_MAX; i++)
     {
         if(strcmp(_registered_filesystems[i]->name, name) == 0){
@@ -77,6 +77,7 @@ struct super_block* alloc_super(){
 	if(sb){
 		INIT_LIST_HEAD(&sb->s_sbs);
 		INIT_LIST_HEAD(&sb->s_inodes);
+		spinlock_init(&sb->s_inode_lock);
 	}
 
 	return sb;
@@ -87,7 +88,7 @@ int vfs_mount(const char* source, const char *mountpoint, const char *filesystem
         return INVALID_ARG;
     }
 
-    struct file_system_type* fs = _find_fs_by_name(filesystemtype);
+    const struct file_system_type* fs = _find_fs_by_name(filesystemtype);
     if(!fs){
         return NOT_FOUND;
     }

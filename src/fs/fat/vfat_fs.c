@@ -144,12 +144,12 @@ err:
     return ERR_PTR(res);
 }
 
-static struct inode* fat_mount(struct file_system_type* fs_type, int flags, const char* dev_name, void* data){
+static struct inode* fat_mount(const struct file_system_type* fs_type, int flags, const char* dev_name, void* data){
     if(!fs_type || !dev_name){
         return ERR_PTR(INVALID_ARG);
     }
 
-	// TODO: Add lookup with dev name	
+	// TODO: Add lookup with dev name
 	struct blkdev* bdev = blk_lookup(3, 1);
 	if(IS_ERR(bdev)){
 		return ERR_CAST(bdev);
@@ -240,7 +240,7 @@ static int fat_unmount(struct super_block* sb){
     return SUCCESS;
 }
 
-static struct file_system_type fat_fs = {
+static const struct file_system_type fat_fs = {
     .name = "vfat",
     .mount = fat_mount,
     .unmount = fat_unmount

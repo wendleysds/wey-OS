@@ -8,30 +8,21 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
         return INVALID_ARG;
     }
 
-	char pathcopy[PATH_MAX];
-	strcpy(pathcopy, path);
-
-	char* slash = strrchr(pathcopy, '/');
-	*slash = '\0';
-
-	char* filename = slash + 1;
-	char* dirs = pathcopy;
-
-    struct inode *dir = vfs_lookup(strlen(dirs) == 0 ? "/" : dirs);
-    if(IS_ERR(dir)){
-        return PTR_ERR(dir);
+    struct inode *ino = vfs_lookup(path);
+    if(IS_ERR(ino)){
+        return PTR_ERR(ino);
     }
 
     int res;
 
-    if(!dir->i_op || !dir->i_op->getattr){
+    if(!ino->i_op || !ino->i_op->getattr){
         res = NOT_SUPPORTED;
         goto out;
     }
 
-    res = dir->i_op->getattr(dir, filename, statbuf);
-    
+    res = ino->i_op->getattr(ino, statbuf);
+
 out:
-    inode_destroy(dir);
+    inode_destroy(ino);
     return res;
 }

@@ -14,41 +14,68 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
-struct inode {
-	uint32_t ino;
+#define ATTR_MODE  (1 << 0)
+#define ATTR_SIZE  (1 << 1)
+#define ATTR_DEV   (1 << 2)
+#define ATTR_ATIME (1 << 3)
+#define ATTR_MTIME (1 << 4)
+#define ATTR_CTIME (1 << 5)
 
-	uint16_t mode;
-	uint32_t size;
-	void *private_data;
-	dev_t i_rdev;
+struct inode {
+	uint64_t ino;
+
+	umode_t mode;
+
+	dev_t dev;
+
+	size_t size;
 
 	atomic_t refcount;
-	spinlock_t i_lock;
+	spinlock_t lock;
+
+	void *private_data;
 
 	struct super_block* i_sb;
 	const struct inode_operations *i_op;
 	const struct file_operations *i_fop;
 
+	timespan atime_sec;
+	timespan mtime_sec;
+	timespan ctime_sec;
+	atomic_t version;
+
 	struct list_head i_sb_list;
 };
 
 struct file {
-	struct inode *inode;
-	off_t pos;
-	int flags;
+	spinlock_t lock;
 	atomic_t refcount;
+
+	struct inode *inode;
 	void *private_data;
+
+	off_t pos;
+	unsigned int flags;
 	const struct file_operations *f_op;
 };
 
 struct stat {
-	uint32_t mode;
-	uint32_t size;
-	uint32_t uid;
-	uint8_t attr;
-	uint32_t atime;
-	uint32_t mtime;
-	uint32_t ctime;
+	uint64_t ino;
+	umode_t mode;
+
+	dev_t rdev;
+	dev_t dev;
+
+	size_t size;
+
+	timespan atime;
+	timespan mtime;
+	timespan ctime;
+};
+
+struct iattr {
+	uint32_t valid;
+	struct stat stat;
 };
 
 struct file_operations {
@@ -66,14 +93,15 @@ struct inode_operations {
 	int (*unlink)(struct inode *dir, const char *name);
 	int (*mkdir)(struct inode *dir, const char *name);
 	int (*rmdir)(struct inode *dir, const char *name);
-	int (*getattr)(struct inode *dir, const char *name, struct stat* restrict statbuf);
-	int (*setarrt)(struct inode *dir, const char *name, uint16_t attr);
+	int (*getattr)(struct inode *ino, struct stat* restrict statbuf);
+	int (*setarrt)(struct inode *ino, struct iattr* attr);
+	int (*mknod)(struct inode *dir, const char *name, uint16_t mode, dev_t dev);
 };
 
 struct file_system_type{
 	const char *name;
 
-	struct inode* (*mount)(struct file_system_type*, int flags, const char* dev_name, void* data);
+	struct inode* (*mount)(const struct file_system_type*, int flags, const char* dev_name, void* data);
 	int (*unmount)(struct super_block*);
 };
 
@@ -84,8 +112,7 @@ struct super_block {
 	void *private_data;
 	unsigned long flags;
 
-	struct file_system_type* fs_type;
-
+	const struct file_system_type* fs_type;
 	const struct super_operations* s_op;
 
 	struct blkdev* bdev;
@@ -131,8 +158,8 @@ int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 
-int vfs_register_filesystem(struct file_system_type* fs);
-int vfs_unregister_filesystem(struct file_system_type* fs);
+int vfs_register_filesystem(const struct file_system_type* fs);
+int vfs_unregister_filesystem(const struct file_system_type* fs);
 
 struct super_block* alloc_super();
 

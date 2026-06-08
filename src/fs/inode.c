@@ -20,7 +20,7 @@ struct inode* inode_new(struct super_block *sb){
 		inode->i_sb = sb;
 		INIT_LIST_HEAD(&inode->i_sb_list);
 
-		spinlock_init(&inode->i_lock);
+		spinlock_init(&inode->lock);
 		atomic_set(&inode->refcount, 1);
 
 		spin_lock(&sb->s_inode_lock);
