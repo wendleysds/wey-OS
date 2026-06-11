@@ -3,91 +3,139 @@
 #include <def/err.h>
 #include <fs/vfs.h>
 
-static struct inode *_find_mount_for_path(const char *path, const char **out_relative){
-    size_t best_match_len = 0;
-	struct mount* current = mnt_root;
-    struct inode *result = current->mnt_root;
+extern struct mount *root_mount;
 
-    while(current){
-        const char* mntPath = current->mountpoint;
-        size_t len = strlen(mntPath);  
+int path_iterate(const char** cursor, struct qstr* comp){
+	const char* path = *cursor;
 
-        if(strncmp(path, mntPath, len) == 0 && (path[len] == '/' || path[len] == '\0')){
-            if(len > best_match_len){
-                best_match_len = len;
-                result = current->mnt_root;
-                *out_relative = (path[len] == '/') ? path + len + 1 : path + len;
-            }
-        }
-        
-        current = current->next;
-    }
+	while (*path == '/')
+		path++;
 
-    if(best_match_len == 0){
-        *out_relative = path;
-    }
-
-    return result;
-}
-
-static inline struct inode* vfs_traverse_path(const char* path){
-    if(!path || path[0] != '/' || strlen(path) > PATH_MAX){
-        return ERR_PTR(INVALID_ARG);
-    }
-
-    const char *relative_path;
-    struct inode *root = _find_mount_for_path(path, &relative_path);
-
-    char pathcopy[PATH_MAX];
-    memset(pathcopy, 0x0, sizeof(pathcopy));
-    strncpy(pathcopy, relative_path, PATH_MAX);
-
-    pathcopy[PATH_MAX - 1] = '\0';
-
-    struct inode *current = root;
-    struct inode *next = NULL;
-
-	int res;
-
-    char *token = strtok(pathcopy, "/");
-    while(token){
-        if (!current->i_op || !current->i_op->lookup){
-			res = NOT_SUPPORTED;
-			goto out_free;
-		}
-
-        next = current->i_op->lookup(current, token);
-        if (IS_ERR(next)) {
-			res = PTR_ERR(next);
-			goto out_free;
-        }
-
-        if (current != root){
-			inode_put(current);
-		}
-        
-        current = next;
-        token = strtok(NULL, "/");
-    }
-
-    if(!current->i_fop || !current->i_fop->read){
-        if (current != root){
-            inode_put(current);
-        }
-
-        return ERR_PTR(INVALID_FILE);
-    }
-
-    return current;
-
-out_free:
-	if (current != root){
-		inode_put(current);
+	if (*path == '\0') {
+		return 0;
 	}
 
-	return ERR_PTR(res);
+	comp->name = path;
+
+	while (*path != '/' && *path != '\0')
+		path++;
+
+	comp->len = path - comp->name;
+
+	*cursor = path;
+
+	return 1;
 }
 
-struct inode* vfs_lookup(const char *restrict path){
-    return vfs_traverse_path(path);
+int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
+	if (!parent->i_op || !parent->i_op->lookup)
+		return NOT_SUPPORTED;
+
+	struct inode *child = parent->i_op->lookup(parent, name);
+	if (IS_ERR_OR_NULL(child))
+		return child ? PTR_ERR(child) : NO_ENTRY;
+
+	res->dentry = child;
+	res->mount = NULL;
+
+	spin_lock(&child->lock);
+	if (child->mounted_here){
+		res->mount = child->mounted_here;
+	}
+	spin_unlock(&child->lock);
+
+	return SUCCESS;
+}
+
+int vfs_walk_path(const char *path, struct path *res) {
+	if (!root_mount) return INVALID_STATE;
+
+	struct mount *curr_mnt = root_mount;
+	struct inode *curr_ino = root_mount->mnt_root;
+	inode_get(curr_ino);
+
+	const char *cursor = path;
+	struct qstr comp;
+
+	while (path_iterate(&cursor, &comp)) {
+		struct path next;
+		int err = vfs_lookup_path(curr_ino, &comp, &next);
+		if (err != SUCCESS) {
+			inode_put(curr_ino);
+			return err;
+		}
+
+		struct inode *next_ino = next.dentry;
+
+		inode_put(curr_ino);
+		curr_ino = next_ino;
+
+		if (next.mount) {
+			struct mount *next_mnt = next.mount;
+			struct inode *mounted_root = next_mnt->mnt_root;
+
+			inode_get(mounted_root);
+			inode_put(curr_ino);
+			curr_ino = mounted_root;
+			curr_mnt = next_mnt;
+		}
+	}
+
+	res->mount = curr_mnt;
+	res->dentry = curr_ino;
+	return SUCCESS;
+}
+
+struct inode* vfs_walk_parent(const char *path, struct qstr *last){
+	if(!root_mount) return ERR_PTR(INVALID_STATE);
+
+	struct inode *cur = root_mount->mnt_root;
+	inode_get(cur);
+
+	struct qstr comp;
+	const char* cursor = path;
+	while(path_iterate(&cursor, &comp)){
+		const char* tmp = cursor;
+		struct qstr next;
+
+		if(!path_iterate(&tmp, &next)){
+			*last = comp;
+			return cur;
+		}
+
+		struct path next_path;
+		int err = vfs_lookup_path(cur, &comp, &next_path);
+		if (err != SUCCESS) {
+			inode_put(cur);
+			return ERR_PTR(err);
+		}
+
+		struct inode *child = next_path.dentry;
+		inode_put(cur);
+		cur = child;
+
+		if (next_path.mount) {
+			struct inode *mounted_root = next_path.mount->mnt_root;
+			inode_get(mounted_root);
+			inode_put(cur);
+			cur = mounted_root;
+		}
+	}
+
+	inode_put(cur);
+	return ERR_PTR(INVALID_ARG);
+}
+
+struct inode* vfs_walk(const char *path){
+	if(!root_mount) return ERR_PTR(INVALID_STATE);
+
+	struct path p;
+
+	int res = vfs_walk_path(path, &p);
+
+	if(IS_ERR_VALUE(res)){
+		return ERR_PTR(res);
+	}
+
+	return p.dentry;
 }

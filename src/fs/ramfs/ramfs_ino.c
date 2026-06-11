@@ -62,27 +62,38 @@ int ramfs_do_truncate(struct inode *inode, size_t new_size){
 	return 0;
 }
 
-struct inode* ramfs_lookup(struct inode *dir, const char *name){
+struct inode* ramfs_lookup(struct inode *dir, struct qstr *name){
 	struct ramfs_inode *rdir = dir->private_data;
 
 	spin_lock(&rdir->spinlock);
 
 	struct ramfs_inode* rino;
 	list_for_each_entry(rino, &rdir->children, sibling){
-		if(strcmp(rino->name, name) == NOT_IMPLEMENTED)
+		if(strlen(rino->name) == name->len && strncmp(rino->name, name->name, name->len) == 0){
+			inode_get(rino->ino);
+			spin_unlock(&rdir->spinlock);
 			return rino->ino;
+		}
 	}
 
+	spin_unlock(&rdir->spinlock);
 	return NULL;
 }
 
-static int ramfs_create_common(struct inode *dir, const char *name, uint16_t mode, uint8_t isDir){
+static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mode, uint8_t isDir){
 	struct ramfs_inode *rdir = dir->private_data;
 
-	if(ramfs_lookup(dir, name))
+	struct inode *existing = ramfs_lookup(dir, name);
+	if(existing){
+		inode_put(existing);
 		return FILE_EXISTS;
+	}
 
-	char* rino_name = strdup(name);
+	char tmp[name->len + 1];
+	memcpy(tmp, name->name, name->len);
+	tmp[name->len] = '\0';
+
+	char* rino_name = strdup(tmp);
 	if(!rino_name){
 		return NO_MEMORY;
 	}
@@ -99,22 +110,24 @@ static int ramfs_create_common(struct inode *dir, const char *name, uint16_t mod
 	rino->parent = rdir;
 	rino->isDir = isDir;
 	inode->mode = mode;
+	inode->i_op = &ramfs_iops;
+	inode->i_fop = &ramfs_fops;
 
 	spin_lock(&rdir->spinlock);
-	list_add(&rdir->children, &rino->sibling);
+	list_add(&rino->sibling, &rdir->children);
 	spin_unlock(&rdir->spinlock);
 
 	return SUCCESS;
 }
 
-static int ramfs_remove_common(struct inode *dir, const char *name, uint8_t isFile){
+static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isFile){
 	struct ramfs_inode *rdir = dir->private_data;
 
 	spin_lock(&rdir->spinlock);
 
 	struct ramfs_inode *rino;
 	list_for_each_entry(rino, &rdir->children, sibling){
-		if(strcmp(rino->name, name) == 0){
+		if(strlen(rino->name) == name->len && strncmp(rino->name, name->name, name->len) == 0){
 			if(rino->isDir && isFile){
 				spin_unlock(&rdir->spinlock);
 				return INVALID_FILE;
@@ -130,6 +143,7 @@ static int ramfs_remove_common(struct inode *dir, const char *name, uint8_t isFi
 			list_remove(&rino->sibling);
 			spin_unlock(&rdir->spinlock);
 
+			inode_put(rino->ino);
 			return SUCCESS;
 		}
 	}
@@ -139,19 +153,19 @@ static int ramfs_remove_common(struct inode *dir, const char *name, uint8_t isFi
 }
 
 
-static int ramfs_create(struct inode *dir, const char *name, uint16_t mode){
+static int ramfs_create(struct inode *dir, struct qstr *name, uint16_t mode){
 	return ramfs_create_common(dir, name, mode, 0);
 }
 
-static int ramfs_mkdir(struct inode *dir, const char *name){
+static int ramfs_mkdir(struct inode *dir, struct qstr *name){
 	return ramfs_create_common(dir, name, S_IFDIR, 1);
 }
 
-static int ramfs_unlink(struct inode *dir, const char *name){
+static int ramfs_unlink(struct inode *dir, struct qstr *name){
 	return ramfs_remove_common(dir, name, 1);
 }
 
-static int ramfs_rmdir(struct inode *dir, const char *name){
+static int ramfs_rmdir(struct inode *dir, struct qstr *name){
 	return ramfs_remove_common(dir, name, 0);
 }
 
@@ -194,7 +208,7 @@ static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
 	return OK;
 }
 
-static int ramfs_mknod(struct inode *dir, const char *name, uint16_t mode, dev_t dev){
+static int ramfs_mknod(struct inode *dir, struct qstr *name, uint16_t mode, dev_t dev){
 	return NOT_IMPLEMENTED;
 }
 
@@ -208,4 +222,3 @@ const struct inode_operations ramfs_iops = {
 	.setarrt = ramfs_setarrt,
 	.mknod = ramfs_mknod
 };
-

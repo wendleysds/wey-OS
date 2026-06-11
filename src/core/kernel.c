@@ -54,15 +54,95 @@ static __init void do_initcalls(){
 }
 
 static int init(void* args){
-	int res = vfs_mount("/dev/hda1", "/", "vfat", 0x0);
-	if(IS_ERR_VALUE(res)){
-		panic("Failed to mount root! %d", res);
-	}
+	#define TRY(op) do { int __res = (int)(op); BUG_MSG(IS_ERR_VALUE(__res), #op " failed %d", __res); } while(0)
 
-	res = kernel_exec("/init", 0x0, 0x0);
-	if(IS_ERR_VALUE(res)){
-		panic("init not found!");
-	}
+	struct inode* ino;
+
+	// # test 1
+	printk("running test 1\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+	TRY(vfs_mkdir("/home"));
+	TRY(vfs_create("/home/file", 0x0));
+	TRY(vfs_umount("/"));
+
+	// # test 2
+	printk("running test 2\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+	TRY(vfs_mkdir("/home"));
+
+	TRY(vfs_mount(0x0, "/home", "ramfs", 0x0, 0x0));
+	TRY(vfs_create("/home/file", 0x0));
+
+	TRY(vfs_umount("/home"));
+	TRY(vfs_umount("/"));
+
+	// # test 3
+	printk("running test 3\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+	TRY(vfs_mkdir("/home"));
+	TRY(vfs_mkdir("/home/HD"));
+	TRY(vfs_mount(0x0, "/home/HD", "ramfs", 0x0, 0x0));
+	
+	TRY(vfs_umount("/home/HD"));
+	TRY(vfs_umount("/"));
+
+	// # test 4
+	printk("running test 4\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/home"));
+	TRY(vfs_mount(0x0, "/home", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/home/user"));
+	TRY(vfs_mount(0x0, "/home/user", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_create("/home/user/file", 0x0));
+
+	TRY(vfs_umount("/home/user"));
+	TRY(vfs_umount("/home"));
+	TRY(vfs_umount("/"));
+
+	// # test 5
+	printk("running test 5\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/mnt"));
+	TRY(vfs_mount(0x0, "/mnt", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/mnt/disk"));
+	TRY(vfs_mount(0x0, "/mnt/disk", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/mnt/disk/data"));
+	TRY(vfs_mount(0x0, "/mnt/disk/data", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_create("/mnt/disk/data/file", 0x0));
+
+	TRY(vfs_umount("/mnt/disk/data"));
+	TRY(vfs_umount("/mnt/disk"));
+	TRY(vfs_umount("/mnt"));
+	TRY(vfs_umount("/"));
+
+	// # test 7
+	printk("running test 7\n");
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+
+	TRY(vfs_mkdir("/home"));
+	TRY(vfs_create("/home/root_file", 0x0));
+
+	TRY(vfs_mount(0x0, "/home", "ramfs", 0x0, 0x0));
+	TRY(vfs_create("/home/mounted_file", 0x0));
+
+	TRY(vfs_umount("/home"));
+
+	TRY(ino = vfs_walk("/home/root_file"));
+	inode_put(ino);
+
+	TRY(vfs_umount("/"));
+
+	interrupts_disable();
+
+	printk("OK\n");
+	while(1) cpu_relax();
 
 	unreachable();
 }

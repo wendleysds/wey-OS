@@ -6,7 +6,7 @@ struct file* vfs_open(const char *restrict path, uint32_t flags){
 		return ERR_PTR(INVALID_ARG);
 	}
 
-	struct inode* ino = vfs_lookup(path); // always return ino->refcount >= 1
+	struct inode* ino = vfs_walk(path); // always return ino->refcount >= 1
 	if(IS_ERR(ino)){
 		return ERR_PTR(PTR_ERR(ino));
 	}
@@ -15,10 +15,6 @@ struct file* vfs_open(const char *restrict path, uint32_t flags){
 	if(!f){
 		inode_put(ino);
 		return ERR_PTR(NO_MEMORY);
-	}
-
-	if(atomic_read(&ino->refcount) > 1){
-		inode_put(ino);
 	}
 
 	f->inode = ino;
