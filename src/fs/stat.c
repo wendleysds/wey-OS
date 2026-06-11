@@ -8,7 +8,7 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
         return INVALID_ARG;
     }
 
-    struct inode *ino = vfs_lookup(path);
+    struct inode *ino = vfs_walk(path);
     if(IS_ERR(ino)){
         return PTR_ERR(ino);
     }

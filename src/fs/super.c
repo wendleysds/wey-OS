@@ -84,7 +84,7 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 	}
 
 	if (root_mount) {
-		point = vfs_lookup(mountpoint);
+		point = vfs_walk(mountpoint);
 		if (IS_ERR(point)) {
 			return PTR_ERR(point);
 		}
@@ -143,7 +143,7 @@ out_point:
 }
 
 int vfs_umount(const char *mountpoint) {
-	struct inode *point = vfs_lookup(mountpoint);
+	struct inode *point = vfs_walk(mountpoint);
 	struct mount *mnt;
 	struct super_block *sb;
 	struct inode *ino, *tmp;

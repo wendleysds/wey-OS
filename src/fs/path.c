@@ -12,7 +12,6 @@ int path_iterate(const char** cursor, struct qstr* comp){
 		path++;
 
 	if (*path == '\0') {
-		*cursor = NULL;
 		return 0;
 	}
 
@@ -23,60 +22,93 @@ int path_iterate(const char** cursor, struct qstr* comp){
 
 	comp->len = path - comp->name;
 
-	*cursor = (*path == '\0') ? NULL : path;
+	*cursor = path;
 
 	return 1;
 }
 
-static struct inode* vfs_lookup_common(const char *restrict path, struct qstr* qstr_path){
+struct inode* vfs_lookup(struct inode *parent, struct qstr *name){
+	if(!parent->i_op || !parent->i_op->lookup){
+		return ERR_PTR(NOT_SUPPORTED);
+	}
+
+	struct inode* child = parent->i_op->lookup(parent, name);
+	if(IS_ERR_OR_NULL(child)){
+		return child ? child : ERR_PTR(NO_ENTRY);
+	}
+
+	struct inode *mounted_root = NULL;
+
+	spin_lock(&child->lock);
+	if(child->mounted_here){
+		mounted_root = child->mounted_here->mnt_root;
+		inode_get(mounted_root);
+	}
+	spin_unlock(&child->lock);
+
+	if(mounted_root){
+		inode_put(child);
+		child = mounted_root;
+	}
+
+	return child;
+}
+
+struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 	if(!root_mount) return ERR_PTR(INVALID_STATE);
 
-	const char* end = qstr_path ? qstr_path->name + qstr_path->len : 0;
-	const char* cursor = path ? path : qstr_path->name;
-	struct inode *child, *cur = root_mount->mnt_root;
-	struct qstr comp;
-
+	struct inode *cur = root_mount->mnt_root;
 	inode_get(cur);
 
+	const char* cursor = path;
+	struct qstr comp;
+
 	while(path_iterate(&cursor, &comp)){
-		if(end && comp.name > end) break;
+		const char* tmp = cursor;
+		struct qstr next;
 
-		if(!cur->i_op || !cur->i_op->lookup){
+		if(!path_iterate(&tmp, &next)){
+			*last = comp;
+			return cur;
+		}
+
+		struct inode* child = vfs_lookup(cur, &comp);
+		if(IS_ERR(child)){
 			inode_put(cur);
-			return ERR_PTR(NOT_SUPPORTED);
-		}
-
-		child = cur->i_op->lookup(cur, &comp);
-		if(IS_ERR_OR_NULL(child)){
-			inode_put(cur);
-			return child ? child : ERR_PTR(NO_ENTRY);
-		}
-
-		struct inode *mounted_root = NULL;
-
-		spin_lock(&child->lock);
-		if(child->mounted_here){
-			mounted_root = child->mounted_here->mnt_root;
-			inode_get(mounted_root);
-		}
-		spin_unlock(&child->lock);
-
-		if(mounted_root){
-			inode_put(child);
-			child = mounted_root;
+			return child;
 		}
 
 		inode_put(cur);
 		cur = child;
 	}
 
+	inode_put(cur);
+	return ERR_PTR(INVALID_ARG);
+}
+
+struct inode* vfs_walk(const char *path){
+	if(!root_mount) return ERR_PTR(INVALID_STATE);
+
+	struct inode *next, *cur = root_mount->mnt_root;
+	inode_get(cur);
+
+	if(path[1] == '\0') return cur;
+
+	const char* cursor = path;
+	struct qstr comp;
+
+	while(path_iterate(&cursor, &comp)){
+		next = vfs_lookup(cur, &comp);
+
+		if(IS_ERR(next)){
+			inode_put(cur);
+			return next;
+		}
+
+		inode_put(cur);
+		cur = next;
+	}
+
 	return cur;
 }
 
-struct inode* vfs_lookup(const char *restrict path){
-	return vfs_lookup_common(path, NULL);
-}
-
-struct inode* vfs_lookup_qstr(struct qstr* qstr_path){
-	return vfs_lookup_common(NULL, qstr_path);
-}

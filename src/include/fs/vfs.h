@@ -154,8 +154,10 @@ struct mount {
 int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, unsigned int flags, void* data);
 int vfs_umount(const char *mountpoint);
 
-struct inode* vfs_lookup(const char *restrict path);
-struct inode* vfs_lookup_qstr(struct qstr* qstr_path);
+struct inode* vfs_lookup(struct inode *parent, struct qstr *name);
+struct inode* vfs_walk_parent(const char *path, struct qstr *last);
+struct inode* vfs_walk(const char *path);
+
 struct file* vfs_open(const char *restrict path, uint32_t flags);
 
 int vfs_create(const char *restrict path, uint16_t mode);
