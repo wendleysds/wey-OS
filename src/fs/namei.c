@@ -3,108 +3,86 @@
 #include <def/err.h>
 #include <fs/vfs.h>
 
-// /some/path/to/file.txt -> outdirs = "/some/path/to", outfname = "file.txt"
-static inline void _extract_dirs_fname(char* path, char** outdirs, char** outfname) {
-    if(!path) {
-        return;
-    }
+extern struct mount *root_mount;
 
-    char *last_slash = strrchr(path, '/');
-
-    *outfname = last_slash + 1;
-    *last_slash = '\0'; // /some/path/to\0file.txt 
-    *outdirs = path;
+static void get_filename(const char* path, struct qstr* qstr){
+	qstr->name = strrchr(path, '/') + 1;
+	qstr->len = strlen(qstr->name);
 }
 
-static struct inode* _get_dir(const char *restrict path) {
-	if(!path || path[0] != '/' || strlen(path) > PATH_MAX) {
-		return ERR_PTR(INVALID_ARG);
-	}
+static void get_directory_path(const char* path, struct qstr* qstr){
+	const char *slash = strrchr(path, '/');
 
-	char pathcopy[PATH_MAX];
-	strcpy(pathcopy, path);
+	qstr->name = path;
+	qstr->len = (slash == path) ? 1 : slash - path;
+}
 
-	char* filename = 0x0;
-	char* dirpath = 0x0;
-
-	_extract_dirs_fname(pathcopy, &dirpath, &filename);
-
-	if(strlen(filename) == 0) {
-		return ERR_PTR(INVALID_ARG);
-	}
-
-	struct inode* dir = vfs_lookup(strlen(dirpath) > 0 ? dirpath : "/");
-	if(IS_ERR(dir)) {
-		return dir;
-	}
-
-	return dir;
+static struct inode* get_dir(const char* path, struct qstr* qstr){
+	get_directory_path(path, qstr);
+	return vfs_lookup_qstr(qstr);
 }
 
 int vfs_create(const char *restrict path, uint16_t mode){
-    if(!path || path[0] != '/' || strlen(path) > PATH_MAX){
-        return INVALID_ARG;
-    }
+	if(!root_mount) return INVALID_STATE;
+	struct qstr qstr;
 
-    struct inode* dir = _get_dir(path);
-	if(IS_ERR(dir)){
+	struct inode* dir = get_dir(path, &qstr);
+	if(IS_ERR_OR_NULL(dir)){
 		return PTR_ERR(dir);
 	}
 
-	char* filename = strrchr(path, '/') + 1;
-    int res = dir->i_op->create(dir, filename, mode);
-    inode_destroy(dir);
+	get_filename(path, &qstr);
 
-    return res;
+	int res = dir->i_op->create(dir, &qstr,mode);
+	inode_put(dir);
+	
+	return res;
 }
 
 int vfs_unlink(const char *restrict path){
-    if(!path || path[0] != '/' || strlen(path) > PATH_MAX){
-        return INVALID_ARG;
-    }
+	if(!root_mount) return INVALID_STATE;
+	struct qstr qstr;
 
-    struct inode* dir = _get_dir(path);
-	if(IS_ERR(dir)){
+	struct inode* dir = get_dir(path, &qstr);
+	if(IS_ERR_OR_NULL(dir)){
 		return PTR_ERR(dir);
 	}
 
-	char* filename = strrchr(path, '/') + 1;
-    int res = dir->i_op->unlink(dir, filename);
-    inode_destroy(dir);
-
-    return res;
+	get_filename(path, &qstr);
+	
+	int res = dir->i_op->unlink(dir, &qstr);
+	inode_put(dir);
+	return res;
 }
 
 int vfs_mkdir(const char *restrict path){
-    if(!path || path[0] != '/' || strlen(path) > PATH_MAX){
-        return INVALID_ARG;
-    }
+	if(!root_mount) return INVALID_STATE;
+	struct qstr qstr;
 
-    struct inode* dir = _get_dir(path);
-	if(IS_ERR(dir)){
+	struct inode* dir = get_dir(path, &qstr);
+	if(IS_ERR_OR_NULL(dir)){
 		return PTR_ERR(dir);
 	}
 
-	char* filename = strrchr(path, '/') + 1;
-    int res = dir->i_op->mkdir(dir, filename);
-    inode_destroy(dir);
-
-    return res;
+	get_filename(path, &qstr);
+	
+	int res = dir->i_op->mkdir(dir, &qstr);
+	inode_put(dir);
+	return res;
 }
 
 int vfs_rmdir(const char *restrict path){
-    if(!path || path[0] != '/' || strlen(path) > PATH_MAX){
-        return INVALID_ARG;
-    }
+	if(!root_mount) return INVALID_STATE;
+	struct qstr qstr;
 
-    struct inode* dir = _get_dir(path);
-	if(IS_ERR(dir)){
+	struct inode* dir = get_dir(path, &qstr);
+	if(IS_ERR_OR_NULL(dir)){
 		return PTR_ERR(dir);
 	}
 
-	char* filename = strrchr(path, '/') + 1;
-    int res = dir->i_op->rmdir(dir, filename);
-    inode_destroy(dir);
-
-    return res;
+	get_filename(path, &qstr);
+	
+	int res = dir->i_op->rmdir(dir, &qstr);
+	inode_put(dir);
+	return res;
 }

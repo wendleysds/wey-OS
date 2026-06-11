@@ -155,6 +155,7 @@ int vfs_mount(const char* source, const char *mountpoint, const char *filesystem
 int vfs_umount(const char *mountpoint);
 
 struct inode* vfs_lookup(const char *restrict path);
+struct inode* vfs_lookup_qstr(struct qstr* qstr_path);
 struct file* vfs_open(const char *restrict path, uint32_t flags);
 
 int vfs_create(const char *restrict path, uint16_t mode);

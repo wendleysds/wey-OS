@@ -17,10 +17,6 @@ struct file* vfs_open(const char *restrict path, uint32_t flags){
 		return ERR_PTR(NO_MEMORY);
 	}
 
-	if(atomic_read(&ino->refcount) > 1){
-		inode_put(ino);
-	}
-
 	f->inode = ino;
 	f->pos = 0;
 	f->flags = flags;

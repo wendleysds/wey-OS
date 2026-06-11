@@ -23,6 +23,6 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
     res = ino->i_op->getattr(ino, statbuf);
 
 out:
-    inode_destroy(ino);
+    inode_put(ino);
     return res;
 }

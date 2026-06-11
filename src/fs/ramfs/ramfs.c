@@ -33,8 +33,6 @@ static struct inode* ramfs_alloc_inode(struct super_block *sb) {
 		inode->private_data = rino;
 		rino->ino = inode;
 		inode->i_sb = sb;
-
-		list_add_tail(&inode->i_sb_list, &sb->s_inodes);
 	}
 
 	return inode;
@@ -64,8 +62,6 @@ static void ramfs_destroy_inode(struct inode *inode) {
 
 		kfree(rino);
 	}
-
-	kfree(inode);
 }
 
 static void ramfs_free_inode(struct inode *inode) {
@@ -78,8 +74,8 @@ static const struct super_operations ramfs_sops = {
 	.free_inode = ramfs_free_inode
 };
 
-static struct inode* ramfs_mount(const struct file_system_type* self, int flags, const char* dev_name, void* data){
-	struct super_block* sb = alloc_super();
+static struct inode* ramfs_mount(const struct file_system_type* self, const char* dev_name, void* data){
+	struct super_block* sb = super_alloc();
 	if(!sb){
 		return ERR_PTR(NO_MEMORY);
 	}
@@ -94,8 +90,9 @@ static struct inode* ramfs_mount(const struct file_system_type* self, int flags,
 
 	sb->private_data = rsb;
 	sb->fs_type = self;
+	sb->s_op = &ramfs_sops;
 
-	struct inode *root = ramfs_alloc_inode(sb);
+	struct inode *root = inode_new(sb);
 	if(!root){
 		kfree(sb);
 		kfree(rsb);
@@ -108,21 +105,18 @@ static struct inode* ramfs_mount(const struct file_system_type* self, int flags,
 	root->i_fop = &ramfs_fops;
 
 	sb->root_inode = root;
-	sb->s_op = &ramfs_sops;
 
 	return root;
 }
 
-static int ramfs_unmount(struct super_block* sb){
+static void ramfs_unmount(struct super_block* sb){
 	if(sb->private_data){
 		kfree(sb->private_data);
 		sb->private_data = NULL;
 	}
-
-	return OK;
 }
 
-static const struct file_system_type ramfs = {
+static struct file_system_type ramfs = {
 	.name = "ramfs",
 	.mount = ramfs_mount,
 	.unmount = ramfs_unmount
