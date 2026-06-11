@@ -21,6 +21,8 @@
 #define ATTR_MTIME (1 << 4)
 #define ATTR_CTIME (1 << 5)
 
+struct mount;
+
 struct inode {
 	uint64_t ino;
 
@@ -34,6 +36,7 @@ struct inode {
 	spinlock_t lock;
 
 	void *private_data;
+	struct mount *mounted_here;
 
 	struct super_block* i_sb;
 	const struct inode_operations *i_op;
@@ -78,6 +81,11 @@ struct iattr {
 	struct stat stat;
 };
 
+struct qstr {
+	const char* name;
+    size_t len;
+};
+
 struct file_operations {
 	int (*read)(struct file *file, void *buffer, uint32_t count);
 	int (*write)(struct file *file, const void *buffer, uint32_t count);
@@ -88,21 +96,23 @@ struct file_operations {
 };
 
 struct inode_operations {
-	struct inode* (*lookup)(struct inode *dir, const char *name);
-	int (*create)(struct inode *dir, const char *name, uint16_t mode);
-	int (*unlink)(struct inode *dir, const char *name);
-	int (*mkdir)(struct inode *dir, const char *name);
-	int (*rmdir)(struct inode *dir, const char *name);
+	struct inode* (*lookup)(struct inode *dir, struct qstr *name);
+	int (*create)(struct inode *dir, struct qstr *name, uint16_t mode);
+	int (*unlink)(struct inode *dir, struct qstr *name);
+	int (*mkdir)(struct inode *dir, struct qstr *name);
+	int (*rmdir)(struct inode *dir, struct qstr *name);
 	int (*getattr)(struct inode *ino, struct stat* restrict statbuf);
 	int (*setarrt)(struct inode *ino, struct iattr* attr);
-	int (*mknod)(struct inode *dir, const char *name, uint16_t mode, dev_t dev);
+	int (*mknod)(struct inode *dir, struct qstr *name, uint16_t mode, dev_t dev);
 };
 
 struct file_system_type{
 	const char *name;
 
-	struct inode* (*mount)(const struct file_system_type*, int flags, const char* dev_name, void* data);
-	int (*unmount)(struct super_block*);
+	struct inode* (*mount)(const struct file_system_type*, const char* dev_name, void* data);
+	void (*unmount)(struct super_block*);
+
+	struct list_head list;
 };
 
 struct super_block {
@@ -118,6 +128,7 @@ struct super_block {
 	struct blkdev* bdev;
 	struct file* bdev_file;
 
+	atomic_t refcount;
 	spinlock_t s_inode_lock;
 	struct list_head s_inodes;
 };
@@ -131,15 +142,16 @@ struct super_operations{
 };
 
 struct mount {
-	char *mountpoint;
-	struct inode* mnt_root;
+	char *name;
+	struct inode *mnt_root;
 	struct super_block *mnt_sb;
-	struct mount *next;
+
+	struct mount *parent;
+	struct list_head children;
+	struct list_head sibling;
 };
 
-extern struct mount* mnt_root;
-
-int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, void* data);
+int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, unsigned int flags, void* data);
 int vfs_umount(const char *mountpoint);
 
 struct inode* vfs_lookup(const char *restrict path);
@@ -158,10 +170,13 @@ int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 
-int vfs_register_filesystem(const struct file_system_type* fs);
-int vfs_unregister_filesystem(const struct file_system_type* fs);
+void vfs_register_filesystem(struct file_system_type* fs);
+void vfs_unregister_filesystem(struct file_system_type* fs);
 
-struct super_block* alloc_super();
+int path_iterate(const char** cursor, struct qstr* comp);
+
+struct super_block* super_alloc();
+void destroy_super(struct super_block* sb);
 
 struct inode* inode_alloc(struct super_block *sb);
 struct inode* inode_new(struct super_block *sb);
@@ -174,6 +189,16 @@ static inline void inode_get(struct inode* ino){
 static inline void inode_put(struct inode* ino){
 	if(atomic_dec_and_test(&ino->refcount)){
 		inode_destroy(ino);
+	}
+}
+
+static inline void super_get(struct super_block* sb){
+	atomic_inc(&sb->refcount);
+}
+
+static inline void super_put(struct super_block* sb){
+	if(atomic_dec_and_test(&sb->refcount)){
+		destroy_super(sb);
 	}
 }
 

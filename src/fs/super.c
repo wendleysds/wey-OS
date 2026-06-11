@@ -1,151 +1,214 @@
-#include <lib/string.h>
+#include "lib/list.h"
+#include "sync/spinlock.h"
 #include <def/config.h>
 #include <def/err.h>
 #include <fs/vfs.h>
+#include <kernel/init.h>
+#include <lib/string.h>
 
-static struct file_system_type const* _registered_filesystems[FILESYSTEMS_MAX] = { 0x0 };
-struct mount* mnt_root = 0x0;
+static LIST_HEAD(file_systems);
+static spinlock_t file_system_lock;
 
-static inline void _register_mount(struct mount* mount){
-    mount->next = 0x0;
+struct mount *root_mount = NULL;
+static spinlock_t mount_lock;
 
-    if(!mnt_root){
-        mnt_root = mount;
-        return;
-    }
-
-    struct mount* n = mnt_root->next;
-    mnt_root->next = mount;
-    mount->next = n;
+void vfs_register_filesystem(struct file_system_type *fs) {
+	spin_lock(&file_system_lock);
+	INIT_LIST_HEAD(&fs->list);
+	list_add(&fs->list, &file_systems);
+	spin_unlock(&file_system_lock);
 }
 
-static inline int _unregister_mount(struct mount* mount){
-    struct mount* current = mnt_root;
-    if(current == mount){
-        mnt_root = mnt_root->next;
-        return SUCCESS;
-    }
-
-    while (current){
-        struct mount* next = current->next;
-        if(next == mount){
-            current->next = mount->next;
-            return SUCCESS;
-        }
-
-        current = next;
-    }
-
-    return NOT_FOUND;
+void vfs_unregister_filesystem(struct file_system_type *fs) {
+	spin_lock(&file_system_lock);
+	list_remove(&fs->list);
+	spin_unlock(&file_system_lock);
 }
 
-int vfs_register_filesystem(const struct file_system_type* fs){
-    for (int i = 0; i < FILESYSTEMS_MAX; i++){
-        if(!_registered_filesystems[i]){
-            _registered_filesystems[i] = fs;
-            return i;
-        }
-    }
+static const struct file_system_type *find_fs_by_name(const char *name) {
+	struct file_system_type *tmp, *fs = NULL;
+	spin_lock(&file_system_lock);
 
-    return OUT_OF_BOUNDS;
+	list_for_each_entry(tmp, &file_systems, list) {
+	if (strcmp(tmp->name, name) == 0) {
+			fs = tmp;
+			break;
+		}
+	}
+
+	spin_unlock(&file_system_lock);
+	return fs;
 }
 
-int vfs_unregister_filesystem(const struct file_system_type* fs){
-    for (int i = 0; i < FILESYSTEMS_MAX; i++){
-        if(_registered_filesystems[i] == fs){
-            _registered_filesystems[i] = 0x0;
-            return i;
-        }
-    }
-
-    return NOT_FOUND;
-}
-
-static const struct file_system_type* _find_fs_by_name(const char* name){
-    for (int i = 0; i < FILESYSTEMS_MAX; i++)
-    {
-        if(strcmp(_registered_filesystems[i]->name, name) == 0){
-            return _registered_filesystems[i];
-        }
-    }
-
-    return 0x0;
-}
-
-struct super_block* alloc_super(){
-	struct super_block* sb = (struct super_block*)kzalloc(sizeof(struct super_block));
-	if(sb){
+struct super_block *super_alloc() {
+	struct super_block *sb = (struct super_block*)kzalloc(sizeof(struct super_block));
+	if (sb) {
 		INIT_LIST_HEAD(&sb->s_sbs);
 		INIT_LIST_HEAD(&sb->s_inodes);
 		spinlock_init(&sb->s_inode_lock);
 	}
-
 	return sb;
 }
 
-int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, void* data){
-    if(!source || !mountpoint || !filesystemtype){
-        return INVALID_ARG;
-    }
+void super_destroy(struct super_block *sb) { 
+	kfree(sb); 
+}
 
-    const struct file_system_type* fs = _find_fs_by_name(filesystemtype);
-    if(!fs){
-        return NOT_FOUND;
-    }
+static struct mount *get_parent_mount(const char *mountpoint) {
+	struct mount *tmp, *mount = root_mount;
+	struct qstr comp;
 
-    struct mount* mnt = (struct mount*)kcalloc(sizeof(struct mount), 1);
-    if(!mnt){
-        return NO_MEMORY;
-    }
-
-    char* mts = strdup(mountpoint);
-    if(!mts){
-        kfree(mnt);
-        return NO_MEMORY;
-    }
-
-	if(strncmp(source, "/dev", 3) == 0){
-		source += 5;
+	const char *cursor = mountpoint;
+	while (path_iterate(&cursor, &comp)) {
+		list_for_each_entry(tmp, &mount->children, sibling) {
+			if (strncmp(tmp->name, comp.name, comp.len) == 0) {
+				mount = tmp;
+				break;
+			}
+		}
 	}
 
-	struct inode* root = fs->mount(fs, 0x0, source, data);
-    if(IS_ERR(root)){
-        kfree(mnt);
-        kfree(mts);
-
-        return PTR_ERR(root);
-    }
-
-	mnt->mnt_root = root;	
-    mnt->mnt_sb = (struct super_block *)root->i_sb;
-    mnt->mountpoint = mts;
-
-    _register_mount(mnt);
-    return SUCCESS;
+	return mount;
 }
 
-int vfs_umount(const char *mountpoint){
-    struct mount* current = mnt_root;
-    while (current){
-        if(strcmp(current->mountpoint, mountpoint) == 0){
-            int res;
+int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, unsigned int flags, void *data) {
+	const struct file_system_type *target_fs = find_fs_by_name(fs_name);
+	struct inode *point = NULL;
+	struct mount *mount = NULL;
+	struct inode *root = NULL;
 
-            if((res = current->mnt_sb->fs_type->unmount(current->mnt_sb)) != SUCCESS){
-                return res;
-            }
+	int ret;
 
-            if((res = _unregister_mount(current)) != SUCCESS){
-                return res;
-            }
+	if (!target_fs) {
+		return NO_ENTRY;
+	}
 
-            kfree(current->mountpoint);
-            kfree(current);
+	if (root_mount) {
+		point = vfs_lookup(mountpoint);
+		if (IS_ERR(point)) {
+			return PTR_ERR(point);
+		}
 
-            return SUCCESS;
-        }
+		spin_lock(&point->lock);
+	}
 
-        current = current->next;
-    }
+	mount = kmalloc(sizeof(*mount));
+	if (!mount) {
+		ret = NO_MEMORY;
+		goto out_point;
+	}
 
-    return NOT_FOUND;
+	spin_lock(&mount_lock);
+
+	root = target_fs->mount(target_fs, source, data);
+	if (IS_ERR_OR_NULL(root)) {
+		ret = root ? PTR_ERR(root) : FAILED;
+		spin_unlock(&mount_lock);
+		goto out_mount;
+	}
+
+	memset(mount, 0x0, sizeof(*mount));
+	INIT_LIST_HEAD(&mount->children);
+	INIT_LIST_HEAD(&mount->sibling);
+
+	mount->mnt_sb = root->i_sb;
+	mount->mnt_root = root;
+
+	if (root_mount) {
+		inode_get(point);
+		point->mounted_here = mount;
+	} else {
+		root_mount = mount;
+		spin_unlock(&mount_lock);
+		return SUCCESS;
+	}
+
+	struct mount *p = get_parent_mount(mountpoint);
+	list_add(&mount->sibling, &p->children);
+	mount->parent = p;
+
+	spin_unlock(&mount_lock);
+	spin_unlock(&point->lock);
+	return SUCCESS;
+
+out_mount:
+	kfree(mount);
+out_point:
+	if (point) {
+		inode_put(point);
+		spin_unlock(&point->lock);
+	}
+
+	return ret;
 }
+
+int vfs_umount(const char *mountpoint) {
+	struct inode *point = vfs_lookup(mountpoint);
+	struct mount *mnt;
+	struct super_block *sb;
+	struct inode *ino, *tmp;
+
+	int ret = SUCCESS;
+
+	if (IS_ERR(point)) {
+		return PTR_ERR(point);
+	}
+
+	spin_lock(&point->lock);
+	spin_lock(&mount_lock);
+
+	mnt = point->mounted_here;
+	if (!mnt) {
+		ret = INVALID_ARG;
+		goto out_unlock;
+	}
+
+	if (!list_empty(&mnt->children)) {
+		ret = BUSY;
+		goto out_unlock;
+	}
+
+	sb = mnt->mnt_sb;
+	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
+		if (atomic_read(&ino->refcount) > 1) {
+			ret = BUSY;
+			goto out_unlock;
+		}
+	}
+
+	if (sb->fs_type->unmount) {
+		sb->fs_type->unmount(sb);
+	}
+
+	list_for_each_entry_safe(ino, tmp, &sb->s_inodes, i_sb_list) {
+		inode_destroy(ino);
+	}
+
+	if (mnt->parent) {
+		list_remove(&mnt->sibling);
+	}
+
+	if (mnt == root_mount) {
+		root_mount = NULL;
+	}
+
+	kfree(mnt);
+	super_destroy(sb);
+	point->mounted_here = NULL;
+
+out_unlock:
+	spin_unlock(&mount_lock);
+	spin_unlock(&point->lock);
+	inode_put(point);
+	return ret;
+}
+
+static __init int vfs_super_init() {
+	root_mount = NULL;
+	INIT_LIST_HEAD(&file_systems);
+	spinlock_init(&file_system_lock);
+	spinlock_init(&mount_lock);
+	return SUCCESS;
+}
+
+core_initcall(vfs_super_init);
