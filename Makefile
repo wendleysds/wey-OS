@@ -112,6 +112,7 @@ KBUILD_CFLAGS += -ffreestanding -nostdlib -nostdinc -nostartfiles -nodefaultlibs
 KBUILD_CFLAGS += -Wno-unused-function -Wno-unused-parameter \
 	-Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
 KBUILD_CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
+KBUILD_CFLAGS += -fno-omit-frame-pointer
 KBUILD_CFLAGS += -fstrength-reduce -finline-functions
 
 KBUILD_ASFLAGS = -f elf32

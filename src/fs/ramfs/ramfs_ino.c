@@ -90,7 +90,7 @@ static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mo
 	}
 
 	char tmp[name->len + 1];
-	strncpy(tmp, name->name, name->len);
+	memcpy(tmp, name->name, name->len);
 	tmp[name->len] = '\0';
 
 	char* rino_name = strdup(tmp);

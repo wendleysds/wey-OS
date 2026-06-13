@@ -144,6 +144,7 @@ struct super_operations{
 struct mount {
 	char *name;
 	struct inode *mnt_root;
+	struct inode *mnt_mountpoint;
 	struct super_block *mnt_sb;
 
 	struct mount *parent;

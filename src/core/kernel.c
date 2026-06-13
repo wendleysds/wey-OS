@@ -54,15 +54,26 @@ static __init void do_initcalls(){
 }
 
 static int init(void* args){
-	int res = vfs_mount("/dev/hda1", "/", "vfat", 0x0);
-	if(IS_ERR_VALUE(res)){
-		panic("Failed to mount root! %d", res);
-	}
+	#define TRY(op) do { int __res = (int)(op); BUG_MSG(IS_ERR_VALUE(__res), #op " failed %d", __res); } while(0)
 
-	res = kernel_exec("/init", 0x0, 0x0);
-	if(IS_ERR_VALUE(res)){
-		panic("init not found!");
-	}
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+	TRY(vfs_mkdir("/home"));
+	TRY(vfs_create("/home/file", 0x0));
+	TRY(vfs_umount("/"));
+
+	TRY(vfs_mount(0x0, "/", "ramfs", 0x0, 0x0));
+	TRY(vfs_mkdir("/home"));
+
+	TRY(vfs_mount(0x0, "/home", "ramfs", 0x0, 0x0));
+	TRY(vfs_create("/home/file", 0x0));
+	TRY(vfs_umount("/home"));
+
+	TRY(vfs_umount("/"));
+
+	interrupts_disable();
+
+	printk("OK\n");
+	while(1) cpu_relax();
 
 	unreachable();
 }

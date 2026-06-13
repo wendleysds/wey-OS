@@ -1,10 +1,12 @@
 #include "lib/list.h"
+#include "sync/atomic.h"
 #include "sync/spinlock.h"
 #include <def/config.h>
 #include <def/err.h>
 #include <fs/vfs.h>
 #include <kernel/init.h>
 #include <lib/string.h>
+#include <kernel/printk.h>
 
 static LIST_HEAD(file_systems);
 static spinlock_t file_system_lock;
@@ -54,21 +56,130 @@ void super_destroy(struct super_block *sb) {
 	kfree(sb); 
 }
 
+static int mount_name_match(const struct mount *mount, const struct qstr *name) {
+	return mount->name && strlen(mount->name) == name->len &&
+		strncmp(mount->name, name->name, name->len) == 0;
+}
+
+static char *dup_mount_name(const char *mountpoint) {
+	struct qstr comp, last = {0};
+	const char *cursor = mountpoint;
+
+	while (path_iterate(&cursor, &comp)) {
+		last = comp;
+	}
+
+	if (!last.name) {
+		return strdup("/");
+	}
+
+	char *name = kmalloc(last.len + 1);
+	if (!name) {
+		return NULL;
+	}
+
+	memcpy(name, last.name, last.len);
+	name[last.len] = '\0';
+	return name;
+}
+
+static struct mount *find_child_mount(struct mount *parent, const struct qstr *name) {
+	struct mount *child;
+
+	list_for_each_entry(child, &parent->children, sibling) {
+		if (mount_name_match(child, name)) {
+			return child;
+		}
+	}
+
+	return NULL;
+}
+
+static struct mount *find_mount(const char *mountpoint) {
+	struct mount *mount = root_mount;
+	struct qstr comp;
+	const char *cursor = mountpoint;
+
+	if (!mount) {
+		return NULL;
+	}
+
+	while (path_iterate(&cursor, &comp)) {
+		mount = find_child_mount(mount, &comp);
+		if (!mount) {
+			return NULL;
+		}
+	}
+
+	return mount;
+}
+
 static struct mount *get_parent_mount(const char *mountpoint) {
 	struct mount *tmp, *mount = root_mount;
 	struct qstr comp;
 
 	const char *cursor = mountpoint;
 	while (path_iterate(&cursor, &comp)) {
-		list_for_each_entry(tmp, &mount->children, sibling) {
-			if (strncmp(tmp->name, comp.name, comp.len) == 0) {
-				mount = tmp;
-				break;
-			}
+		const char *next = cursor;
+		struct qstr next_comp;
+
+		if (!path_iterate(&next, &next_comp)) {
+			break;
+		}
+
+		tmp = find_child_mount(mount, &comp);
+		if (tmp) {
+			mount = tmp;
 		}
 	}
 
 	return mount;
+}
+
+static int do_umount(struct mount* mount){
+	struct super_block *sb;
+	struct inode *ino, *tmp;
+
+	int ret = SUCCESS;
+
+	if (!list_empty(&mount->children)) {
+		ret = BUSY;
+		goto out_unlock;
+	}
+
+	sb = mount->mnt_sb;
+	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
+		if (atomic_read(&ino->refcount) > 1) {
+			ret = BUSY;
+			goto out_unlock;
+		}
+	}
+
+	list_for_each_entry_safe(ino, tmp, &sb->s_inodes, i_sb_list) {
+		inode_destroy(ino);
+	}
+
+	if (sb->fs_type->unmount) {
+		sb->fs_type->unmount(sb);
+	}
+
+	if (mount->parent) {
+		list_remove(&mount->sibling);
+	}
+
+	if (mount == root_mount) {
+		root_mount = NULL;
+	}
+
+	if (mount->name) {
+		kfree(mount->name);
+	}
+
+	kfree(mount);
+	super_destroy(sb);
+
+out_unlock:
+	return ret;
 }
 
 int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, unsigned int flags, void *data) {
@@ -88,14 +199,22 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 		if (IS_ERR(point)) {
 			return PTR_ERR(point);
 		}
-
-		spin_lock(&point->lock);
 	}
 
 	mount = kmalloc(sizeof(*mount));
 	if (!mount) {
 		ret = NO_MEMORY;
 		goto out_point;
+	}
+
+	memset(mount, 0x0, sizeof(*mount));
+	INIT_LIST_HEAD(&mount->children);
+	INIT_LIST_HEAD(&mount->sibling);
+
+	mount->name = dup_mount_name(mountpoint);
+	if (!mount->name) {
+		ret = NO_MEMORY;
+		goto out_mount;
 	}
 
 	spin_lock(&mount_lock);
@@ -107,15 +226,12 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 		goto out_mount;
 	}
 
-	memset(mount, 0x0, sizeof(*mount));
-	INIT_LIST_HEAD(&mount->children);
-	INIT_LIST_HEAD(&mount->sibling);
-
 	mount->mnt_sb = root->i_sb;
 	mount->mnt_root = root;
+	mount->mnt_mountpoint = point;
 
 	if (root_mount) {
-		inode_get(point);
+		spin_lock(&point->lock);
 		point->mounted_here = mount;
 	} else {
 		root_mount = mount;
@@ -132,74 +248,62 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 	return SUCCESS;
 
 out_mount:
+	if (mount->name) {
+		kfree(mount->name);
+	}
 	kfree(mount);
 out_point:
 	if (point) {
 		inode_put(point);
-		spin_unlock(&point->lock);
 	}
 
 	return ret;
 }
 
 int vfs_umount(const char *mountpoint) {
-	struct inode *point = vfs_walk(mountpoint);
-	struct mount *mnt;
-	struct super_block *sb;
-	struct inode *ino, *tmp;
-
-	int ret = SUCCESS;
-
-	if (IS_ERR(point)) {
-		return PTR_ERR(point);
-	}
-
-	spin_lock(&point->lock);
 	spin_lock(&mount_lock);
 
-	mnt = point->mounted_here;
-	if (!mnt) {
+	int ret = SUCCESS;
+	int release_mountpoint = 0;
+	struct mount *mnt = find_mount(mountpoint);
+	if(!mnt){
 		ret = INVALID_ARG;
-		goto out_unlock;
+		goto out;
 	}
 
-	if (!list_empty(&mnt->children)) {
-		ret = BUSY;
-		goto out_unlock;
+	struct inode *point = mnt->mnt_mountpoint;
+	if(point){
+		spin_lock(&point->lock);
 	}
 
-	sb = mnt->mnt_sb;
-	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
-		if (atomic_read(&ino->refcount) > 1) {
-			ret = BUSY;
-			goto out_unlock;
-		}
+	if(point && point->mounted_here != mnt){
+		ret = INVALID_ARG;
+		goto out_point;
 	}
 
-	if (sb->fs_type->unmount) {
-		sb->fs_type->unmount(sb);
+	if(point){
+		point->mounted_here = NULL;
 	}
 
-	list_for_each_entry_safe(ino, tmp, &sb->s_inodes, i_sb_list) {
-		inode_destroy(ino);
+	ret = do_umount(mnt);
+
+	if(unlikely(ret != SUCCESS) && point){
+		point->mounted_here = mnt;
+	} else if(point) {
+		release_mountpoint = 1;
 	}
 
-	if (mnt->parent) {
-		list_remove(&mnt->sibling);
+out_point:
+	if(point){
+		spin_unlock(&point->lock);
 	}
-
-	if (mnt == root_mount) {
-		root_mount = NULL;
-	}
-
-	kfree(mnt);
-	super_destroy(sb);
-	point->mounted_here = NULL;
-
-out_unlock:
+out:
 	spin_unlock(&mount_lock);
-	spin_unlock(&point->lock);
-	inode_put(point);
+
+	if(release_mountpoint){
+		inode_put(point);
+	}
+
 	return ret;
 }
 
