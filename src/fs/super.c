@@ -1,12 +1,8 @@
-#include "lib/list.h"
-#include "sync/atomic.h"
-#include "sync/spinlock.h"
 #include <def/config.h>
 #include <def/err.h>
 #include <fs/vfs.h>
 #include <kernel/init.h>
 #include <lib/string.h>
-#include <kernel/printk.h>
 
 static LIST_HEAD(file_systems);
 static spinlock_t file_system_lock;
@@ -56,11 +52,6 @@ void super_destroy(struct super_block *sb) {
 	kfree(sb); 
 }
 
-static int mount_name_match(const struct mount *mount, const struct qstr *name) {
-	return mount->name && strlen(mount->name) == name->len &&
-		strncmp(mount->name, name->name, name->len) == 0;
-}
-
 static char *dup_mount_name(const char *mountpoint) {
 	struct qstr comp, last = {0};
 	const char *cursor = mountpoint;
@@ -81,59 +72,6 @@ static char *dup_mount_name(const char *mountpoint) {
 	memcpy(name, last.name, last.len);
 	name[last.len] = '\0';
 	return name;
-}
-
-static struct mount *find_child_mount(struct mount *parent, const struct qstr *name) {
-	struct mount *child;
-
-	list_for_each_entry(child, &parent->children, sibling) {
-		if (mount_name_match(child, name)) {
-			return child;
-		}
-	}
-
-	return NULL;
-}
-
-static struct mount *find_mount(const char *mountpoint) {
-	struct mount *mount = root_mount;
-	struct qstr comp;
-	const char *cursor = mountpoint;
-
-	if (!mount) {
-		return NULL;
-	}
-
-	while (path_iterate(&cursor, &comp)) {
-		mount = find_child_mount(mount, &comp);
-		if (!mount) {
-			return NULL;
-		}
-	}
-
-	return mount;
-}
-
-static struct mount *get_parent_mount(const char *mountpoint) {
-	struct mount *tmp, *mount = root_mount;
-	struct qstr comp;
-
-	const char *cursor = mountpoint;
-	while (path_iterate(&cursor, &comp)) {
-		const char *next = cursor;
-		struct qstr next_comp;
-
-		if (!path_iterate(&next, &next_comp)) {
-			break;
-		}
-
-		tmp = find_child_mount(mount, &comp);
-		if (tmp) {
-			mount = tmp;
-		}
-	}
-
-	return mount;
 }
 
 static int do_umount(struct mount* mount){
@@ -184,20 +122,21 @@ out_unlock:
 
 int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, unsigned int flags, void *data) {
 	const struct file_system_type *target_fs = find_fs_by_name(fs_name);
-	struct inode *point = NULL;
+	struct path target_point;
 	struct mount *mount = NULL;
 	struct inode *root = NULL;
 
 	int ret;
+	memset(&target_point, 0x0, sizeof(struct path));
 
 	if (!target_fs) {
 		return NO_ENTRY;
 	}
 
 	if (root_mount) {
-		point = vfs_walk(mountpoint);
-		if (IS_ERR(point)) {
-			return PTR_ERR(point);
+		ret = vfs_walk_path(mountpoint, &target_point);
+		if (IS_ERR_VALUE(ret)) {
+			return ret;
 		}
 	}
 
@@ -228,23 +167,23 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 
 	mount->mnt_sb = root->i_sb;
 	mount->mnt_root = root;
-	mount->mnt_mountpoint = point;
+	mount->mnt_mountpoint = target_point.dentry;
 
 	if (root_mount) {
-		spin_lock(&point->lock);
-		point->mounted_here = mount;
+		spin_lock(&target_point.dentry->lock);
+		target_point.dentry->mounted_here = mount;
 	} else {
 		root_mount = mount;
 		spin_unlock(&mount_lock);
 		return SUCCESS;
 	}
 
-	struct mount *p = get_parent_mount(mountpoint);
+	struct mount *p = target_point.mount;
 	list_add(&mount->sibling, &p->children);
 	mount->parent = p;
 
 	spin_unlock(&mount_lock);
-	spin_unlock(&point->lock);
+	spin_unlock(&target_point.dentry->lock);
 	return SUCCESS;
 
 out_mount:
@@ -253,57 +192,41 @@ out_mount:
 	}
 	kfree(mount);
 out_point:
-	if (point) {
-		inode_put(point);
+	if (target_point.dentry) {
+		inode_put(target_point.dentry);
 	}
 
 	return ret;
 }
 
 int vfs_umount(const char *mountpoint) {
+	struct path target_path;
+	int err = vfs_walk_path(mountpoint, &target_path);
+	if (err != SUCCESS) return err;
+
+	struct mount *mnt = target_path.mount;
+
+	inode_put(target_path.dentry); 
+
 	spin_lock(&mount_lock);
-
-	int ret = SUCCESS;
-	int release_mountpoint = 0;
-	struct mount *mnt = find_mount(mountpoint);
-	if(!mnt){
-		ret = INVALID_ARG;
-		goto out;
-	}
-
+	
 	struct inode *point = mnt->mnt_mountpoint;
-	if(point){
+	if (point) {
 		spin_lock(&point->lock);
-	}
-
-	if(point && point->mounted_here != mnt){
-		ret = INVALID_ARG;
-		goto out_point;
-	}
-
-	if(point){
 		point->mounted_here = NULL;
 	}
 
-	ret = do_umount(mnt);
+	int ret = do_umount(mnt);
 
 	if(unlikely(ret != SUCCESS) && point){
 		point->mounted_here = mnt;
+		spin_unlock(&point->lock);
 	} else if(point) {
-		release_mountpoint = 1;
-	}
-
-out_point:
-	if(point){
+		inode_put(point);
 		spin_unlock(&point->lock);
 	}
-out:
+	
 	spin_unlock(&mount_lock);
-
-	if(release_mountpoint){
-		inode_put(point);
-	}
-
 	return ret;
 }
 

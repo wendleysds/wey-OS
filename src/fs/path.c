@@ -27,58 +27,24 @@ int path_iterate(const char** cursor, struct qstr* comp){
 	return 1;
 }
 
-struct inode* vfs_lookup(struct inode *parent, struct qstr *name){
-	if(!parent->i_op || !parent->i_op->lookup){
-		return ERR_PTR(NOT_SUPPORTED);
-	}
-
-	struct inode* child = parent->i_op->lookup(parent, name);
-	if(IS_ERR_OR_NULL(child)){
-		return child ? child : ERR_PTR(NO_ENTRY);
-	}
-
-	struct inode *mounted_root = NULL;
-
-	spin_lock(&child->lock);
-	if(child->mounted_here){
-		mounted_root = child->mounted_here->mnt_root;
-		inode_get(mounted_root);
-	}
-	spin_unlock(&child->lock);
-
-	if(mounted_root){
-		inode_put(child);
-		child = mounted_root;
-	}
-
-	return child;
-}
-
 int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
-	if (!parent->i_op || !parent->i_op->lookup) {
+	if (!parent->i_op || !parent->i_op->lookup)
 		return NOT_SUPPORTED;
-	}
 
 	struct inode *child = parent->i_op->lookup(parent, name);
-	if (IS_ERR_OR_NULL(child)) {
+	if (IS_ERR_OR_NULL(child))
 		return child ? PTR_ERR(child) : NO_ENTRY;
-	}
+
+	res->dentry = child;
+	res->mount = NULL;
 
 	spin_lock(&child->lock);
-	if (child->mounted_here) {
-		struct mount *next_mnt = child->mounted_here;
-		struct inode *mounted_root = next_mnt->mnt_root;
-		
-		inode_get(mounted_root);
-		inode_put(child);
-
-		child = mounted_root;
-		res->mount = next_mnt;
+	if (child->mounted_here){
+		res->mount = child->mounted_here;
 	}
 	spin_unlock(&child->lock);
 
-	res->dentry = child;
-	return OK;
+	return SUCCESS;
 }
 
 int vfs_walk_path(const char *path, struct path *res) {
@@ -92,14 +58,27 @@ int vfs_walk_path(const char *path, struct path *res) {
 	struct qstr comp;
 
 	while (path_iterate(&cursor, &comp)) {
-		int ret = vfs_lookup_path(curr_ino, &comp, res);
-		inode_put(curr_ino);
-	
-		if(IS_ERR_VALUE(ret)){
-			return ret;
+		struct path next;
+		int err = vfs_lookup_path(curr_ino, &comp, &next);
+		if (err != SUCCESS) {
+			inode_put(curr_ino);
+			return err;
 		}
 
-		curr_ino = res->dentry;
+		struct inode *next_ino = next.dentry;
+
+		inode_put(curr_ino);
+		curr_ino = next_ino;
+
+		if (next.mount) {
+			struct mount *next_mnt = next.mount;
+			struct inode *mounted_root = next_mnt->mnt_root;
+
+			inode_get(mounted_root);
+			inode_put(curr_ino);
+			curr_ino = mounted_root;
+			curr_mnt = next_mnt;
+		}
 	}
 
 	res->mount = curr_mnt;
@@ -124,14 +103,23 @@ struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 			return cur;
 		}
 
-		struct inode* child = vfs_lookup(cur, &comp);
-		if(IS_ERR(child)){
+		struct path next_path;
+		int err = vfs_lookup_path(cur, &comp, &next_path);
+		if (err != SUCCESS) {
 			inode_put(cur);
-			return child;
+			return ERR_PTR(err);
 		}
 
+		struct inode *child = next_path.dentry;
 		inode_put(cur);
 		cur = child;
+
+		if (next_path.mount) {
+			struct inode *mounted_root = next_path.mount->mnt_root;
+			inode_get(mounted_root);
+			inode_put(cur);
+			cur = mounted_root;
+		}
 	}
 
 	inode_put(cur);
