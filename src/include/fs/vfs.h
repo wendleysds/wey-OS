@@ -152,8 +152,16 @@ struct mount {
 	struct list_head sibling;
 };
 
+struct path {
+	struct mount *mount;
+	struct inode *dentry;
+};
+
 int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, unsigned int flags, void* data);
 int vfs_umount(const char *mountpoint);
+
+int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res);
+int vfs_walk_path(const char *path, struct path *res);
 
 struct inode* vfs_lookup(struct inode *parent, struct qstr *name);
 struct inode* vfs_walk_parent(const char *path, struct qstr *last);

@@ -54,15 +54,67 @@ struct inode* vfs_lookup(struct inode *parent, struct qstr *name){
 	return child;
 }
 
+int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
+	if (!parent->i_op || !parent->i_op->lookup) {
+		return NOT_SUPPORTED;
+	}
+
+	struct inode *child = parent->i_op->lookup(parent, name);
+	if (IS_ERR_OR_NULL(child)) {
+		return child ? PTR_ERR(child) : NO_ENTRY;
+	}
+
+	spin_lock(&child->lock);
+	if (child->mounted_here) {
+		struct mount *next_mnt = child->mounted_here;
+		struct inode *mounted_root = next_mnt->mnt_root;
+		
+		inode_get(mounted_root);
+		inode_put(child);
+
+		child = mounted_root;
+		res->mount = next_mnt;
+	}
+	spin_unlock(&child->lock);
+
+	res->dentry = child;
+	return OK;
+}
+
+int vfs_walk_path(const char *path, struct path *res) {
+	if (!root_mount) return INVALID_STATE;
+
+	struct mount *curr_mnt = root_mount;
+	struct inode *curr_ino = root_mount->mnt_root;
+	inode_get(curr_ino);
+
+	const char *cursor = path;
+	struct qstr comp;
+
+	while (path_iterate(&cursor, &comp)) {
+		int ret = vfs_lookup_path(curr_ino, &comp, res);
+		inode_put(curr_ino);
+	
+		if(IS_ERR_VALUE(ret)){
+			return ret;
+		}
+
+		curr_ino = res->dentry;
+	}
+
+	res->mount = curr_mnt;
+	res->dentry = curr_ino;
+	return SUCCESS;
+}
+
 struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 	if(!root_mount) return ERR_PTR(INVALID_STATE);
 
 	struct inode *cur = root_mount->mnt_root;
 	inode_get(cur);
 
-	const char* cursor = path;
 	struct qstr comp;
-
+	const char* cursor = path;
 	while(path_iterate(&cursor, &comp)){
 		const char* tmp = cursor;
 		struct qstr next;
@@ -89,26 +141,13 @@ struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 struct inode* vfs_walk(const char *path){
 	if(!root_mount) return ERR_PTR(INVALID_STATE);
 
-	struct inode *next, *cur = root_mount->mnt_root;
-	inode_get(cur);
+	struct path p;
 
-	if(path[1] == '\0') return cur;
+	int res = vfs_walk_path(path, &p);
 
-	const char* cursor = path;
-	struct qstr comp;
-
-	while(path_iterate(&cursor, &comp)){
-		next = vfs_lookup(cur, &comp);
-
-		if(IS_ERR(next)){
-			inode_put(cur);
-			return next;
-		}
-
-		inode_put(cur);
-		cur = next;
+	if(IS_ERR_VALUE(res)){
+		return ERR_PTR(res);
 	}
 
-	return cur;
+	return p.dentry;
 }
-
