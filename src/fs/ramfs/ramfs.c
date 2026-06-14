@@ -62,16 +62,13 @@ static void ramfs_destroy_inode(struct inode *inode) {
 
 		kfree(rino);
 	}
-}
 
-static void ramfs_free_inode(struct inode *inode) {
 	kfree(inode);
 }
 
 static const struct super_operations ramfs_sops = {
 	.alloc_inode = ramfs_alloc_inode,
 	.destroy_inode = ramfs_destroy_inode,
-	.free_inode = ramfs_free_inode
 };
 
 static struct inode* ramfs_mount(const struct file_system_type* self, const char* dev_name, void* data){
