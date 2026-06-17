@@ -80,6 +80,8 @@ __no_return void kmain(){
 
 	setup_arch();
 
+	terminal_early_init();
+
 	module_load("Memory", memory_init);
 
 	module_load("Terminal", terminal_init);

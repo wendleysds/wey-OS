@@ -71,8 +71,6 @@ void __init __no_stack_protector mk_early_pgtbl_32(void){
 
 void __regparm(1) __init __no_return i386_start_kernel(struct boot_header* boot_header_ptr){
 	memcpy(&boot_header, boot_header_ptr, sizeof(struct boot_header));
-	terminal_early_init();
-
 	printk("Started i386 kernel\n");
 
 	kmain();

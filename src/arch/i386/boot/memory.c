@@ -1,13 +1,11 @@
 #include <def/err.h>
 #include "boot.h"
 
-
 #define SMAP 0x534d4150 // ASCII "SMAP"
 
-static void e820(){
+static int e820(struct e820_entry* table){
 	int count = 0;
 	struct biosregs ireg, oreg;
-	struct e820_entry *desc = boot_header.e820_table;
 	static struct e820_entry buff;
 
 	initregs(&ireg);
@@ -24,17 +22,19 @@ static void e820(){
 			break;
 
 		if (oreg.eax != SMAP) {
-			count = 0;
-			break;
+			return 1;
 		}
 
-		*desc++ = buff;
-		count++;
-	} while (ireg.ebx && count < ARRAY_SIZE(boot_header.e820_table));
+		if(table){
+			*table++ = buff;
+		}
 
-	boot_header.e820_entries_count = count;
+		count++;
+	} while (ireg.ebx);
+
+	return count;
 }
 
-void detect_memory(){
-	e820();
+int detect_memory(struct e820_entry* table){
+	return e820(table);
 }

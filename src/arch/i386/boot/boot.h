@@ -75,16 +75,15 @@ static inline uint16_t gs(void){
 	return seg;
 }
 
-extern struct setup_header hdr;
-extern struct boot_header boot_header;
+extern struct boot_tag_setup hdr;
 
 // BIOS
 void initregs(struct biosregs *reg);
 void __regparm(3) intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 
 // Setup
-void setup_video();
-void detect_memory();
+void setup_video(struct boot_tag_video* video) ;
+int detect_memory(struct e820_entry* out_table);
 
 // Keyboard
 int kbd_getchar();

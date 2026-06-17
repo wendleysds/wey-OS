@@ -1,8 +1,9 @@
+#include "asm/page.h"
 #include <device/terminal.h>
 #include <kernel/init.h>
 #include <kernel/printk.h>
 #include <mm/kheap.h>
-#include <mm/earlyalloc.h>
+#include <mm/memblock.h>
 #include <def/err.h>
 #include <def/config.h>
 #include <uapi/headers.h>
@@ -12,7 +13,7 @@
 
 static struct vt terminals[TERMINALS_MAX];
 
-extern struct boot_header boot_header;
+extern struct video_info video_info;
 extern const struct consw vgadrv_consw;
 
 int cur_vt, last_vt;
@@ -65,21 +66,25 @@ static void vt_data_setup(struct vt_data *vt){
 
 static __init int vt_early_alloc(){
 	struct vt* terminal = terminal_get(FIRST_VT_INDEX);
-	struct vt_data *vt = (struct vt_data*)early_alloc(sizeof(struct vt_data), 0);
+	struct vt_data *vt = (struct vt_data*)memblock_alloc(sizeof(struct vt_data), 1);
 
 	if(!vt){
 		return NO_MEMORY;
 	}
+
+	vt = (struct vt_data*)__va(vt);
 
 	int res = vt_data_con_setup(vt);
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
 
-	vt->screenbuffer = (unsigned short*)early_alloc(vt->screenbuffer_size, 0);
+	vt->screenbuffer = (unsigned short*)memblock_alloc(vt->screenbuffer_size, 1);
 	if(!vt->screenbuffer){
 		return NO_MEMORY;
 	}
+
+	vt->screenbuffer = (unsigned short*)__va(vt->screenbuffer);
 
 	vt_data_setup(vt);
 
@@ -251,7 +256,7 @@ static void _vt_console_write(const char *buf, int length){
 static int __init terminal_common_init(int early){
 	memset(terminals, 0x0, sizeof(terminals));
 
-	int res = vgadrv_consw.setup(&boot_header.video_info);
+	int res = vgadrv_consw.setup(&video_info);
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
@@ -266,11 +271,10 @@ static int __init terminal_common_init(int early){
 		return res;
 	}
 
-	if (early) {
-		terminals[FIRST_VT_INDEX].data->state.x = boot_header.video_info.orig_x;
-		terminals[FIRST_VT_INDEX].data->state.y = boot_header.video_info.orig_y;
+	if(video_info.bpp == 0)
 		terminals[FIRST_VT_INDEX].data->vt_is_text_mode = 1;
-	} else {
+
+	if(!early) {
 		vgadrv_consw.exit_early();
 	}
 
@@ -278,7 +282,7 @@ static int __init terminal_common_init(int early){
 
 	printk_set_echo(_vt_console_write);
 
-	if (!early) printk_show_buffer();
+	printk_show_buffer();
 
 	return SUCCESS;
 }
@@ -289,6 +293,7 @@ int __init terminal_early_init(){
 
 int __init terminal_init(){
 	if(terminal_get(FIRST_VT_INDEX)->data){
+		vgadrv_consw.exit_early();
 		return SUCCESS;
 	}
 

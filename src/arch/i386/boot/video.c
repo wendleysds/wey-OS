@@ -48,9 +48,8 @@ static inline int is_vga_text_mode(uint16_t mode) {
     return (mode > 0x00 && mode <= 0x03) || mode == 0x07;
 }
 
-static void save_current(){
+static void save_current(struct boot_tag_video* vi)  {
 	struct biosregs ireg, oreg;
-	struct video_info* vi = &boot_header.video_info;
 
 	// get current mode
 	initregs(&ireg);
@@ -104,13 +103,10 @@ static void save_current(){
 		vi->reserved_position = infoMode.reserved_position;
 
 		vi->attributes = infoMode.attributes;
-		vi->direct_color_attributes = infoMode.direct_color_attributes;
-		vi->pages = infoMode.image_pages;
 		vi->capabilities = *((uint32_t*)infoBlock.Capabilities);
 
-		vi->vesapm_off = OFF(infoMode.win_func_ptr);
-		vi->vesapm_seg = SEG(infoMode.win_func_ptr);
-		goto get_cursor_position;
+		vi->vesapm_addr = infoMode.win_func_ptr;
+		return;
     }
 	
 no_vbe_mode:
@@ -124,15 +120,12 @@ no_vbe_mode:
 	ireg.bl = 0x10;
 	intcall(0x10, &ireg, &oreg);
 
-	vi->ega_bx = oreg.bx;
-
 	if (oreg.bl != 0x10) {
 		ireg.ax = 0x1A00;
 		intcall(0x10, &ireg, &oreg);
 
 		if (oreg.al == 0x1A) {
 			vi->type = VIDEO_TYPE_VGAC;
-			vi->isVGA = 1;
 		} else {
 			vi->type = VIDEO_TYPE_EGAM;
 		}
@@ -148,15 +141,6 @@ no_vbe_mode:
 		vi->pitch = mode->width / 8;
 		vi->framebuffer = mode->vrambase;
 	}
-
-get_cursor_position:
-	// Get cursor position
-	initregs(&ireg);
-	ireg.ah = 0x03;
-	intcall(0x10, &ireg, &oreg);
-
-	vi->orig_x = oreg.dl;
-	vi->orig_y = oreg.dh;
 }
 
 static void check_vbe(){
@@ -171,15 +155,7 @@ static void check_vbe(){
 	vbe_supported = (oreg.ax == 0x004F);
 }
 
-static void query_mode(){
-
-}
-
-void setup_video(){
+void setup_video(struct boot_tag_video* video) {
 	check_vbe();
-
-
-
-	save_current();
+	save_current(video);
 }
-

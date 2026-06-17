@@ -51,6 +51,4 @@ struct VbeInfoMode {
 	uint8_t reserved1[206];
 } __attribute__ ((packed));
 
-void setup_video();
-
 #endif

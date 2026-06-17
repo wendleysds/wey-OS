@@ -36,6 +36,7 @@ int __init vga_setup(struct video_info* video_info){
 
 	vga_num_lines = video_info->height;
 	vga_num_columns =video_info->width;
+	vga_video_type = video_info->type;
 
 	if (video_info->mode == 7) {
 		// Mono
@@ -55,19 +56,14 @@ int __init vga_setup(struct video_info* video_info){
 	} else {
 		// Color
 		vga_vram_base = 0xB8000;
+		vga_vram_size = 0x8000;
 		vga_reg_port = VGA_CRT_IC;
 		vga_reg_val = VGA_CRT_DC;
 		vga_support_color = 1;
 
-		if ((video_info->ega_bx & 0xff) != 0x10) {
-			vga_vram_size = 0x8000;
-			vga_video_type = video_info->isVGA ? 
-				VIDEO_TYPE_VGAC : VIDEO_TYPE_EGAC;
-		} else {
-			vga_video_type = VIDEO_TYPE_CGA;
-			vga_vram_size = 0x2000;
-			vga_font_height = 8;
-		}
+		int mode = video_info->mode;
+
+		vga_video_type = (mode > 0x00 && mode <= 0x03) || mode == 0x07 ? VIDEO_TYPE_VGAC : VIDEO_TYPE_EGAC;
 	}
 
 	vga_vram_base = __va(vga_vram_base);

@@ -4,9 +4,6 @@ ENTRY(main)
 
 SECTIONS{
 	. = 0;
-	.pad : {
-		. = 0x38;
-	} = 0xFFFFFFFF
 	
 	.header : {
 		*(.header*)
@@ -40,5 +37,7 @@ SECTIONS{
 		*(COMMON)
 		*(.bss*)
 	}
+
+	_brk = .;
 }
 
