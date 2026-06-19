@@ -10,15 +10,15 @@
 #define SETUP_LOAD_ADDR 0x90000
 
 int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_buffer){
-	struct setup_header setup_header;
+	struct boot_tag_setup setup_header;
 
 	struct file* file = platform_open_file(fat, entry->target);
 	if(IS_ERR(file)){
 		return PTR_ERR(file);
 	}
 
-	file->ops->lseek(file, 0x38, 0);
-	file->ops->read(file, &setup_header, sizeof(struct setup_header));
+	file->ops->lseek(file, 0, 0);
+	file->ops->read(file, &setup_header, sizeof(struct boot_tag_setup));
 
 	uint16_t setup_size =  setup_header.setup_sectors * 0x200;
 	uint32_t start_kernel = (setup_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
@@ -27,6 +27,11 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 	if((setup_header.syssize * 16) < kernel_size){
 		printf("Kernel size is larger than syssize!\n");
 		return FILE_TOO_LARGE;
+	}
+
+	if(setup_header.boot_sig != 0xAA55){
+		printf("Invalid signature! %x\n", setup_header.boot_sig );
+		return INVALID_FILE;
 	}
 	
 	char buffer[4096];

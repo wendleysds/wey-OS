@@ -1,4 +1,7 @@
+#include <device/terminal_struct.h>
 #include <kernel/printk.h>
+#include <kernel/syscall.h>
+#include <kernel/panic.h>
 #include <mm/memblock.h>
 #include <kernel/init.h>
 #include <def/linker.h>
@@ -7,7 +10,6 @@
 #include <asm/idt.h>
 #include <asm/page.h>
 #include <asm/paging.h>
-#include <kernel/syscall.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
 
@@ -17,6 +19,7 @@
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
 struct boot_header boot_header;
+struct video_info video_info;
 
 unsigned long max_low_pfn_mapped;
 unsigned long max_pfn_mapped;
@@ -100,10 +103,41 @@ static __init void setup_swapper(void){
 	}
 }
 
+static __init void setup_video(void){
+	struct boot_tag_video* v = (struct boot_tag_video*)boot_find_tag(&boot_header, BOOT_TAG_VIDEO);
+	if(!v) panic("Setup: No video information provided!");
+
+	struct video_info video = {
+		.type = v->type,
+		.width = v->width,
+		.height = v->height,
+		.pitch = v->pitch,
+		.bpp = v->bpp,
+		.framebuffer = v->framebuffer,
+		.red_mask = v->red_mask,
+		.red_position = v->red_position,
+		.green_mask = v->green_mask,
+		.green_position = v->green_position,
+		.blue_mask = v->blue_mask,
+		.blue_position = v->blue_position,
+		.reserved_mask = v->reserved_mask,
+		.reserved_position = v->reserved_position,
+		.mode = v->mode,
+		.attributes = v->attributes,
+	};
+
+	memcpy(&video_info, &video, sizeof(struct video_info));
+}
+
 static __init void setup_memblock(void){
+	struct boot_tag_e820* e820 = (void*)boot_find_tag(
+		&boot_header, 
+		BOOT_TAG_E820
+	);
+
 	// add usable memory
-	for (size_t idx = 0; idx < boot_header.e820_entries_count; idx++){
-		struct e820_entry* entry = &boot_header.e820_table[idx];
+	for (size_t idx = 0; idx < e820->entries; idx++){
+		struct e820_entry* entry = &e820->map[idx];
 
 		if(entry->type == E820_TYPE_SOFT_RESERVED){
 			memblock_reserve(entry->base_addr, entry->length);
@@ -130,6 +164,9 @@ static __init void setup_memblock(void){
 
 	// BIOS owned area
 	memblock_reserve(0x0, KiB(64));
+
+	// Reserve boot tags
+	memblock_reserve(boot_header.tags_ptr, boot_header.tags_size);
 
 	// BRK
 	if(_brk_ptr > _brk_start){
@@ -166,16 +203,27 @@ __init void setup_arch(void){
 	setup_swapper();
 
 	paging_load_table(__pa(swapper_pgdir));
+	
+	boot_header.tags_ptr = __va(boot_header.tags_ptr);
+
+	struct boot_tag_e820* e820 = (void*)boot_find_tag(
+		&boot_header, 
+		BOOT_TAG_E820
+	);
+
+	if(!e820) panic("Setup: No memory map provided!");
 
 	e820_init(
-		boot_header.e820_table, 
-		boot_header.e820_entries_count
+		e820->map, 
+		e820->entries
 	);
 
 	printk("Setup: E820-provided physical RAM map:\n");
 	e820_print();
 
 	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);
+
+	setup_video();
 
 	setup_memblock();
 

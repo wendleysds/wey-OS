@@ -13,7 +13,6 @@
 
 struct vt_data;
 struct font_info;
-struct video_info;
 
 typedef enum {
 	TERMINAL_COLOR_BLACK =          0x0,

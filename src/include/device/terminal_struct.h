@@ -3,6 +3,33 @@
 
 #include <lib/font.h>
 
+struct video_info {
+	uint8_t type;
+
+	uint16_t width;
+	uint16_t height;
+	uint16_t pitch;
+	uint8_t bpp;
+
+	uint64_t framebuffer;
+	uint64_t framebuffer_size;
+
+	uint16_t red_mask;
+	uint16_t red_position;
+
+	uint16_t green_mask;
+	uint16_t green_position;
+
+	uint16_t blue_mask;
+	uint16_t blue_position;
+
+	uint16_t reserved_mask;
+	uint16_t reserved_position;
+
+	uint16_t mode;
+	uint16_t attributes;
+};
+
 enum vt_intensity {
 	TERMINAL_INTENSITY_HALF_BRIGHT,
 	TERMINAL_INTENSITY_NORMAL,
