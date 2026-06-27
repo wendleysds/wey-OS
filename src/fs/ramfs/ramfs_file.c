@@ -111,29 +111,28 @@ off_t ramfs_lseek(struct file *file, off_t offset, int whence){
 			target = offset;
 			break;
 		case SEEK_CUR:
-			target = file->pos + offset;
+			target = (off_t)file->pos + offset;
 			break;
 		case SEEK_END:
-			target = filesize + offset;
+			target = (off_t)filesize + offset;
 			break;
 		default:
 			return INVALID_ARG;
 	}
 
-	if(target < filesize){
+	if(target < 0){
 		return INVALID_ARG;
 	}
 
-	if(target > filesize){
+	if(target > (off_t)filesize){
 		int res = ramfs_do_truncate(file->inode, target);
 		if(IS_ERR_VALUE(res)){
 			return res;
 		}
 	}
 
-	file->pos = target;
-
-	return filesize - target;
+	file->pos = (size_t)target;
+	return target;
 }
 
 const struct file_operations ramfs_fops = {

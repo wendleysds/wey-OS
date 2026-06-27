@@ -60,6 +60,8 @@ static int init(void* args){
 
 	printk("unpack status: %d\n", unpack_initrd());
 
+	kernel_exec("/init", 0x0, 0x0);
+
 	printk("OK\n");
 
 	while(1) cpu_relax();
