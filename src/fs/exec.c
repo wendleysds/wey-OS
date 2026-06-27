@@ -66,7 +66,7 @@ static struct binprm* bprm_alloc(const char* filename){
 		return ERR_PTR(NO_MEMORY);
 	}
 
-	struct file* file = vfs_open(filename, 0x0);
+	struct file* file = vfs_open(filename, O_RDONLY, 0x0);
 	if(IS_ERR_VALUE(file)){
 		res = PTR_ERR(file);
 		goto out_free;

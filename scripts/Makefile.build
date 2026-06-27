@@ -57,7 +57,7 @@ $(OBJ_DIR)/$(obj)%.lds: $(src)%.lds.S
 $(OBJ_DIR)/$(obj)%c_s.o: $(src)%.S
 	@echo "  CPP        $<"
 	@mkdir -p $(dir $@)
-	$(Q)$(CPP) $(KINCLUDE) -D__ASSEMBLY__ -P -o $(OBJ_DIR)/$(obj)$*.S $<
+	$(Q)$(CPP) $(KBUILD_CFLAGS) $(KINCLUDE) -D__ASSEMBLY__ -P -o $(OBJ_DIR)/$(obj)$*.S $<
 
 	@echo "  AS         $<"
 	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $(OBJ_DIR)/$(obj)$*.S

@@ -2,6 +2,23 @@
 #include <lib/cpio.h>
 #include <def/status.h>
 
+struct cpio_header{
+	char magic[6];  // "070701"
+	char ino[8];
+	char mode[8];
+	char uid[8];
+	char gid[8];
+	char nlink[8];
+	char mtime[8];
+	char filesize[8];
+	char devmajor[8];
+	char devminor[8];
+	char rdevmajor[8];
+	char rdevminor[8];
+	char namesize[8];
+	char check[8];
+} __packed;
+
 static inline uintptr_t align4(uintptr_t p) {
 	uintptr_t v = p;
 	uintptr_t pad = (4 - (v % 4)) % 4;
@@ -12,7 +29,7 @@ static inline int cpio_range_valid(const uint8_t* start, const uint8_t* end, siz
 	return len <= (size_t)(end - start);
 }
 
-uint32_t cpio_parse_field(const char field[8]) {
+static uint32_t cpio_parse_field(const char field[8]) {
 	uint32_t value = 0;
 
 	for(int i = 0; i < 8; i++) {
@@ -31,16 +48,17 @@ uint32_t cpio_parse_field(const char field[8]) {
 	return value;
 }
 
-int cpio_initramfs_iterate(void* initrd_start, size_t size, void** cursor, struct cpio_file_iter* file_buffer){
+int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer){
 	if (!initrd_start || !cursor || !file_buffer)
-		return INVALID_FILE;
+		return INVALID_ARG;
 
 	uintptr_t aligned;
-	uint8_t* cur;
+	const uint8_t* cur;
 
 	uint8_t* start = (uint8_t*)initrd_start;
-	if(size > UINTPTR_MAX - (uintptr_t)start)
-		return INVALID_FILE;
+	if(size > UINTPTR_MAX - (uintptr_t)start){
+		return OVERFLOW;
+	}
 
 	uint8_t* end = start + size;
 
@@ -49,16 +67,19 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, void** cursor, struc
 	else
 		cur = *cursor;
 
-	if (!cpio_range_valid(cur, end, sizeof(struct cpio_header)))
+	if (!cpio_range_valid(cur, end, sizeof(struct cpio_header))){
 		return INVALID_FILE;
+	}
 
 	const struct cpio_header* header = (const struct cpio_header*)cur;
-	if (memcmp(header->magic, "070701", 6) != 0)
-		return INVALID_FILE;
+	if (memcmp(header->magic, "070701", 6) != 0){
+		return INVALID_FORMAT;
+	}
 
 	uint32_t namesize = cpio_parse_field(header->namesize);
-	if (namesize == 0)
+	if (namesize == 0){
 		return INVALID_FILE;
+	}
 
 	uint32_t filesize = cpio_parse_field(header->filesize);
 	uint32_t ino = cpio_parse_field(header->ino);
@@ -75,14 +96,15 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, void** cursor, struc
 
 	cur += sizeof(*header);
 
-	if (!cpio_range_valid(cur, end, namesize))
+	if (!cpio_range_valid(cur, end, namesize)){
 		return INVALID_FILE;
+	}
 
-	if (((char*)cur)[namesize - 1] != '\0')
-		return INVALID_FILE;
+	if (((char*)cur)[namesize - 1] != '\0'){
+		return INVALID_STATE;
+	}
 
-	file_buffer->name.name = (const char*)cur;
-	file_buffer->name.len = namesize - 1;
+	file_buffer->name = (const char*)cur;
 
 	if (
 		namesize == 11 &&
@@ -95,14 +117,15 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, void** cursor, struc
 
 	aligned = align4((uintptr_t)cur);
 	if (aligned > (uintptr_t)end)
-		return INVALID_FILE;
+		return OVERFLOW;
 
 	cur = (uint8_t*)aligned;
 
-	if (!cpio_range_valid(cur, end, filesize))
+	if (!cpio_range_valid(cur, end, filesize)){
 		return INVALID_FILE;
+	}
 
-	file_buffer->content_ptr = (uintptr_t)cur;
+	file_buffer->content_ptr = cur;
 	file_buffer->filesize = filesize;
 	file_buffer->ino = ino;
 	file_buffer->mode = mode;
@@ -119,8 +142,9 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, void** cursor, struc
 	cur += filesize;
 
 	aligned = align4((uintptr_t)cur);
-	if (aligned > (uintptr_t)end)
+	if (aligned > (uintptr_t)end){
 		return INVALID_FILE;
+	}
 
 	cur = (uint8_t*)aligned;
 

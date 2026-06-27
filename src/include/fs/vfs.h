@@ -5,10 +5,16 @@
 #include <lib/list.h>
 #include <mm/kheap.h>
 
-#define FMODE_READ   0x1
-#define FMODE_WRITE  0x2
-#define FMODE_LSEEK  0x4
-#define FMODE_EXEC   0x8
+#define FMODE_READ   (1 << 0)
+#define FMODE_WRITE  (1 << 2)
+#define FMODE_LSEEK  (1 << 3)
+#define FMODE_EXEC   (1 << 4)
+
+#define O_RDONLY    0
+#define O_WRONLY    (1 << 0)
+#define O_CREAT     (1 << 1)
+#define O_TRUNC     (1 << 2)
+#define O_DIRECTORY (1 << 3)
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
@@ -167,7 +173,7 @@ struct inode* vfs_lookup(struct inode *parent, struct qstr *name);
 struct inode* vfs_walk_parent(const char *path, struct qstr *last);
 struct inode* vfs_walk(const char *path);
 
-struct file* vfs_open(const char *restrict path, uint32_t flags);
+struct file* vfs_open(const char *restrict path, int flags, umode_t mode);
 
 int vfs_create(const char *restrict path, uint16_t mode);
 int vfs_unlink(const char *restrict path);

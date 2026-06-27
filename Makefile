@@ -108,6 +108,10 @@ ifdef DEBUG_KERNEL
 KBUILD_CFLAGS += -g
 endif
 
+ifneq ($(INITRAM),)
+    KBUILD_CFLAGS += -DCONFIG_INITRAM=\"$(INITRAM)\"
+endif
+
 KBUILD_CFLAGS += -ffreestanding -nostdlib -nostdinc -nostartfiles -nodefaultlibs
 KBUILD_CFLAGS += -Wno-unused-function -Wno-unused-parameter \
 	-Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
@@ -123,7 +127,7 @@ export KBUILD_CFLAGS KBUILD_ASFLAGS KBUILD_LDFLAGS KINCLUDE
 
 # --------- Rules ---------------
 
-core-y := core/ memory/ block/ drivers/ fs/
+core-y := core/ memory/ block/ drivers/ fs/ usr/
 lib-y := lib/
 arch-y := arch/$(ARCH)/
 

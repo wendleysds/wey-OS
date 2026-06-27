@@ -1,3 +1,10 @@
+#define INIT_RAM_FS        \
+	. = ALIGN(4);          \
+	__initramfs_start = .; \
+	KEEP(*(.init.ramfs))   \
+	. = ALIGN(8);          \
+	KEEP(*(.init.ramfs.info))
+
 #define INIT_TEXT \
 	*(.init.text .init.text.*) \
 	*(.text.startup)
@@ -46,6 +53,7 @@
 	.init.data : AT(ADDR(.init.data) - LOAD_OFFSET) { \
 		INIT_DATA                                     \
 		INIT_CALLS                                    \
+		INIT_RAM_FS                                   \
 	}
 
 #define EXIT_DISCARDS \

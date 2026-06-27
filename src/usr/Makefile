@@ -1,0 +1,1 @@
+obj-y += initramfsc_s.o
