@@ -3,7 +3,7 @@
 #include <kernel/init.h>
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/status.h>
+#include <def/errno.h>
 
 struct device* devices[DEVICES_MAX] = { 0 };
 uint16_t next_id = 1;
@@ -13,7 +13,7 @@ int __must_check device_register(struct device *dev){
     for (int i = 0; i < DEVICES_MAX; i++){
 		if(devices[i]){
 			if(dev->id == devices[i]->id || dev->devt == devices[i]->devt){
-				return INVALID_ARG;
+				return -EINVAL;
 			}
 		}else if(freeIndex == -1){
 			freeIndex = i;
@@ -28,7 +28,7 @@ int __must_check device_register(struct device *dev){
 
     printk("device_register(): device '%s' not registered! max devices reached\n", dev->name);
 
-    return LIST_FULL;
+    return -ENOENT;
 }
 
 void device_unregister(struct device *dev){

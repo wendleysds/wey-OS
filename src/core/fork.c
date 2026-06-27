@@ -1,6 +1,6 @@
 #include <kernel/sched.h>
 #include <kernel/syscall.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <mm/vma.h>
 
 static struct task *copy_process() {
@@ -8,20 +8,20 @@ static struct task *copy_process() {
 
 	struct task *child = task_create(cur->name, cur->priority);
 	if (!child){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	pid_t child_pid = pid_alloc();
 	if(child_pid < 0){
 		kfree(child);
-		return ERR_PTR(LIST_FULL);
+		return ERR_PTR(-ENOENT);
 	}
 
 	void *new_kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
 	if (!new_kstack) {
 		kfree(child);
 		pid_free(child_pid);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	child->kstack = new_kstack;
@@ -32,7 +32,7 @@ static struct task *copy_process() {
 		kfree(new_kstack);
 		kfree(child);
 		pid_free(child_pid);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	child->mm = c_mm;
@@ -54,20 +54,20 @@ static struct task *copy_process() {
 pid_t kernel_thread(int (*fn)(void*), const char* name, void* args){
 	struct task* task = task_create(name, 0);
 	if(!task){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	char* ksp = kmalloc(PROC_KERNEL_STACK_SIZE);
 	if(!ksp){
 		kfree(task);
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	task->pid = pid_alloc();
 	if(task->pid == -1){
 		kfree(ksp);
 		kfree(task);
-		return LIST_FULL;
+		return -ENOENT;
 	}
 
 	task->kstack = ksp;

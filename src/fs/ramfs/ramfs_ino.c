@@ -3,7 +3,7 @@
 #include <lib/string.h>
 #include <lib/list.h>
 #include <sync/spinlock.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <def/config.h>
 #include <mm/page.h>	
 
@@ -86,7 +86,7 @@ static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mo
 	struct inode *existing = ramfs_lookup(dir, name);
 	if(existing){
 		inode_put(existing);
-		return FILE_EXISTS;
+		return -EEXIST;
 	}
 
 	char tmp[name->len + 1];
@@ -95,13 +95,13 @@ static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mo
 
 	char* rino_name = strdup(tmp);
 	if(!rino_name){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	struct inode *inode = inode_new(dir->i_sb);
 	if(!inode){
 		kfree(rino_name);
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	struct ramfs_inode *rino = inode->private_data;
@@ -130,13 +130,13 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 		if(strlen(rino->name) == name->len && strncmp(rino->name, name->name, name->len) == 0){
 			if(rino->isDir && isFile){
 				spin_unlock(&rdir->spinlock);
-				return INVALID_FILE;
+				return -EINVAL;
 			}
 
 			if(rino->isDir){
 				if(!list_empty(&rino->children)){
 					spin_unlock(&rdir->spinlock);
-					return DIR_NOT_EMPTY;
+					return -ENOTEMPTY;
 				}
 			}
 
@@ -149,7 +149,7 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 	}
 
 	spin_unlock(&rdir->spinlock);
-	return FILE_NOT_FOUND;
+	return -ENOENT;
 }
 
 
@@ -209,7 +209,7 @@ static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
 }
 
 static int ramfs_mknod(struct inode *dir, struct qstr *name, uint16_t mode, dev_t dev){
-	return NOT_IMPLEMENTED;
+	return -ENOSYS;
 }
 
 const struct inode_operations ramfs_iops = {

@@ -1,4 +1,4 @@
-#include <def/err.h>
+#include <def/errno.h>
 #include "boot.h"
 
 #define SMAP 0x534d4150 // ASCII "SMAP"

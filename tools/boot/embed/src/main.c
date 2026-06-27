@@ -1,7 +1,7 @@
 #include <utils.h>
 #include <mem.h>
 #include <platform.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <disk.h>
 #include <heap.h>
 #include <loader.h>
@@ -50,7 +50,7 @@ void _die(){
 
 void main(){
 	int status = platform_init();
-	if (IS_STAT_ERR(status)){
+	if (IS_ERR_VALUE(status)){
 		printf("Failer to init platform! %d\n", status);
 		_die();
 	}
@@ -65,7 +65,7 @@ void main(){
 	uint32_t counter = 0;
 	status = platform_get_memory_map(entries, ARRAY_SIZE(entries), &counter);
 
-	if (IS_STAT_ERR(status)){
+	if (IS_ERR_VALUE(status)){
 		printf("Failed to get memory map! %d\n", status);
 		_die();
 	}
@@ -86,13 +86,13 @@ void main(){
 
 	status = platform_disk_init();
 	
-	if(IS_STAT_ERR(status)){
+	if(IS_ERR_VALUE(status)){
 		printf("Failed to init disk! %d\n", status);
 		_die();
 	}
 
 	status = disk_parse_partitions(main_disk);
-	if(IS_STAT_ERR(status)){
+	if(IS_ERR_VALUE(status)){
 		printf("Failed to parse disk partitions! %d\n", status);
 		_die();
 	}
@@ -134,7 +134,7 @@ found:
 	/*
 	Config file format ex:
 
-	TIMEOUT 30 # time to select entry
+	-ETIME 30 # time to select entry
 
 	DEFAULT WeyOs # default boot entry after timeout
 
@@ -168,7 +168,7 @@ found:
 
 	// Read the whole file to memory
 	uint32_t readed = config_file->ops->read(config_file, buffer, buffer_size);
-	if(IS_STAT_ERR(readed)){
+	if(IS_ERR_VALUE(readed)){
 		printf("Error reading cfg file! %d", readed);
 		_die();
 	}
@@ -215,8 +215,8 @@ found:
 
 process_line:
 
-		// TIMEOUT
-		if(strncmp(line, "TIMEOUT", 7) == 0){
+		// -ETIME
+		if(strncmp(line, "-ETIME", 7) == 0){
 			char* val = line + 7;
 			while(IS_BLANK(*val)) val++;
 			config.timeoutSecs = atoi(val);
@@ -434,7 +434,7 @@ process_line:
 	struct load_info_struct load_info;
 
 	status = weyos_loader(cur, fat, &load_info);
-	if(!IS_STAT_ERR(status)) goto ok;
+	if(!IS_ERR_VALUE(status)) goto ok;
 
 	printf("Failed to load! %d\n", status);
 	_die();

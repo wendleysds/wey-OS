@@ -1,17 +1,17 @@
 #include <lib/string.h>
 #include <fs/stat.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #include "vfat_fs_internal.h"
 
 static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
     if(dirCluster < 2){
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct Stream* stream = stream_new(fat->bdev);
 	if(!stream){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
     int count = 0;
@@ -24,7 +24,7 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
             struct FATLegacyEntry buffer;
             if (stream_read(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
-                return ERROR_IO;
+                return -EIO;
             }
 
             if (buffer.name[0] == 0x0) {
@@ -53,19 +53,19 @@ static inline int _fat_count_entries(struct FAT* fat, uint32_t dirCluster){
 
 struct inode* fat_lookup(struct inode *dir, const char *name){
     if(!dir || !name){
-        return ERR_PTR(INVALID_ARG);
+        return ERR_PTR(-EINVAL);
     }
 
     struct FATFileDescriptor* dirfd = (struct FATFileDescriptor*)dir->private_data;
 
     if(!(dirfd->entry.attr & ATTR_DIRECTORY)){
-        return ERR_PTR(INVALID_FILE);
+        return ERR_PTR(-EINVAL);
     }
 
     struct FAT* fat = dirfd->fat;
     struct Stream* stream = stream_new(fat->bdev);
 	if(!stream){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
     uint32_t cluster = dirfd->firstCluster; 
@@ -84,12 +84,12 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
         for (uint32_t i = 0; i < (fat->clusterSize / sizeof(entry)); ++i) {
             if (stream_read(stream, &entry, sizeof(entry)) < 0) {
 				stream_dispose(stream);
-                return ERR_PTR(ERROR_IO);
+                return ERR_PTR(-EIO);
             }
 
             if (entry.name[0] == 0x0) {
 				stream_dispose(stream);
-                return ERR_PTR(FILE_NOT_FOUND);
+                return ERR_PTR(-ENOENT);
             }
 
             if (entry.name[0] == 0xE5) {
@@ -103,14 +103,14 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
 			struct inode* inode = inode_new(dir->i_sb);
 			if(!inode){
 				stream_dispose(stream);
-				return ERR_PTR(NO_MEMORY);
+				return ERR_PTR(-ENOMEM);
 			}
 
             struct FATFileDescriptor* newfd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
             if(!newfd){
                 inode_destroy(inode);
 				stream_dispose(stream);
-                return ERR_PTR(NO_MEMORY);
+                return ERR_PTR(-ENOMEM);
             }
 
             newfd->fat = fat;
@@ -140,19 +140,19 @@ struct inode* fat_lookup(struct inode *dir, const char *name){
     }
 
 	stream_dispose(stream);
-    return ERR_PTR(FILE_NOT_FOUND);
+    return ERR_PTR(-ENOENT);
 }
 
 int fat_mkdir(struct inode *dir, const char *name) {
     if (!dir || !name) {
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct FATFileDescriptor* fd = (struct FATFileDescriptor*)dir->private_data;
     struct FAT* fat = fd->fat;
 
     if (!(fd->entry.attr & ATTR_DIRECTORY)) {
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     return _fat_create(fat, name, fd->firstCluster, ATTR_DIRECTORY);
@@ -160,14 +160,14 @@ int fat_mkdir(struct inode *dir, const char *name) {
 
 int fat_rmdir(struct inode *dir, const char* name){
     if(!dir){
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct FATFileDescriptor* dfd = (struct FATFileDescriptor*)dir->private_data;
     struct FAT* fat = dfd->fat;
 
     if (!(dfd->entry.attr & ATTR_DIRECTORY)) {
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct inode* tinode = fat_lookup(dir, name);
@@ -179,12 +179,12 @@ int fat_rmdir(struct inode *dir, const char* name){
     int itensCount = _fat_count_entries(fat, tfd->firstCluster);
     inode_put(tinode);
 
-    if(IS_STAT_ERR(itensCount)){
+    if(IS_ERR_VALUE(itensCount)){
         return itensCount;
     }
 
     if((itensCount - 2) > 0){
-        return DIR_NOT_EMPTY;
+        return -ENOTEMPTY;
     }
 
     return _fat_remove(fat, name, dfd->firstCluster);

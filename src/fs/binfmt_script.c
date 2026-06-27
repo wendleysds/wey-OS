@@ -1,9 +1,9 @@
 #include <exec/binfmts.h>
-#include <def/status.h>
+#include <def/errno.h>
 #include <kernel/init.h>
 
 static int load_script(struct binprm *bprm){
-    return NOT_IMPLEMENTED;
+    return -ENOSYS;
 }
 
 static struct binfmt script_format = {

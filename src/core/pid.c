@@ -1,7 +1,7 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <sync/spinlock.h>
-#include <def/status.h>
+#include <def/errno.h>
 
 #define PID_FREE 0
 #define PID_ALLOC 1
@@ -26,7 +26,7 @@ pid_t pid_alloc(){
 	} while(i != start);
 
 	spin_unlock(&pid_spinlock);
-	return LIST_FULL;
+	return -ENOENT;
 }
 
 void pid_free(pid_t pid){
@@ -58,7 +58,7 @@ SYSCALL_DEFINE3(waitpid, pid_t, pid, int*, wstatus, int, options){
 		if(pid > 0){
 			child = task_get_child(current, pid);
 			if(!child){
-				return NOT_FOUND;
+				return -ENOENT;
 			}
 		}else{
 			child = task_find_zombie_child(current);

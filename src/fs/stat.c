@@ -1,11 +1,11 @@
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
     if(!path || !statbuf){
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct inode *ino = vfs_walk(path);
@@ -16,7 +16,7 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf){
     int res;
 
     if(!ino->i_op || !ino->i_op->getattr){
-        res = NOT_SUPPORTED;
+        res = -ENOSYS;
         goto out;
     }
 

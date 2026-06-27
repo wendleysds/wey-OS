@@ -5,7 +5,7 @@
 #include <mm/memory.h>
 #include <mm/memblock.h>
 #include <kernel/init.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <def/config.h>
 #include <lib/string.h>
 
@@ -86,7 +86,7 @@ static __init int vmemmap_sections_init(void){
 	);
 
 	if(!sections){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	sections = (void*)__va(sections);
@@ -123,7 +123,7 @@ static __init int vmemmap_populate(void) {
 			size_t sec = pfn_to_section_nr(pfn);
 			if(sec >= max_sections) {
 				printk("VMEMMAP: section %lu out of range (max %lu)\n", sec, max_sections);
-				return OUT_OF_BOUNDS;
+				return -ERANGE;
 			}
 
 			struct page *pages = sections[sec];
@@ -137,7 +137,7 @@ static __init int vmemmap_populate(void) {
 
 				uintptr_t phys_meta = (uintptr_t)memblock_alloc(map_size, PAGE_SIZE);
 				if (!phys_meta)
-					return NO_MEMORY;
+					return -ENOMEM;
 
 				uintptr_t vaddr_base =
 					KERNEL_VMEMMAP_START +
@@ -151,7 +151,7 @@ static __init int vmemmap_populate(void) {
 						phys_meta + off,
 						(MEM_READ | MEM_WRITE)
 					)) {
-						return FAILED;
+						return -ENOMEM;
 					}
 				}
 

@@ -1,4 +1,4 @@
-#include <def/status.h>
+#include <def/errno.h>
 
 #include "vfat_fs_internal.h"
 
@@ -155,12 +155,12 @@ void fat_free_chain(struct FAT* fat, uint32_t startCluster){
 
 off_t fat_get_entry_offset(struct FAT* fat, uint32_t dirCluster, struct FATLegacyEntry* entry){
     if(!entry || dirCluster < 2){
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     struct Stream* stream = stream_new(fat->bdev);
 	if(!stream){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
     uint32_t cluster = dirCluster;
@@ -172,12 +172,12 @@ off_t fat_get_entry_offset(struct FAT* fat, uint32_t dirCluster, struct FATLegac
             struct FATLegacyEntry buffer;
             if (stream_read(stream, &buffer, sizeof(buffer)) < 0) {
 				stream_dispose(stream);
-                return ERROR_IO;
+                return -EIO;
             }
 
             if (buffer.name[0] == 0x0) {
 				stream_dispose(stream);
-                return FILE_NOT_FOUND;
+                return -ENOENT;
             }
 
             if (buffer.name[0] == 0xE5) {
@@ -194,5 +194,5 @@ off_t fat_get_entry_offset(struct FAT* fat, uint32_t dirCluster, struct FATLegac
     }
 
 	stream_dispose(stream);
-    return FILE_NOT_FOUND;
+    return -ENOENT;
 }

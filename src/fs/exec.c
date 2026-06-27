@@ -2,7 +2,7 @@
 #include <kernel/sched.h>
 #include <lib/assert.h>
 #include <lib/string.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <mm/vma.h>
 
 static LIST_HEAD(formats);
@@ -27,12 +27,12 @@ static inline void* _pop(void** stack, unsigned long size) {
 }
 
 static int _copy_char_arr(void** stack, const char** arr) {
-    if (!arr || !stack) return INVALID_ARG;
+    if (!arr || !stack) return -EINVAL;
 
     unsigned int count = 0;
     while (arr[count]) {
         if (++count >= PROC_ARG_MAX)
-            return OVERFLOW;
+            return -ERANGE;
     }
 
     *stack -= sizeof(uintptr_t) * (count + 1);
@@ -57,13 +57,13 @@ static struct binprm* bprm_alloc(const char* filename){
 	int res = -1;
 
 	if(!bprm){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	struct mm_struct* mm = vma_alloc();
 	if(!mm){
 		kfree(bprm);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	struct file* file = vfs_open(filename, O_RDONLY, 0x0);
@@ -76,7 +76,7 @@ static struct binprm* bprm_alloc(const char* filename){
 	if(!ctx){
 		vma_destroy(mm);
 		vfs_close(file);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	mm->ctx = ctx;
@@ -170,7 +170,7 @@ static int load_binprm(struct binprm* bprm){
 		}
 	}
 
-	return INVALID_FORMAT;
+	return -EINVAL;
 }
 
 int kernel_exec(const char* pathname, const char* argv[], const char* envp[]){

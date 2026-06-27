@@ -1,16 +1,16 @@
-#include <def/err.h>
+#include <def/errno.h>
 #include <disk.h>
 #include <utils.h>
 #include <heap.h>
 #include <string.h>
 
 static struct GPTPartitionEntry* gpt_parse_partitions(struct disk* disk, uint8_t* partitionCount){
-	return ERR_PTR(NOT_SUPPORTED);
+	return ERR_PTR(-ENOSYS);
 }
 
 int disk_parse_partitions(struct disk* disk){
 	uint8_t sec0[0x200];
-	if(!IS_STAT_ERR(disk->ops->read(disk, 0, sec0, 1))){
+	if(!IS_ERR_VALUE(disk->ops->read(disk, 0, sec0, 1))){
 		struct MBRPartitionEntry* mbr = (struct MBRPartitionEntry*)(sec0 + 0x1BE);
 
 		uint8_t isMBR = mbr->type != 0xEE;
@@ -21,7 +21,7 @@ int disk_parse_partitions(struct disk* disk){
 		if(isMBR){
 			struct MBRPartitionEntry* partitions = (struct MBRPartitionEntry*)malloc(4 * sizeof(struct MBRPartitionEntry));
 			if(!partitions){
-				return NO_MEMORY;
+				return -ENOMEM;
 			}
 
 			memcpy(partitions, mbr, 4 * sizeof(struct MBRPartitionEntry));
@@ -42,5 +42,5 @@ int disk_parse_partitions(struct disk* disk){
 		return SUCCESS;
 	}
 
-	return READ_FAIL;
+	return -EIO;
 }

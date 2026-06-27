@@ -2,7 +2,7 @@
 #include <kernel/printk.h>
 #include <device/ata.h>
 #include <lib/stdio.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 #include "ata_internal.h"
@@ -58,7 +58,7 @@ static void ata_identify_parser(struct ATADeviceInfo* ata_info, uint16_t* buffer
 
 static int ata_open(struct blkdev *bdev, int mode){
 	if(!bdev){
-		return NULL_PTR;
+		return -EINVAL;
 	}
 	
 	return SUCCESS;
@@ -85,11 +85,11 @@ static int ata_submit_rq(struct blkdev *bdev, struct request *req){
 	struct ATADevice* atadev = bdev->disk->private;
 
 	if(bdev->major != 3){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	if(!ata_device(atadev)){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	uint8_t cmd;
@@ -100,7 +100,7 @@ static int ata_submit_rq(struct blkdev *bdev, struct request *req){
 		case BLK_WRITE: 
 			cmd = atadev->info.supports_lba48 ? ATA_CMD_WRITE_PIO_EXT : ATA_CMD_WRITE_PIO;
 			break;
-		default: return NOT_SUPPORTED;
+		default: return -ENOTSUP;
 	}
 
 	return ata_pio(
@@ -120,7 +120,7 @@ static const struct block_device_ops ata_ops = {
 static int ata_register_device(struct ATADevice *atadev, char channel){
 	struct gendisk *disk = gendisk_alloc();
 	if (!disk)
-		return NO_MEMORY;
+		return -ENOMEM;
 
 	int idx = channel * 2 + atadev->drive;
 
@@ -184,7 +184,7 @@ static void ata_probe_all() {
 				printk("ATA: probe_all: found \"%s\"\n", atadev->info.model);
 
 				res = ata_register_device(atadev, channel);
-				if(IS_STAT_ERR(res)){
+				if(IS_ERR_VALUE(res)){
 					continue;
 				}
 

@@ -1,6 +1,6 @@
 #include <lib/string.h>
 #include <lib/cpio.h>
-#include <def/status.h>
+#include <def/errno.h>
 
 struct cpio_header{
 	char magic[6];  // "070701"
@@ -50,14 +50,14 @@ static uint32_t cpio_parse_field(const char field[8]) {
 
 int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer){
 	if (!initrd_start || !cursor || !file_buffer)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	uintptr_t aligned;
 	const uint8_t* cur;
 
 	uint8_t* start = (uint8_t*)initrd_start;
 	if(size > UINTPTR_MAX - (uintptr_t)start){
-		return OVERFLOW;
+		return -ERANGE;
 	}
 
 	uint8_t* end = start + size;
@@ -68,17 +68,17 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** curs
 		cur = *cursor;
 
 	if (!cpio_range_valid(cur, end, sizeof(struct cpio_header))){
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 
 	const struct cpio_header* header = (const struct cpio_header*)cur;
 	if (memcmp(header->magic, "070701", 6) != 0){
-		return INVALID_FORMAT;
+		return -EINVAL;
 	}
 
 	uint32_t namesize = cpio_parse_field(header->namesize);
 	if (namesize == 0){
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 
 	uint32_t filesize = cpio_parse_field(header->filesize);
@@ -97,11 +97,11 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** curs
 	cur += sizeof(*header);
 
 	if (!cpio_range_valid(cur, end, namesize)){
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 
 	if (((char*)cur)[namesize - 1] != '\0'){
-		return INVALID_STATE;
+		return -EINVAL;
 	}
 
 	file_buffer->name = (const char*)cur;
@@ -110,19 +110,19 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** curs
 		namesize == 11 &&
 		memcmp(cur, "TRAILER!!!", 11) == 0
 	) {
-		return END_OF_FILE;
+		return 0;
 	}
 
 	cur += namesize;
 
 	aligned = align4((uintptr_t)cur);
 	if (aligned > (uintptr_t)end)
-		return OVERFLOW;
+		return -ERANGE;
 
 	cur = (uint8_t*)aligned;
 
 	if (!cpio_range_valid(cur, end, filesize)){
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 
 	file_buffer->content_ptr = cur;
@@ -143,11 +143,11 @@ int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** curs
 
 	aligned = align4((uintptr_t)cur);
 	if (aligned > (uintptr_t)end){
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 
 	cur = (uint8_t*)aligned;
 
 	*cursor = cur;
-	return OK;
+	return 1;
 }

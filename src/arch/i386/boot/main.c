@@ -1,5 +1,5 @@
 #include <def/compile.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <io/ports.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>
@@ -94,7 +94,7 @@ void main(){
 
 	build_boot_header(&boot_header, tags, ARRAY_SIZE(tags));
 
-	if(IS_STAT_ERR(enable_a20())){
+	if(IS_ERR_VALUE(enable_a20())){
 		printf("Failed to enable A20 line!\n");
 		while(1) asm volatile ("hlt");
 	}

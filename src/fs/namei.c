@@ -1,12 +1,12 @@
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 extern struct mount *root_mount;
 
 int vfs_create(const char *restrict path, uint16_t mode){
-	if(!root_mount) return INVALID_STATE;
+	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
 	struct inode* parent = vfs_walk_parent(path, &name);
@@ -21,7 +21,7 @@ int vfs_create(const char *restrict path, uint16_t mode){
 }
 
 int vfs_unlink(const char *restrict path){
-	if(!root_mount) return INVALID_STATE;
+	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
 	struct inode* parent = vfs_walk_parent(path, &name);
@@ -36,7 +36,7 @@ int vfs_unlink(const char *restrict path){
 }
 
 int vfs_mkdir(const char *restrict path){
-	if(!root_mount) return INVALID_STATE;
+	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
 	struct inode* parent = vfs_walk_parent(path, &name);
@@ -51,7 +51,7 @@ int vfs_mkdir(const char *restrict path){
 }
 
 int vfs_rmdir(const char *restrict path){
-	if(!root_mount) return INVALID_STATE;
+	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
 	struct inode* parent = vfs_walk_parent(path, &name);

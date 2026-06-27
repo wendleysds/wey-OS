@@ -3,7 +3,7 @@
 #include <kernel/init.h>
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 static struct blk_major_name{
@@ -30,7 +30,7 @@ static int find_free_major(){
 
 int blkdev_register(unsigned int major, const char* name){
 	if (major >= MAJOR_MAX) {
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	int ret = SUCCESS;
@@ -39,7 +39,7 @@ int blkdev_register(unsigned int major, const char* name){
 	if(major == 0){
 		major = find_free_major();
 		if(major == 0){
-			return LIST_FULL;
+			return -ENOENT;
 		}
 
 		ret = major;
@@ -47,7 +47,7 @@ int blkdev_register(unsigned int major, const char* name){
 
 	entry = kmalloc(sizeof(struct blk_major_name));
 	if(!entry){
-		ret = NO_MEMORY;
+		ret = -ENOMEM;
 		goto out;
 	}
 
@@ -65,7 +65,7 @@ int blkdev_register(unsigned int major, const char* name){
 		goto out;
 	}
 		
-	ret = LIST_FULL;
+	ret = -ENOENT;
 	kfree(entry);
 
 out:
@@ -98,28 +98,28 @@ void blkdev_unregister(unsigned int major, const char *name){
 
 int add_disk(struct gendisk* disk){
 	if (!disk)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	if (disk->major >= MAJOR_MAX)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	if (!major_names[major_to_index(disk->major)])
-		return INVALID_ARG;
+		return -EINVAL;
 
 	if (disk->minors_total <= 0)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	INIT_LIST_HEAD(&disk->blkdevs);
 	INIT_LIST_HEAD(&disk->list);
 
 	struct blkdev *bdev = kmalloc(sizeof(struct blkdev));
 	if (!bdev)
-		return NO_MEMORY;
+		return -ENOMEM;
 
 	struct request_queue *queue = kmalloc(sizeof(struct request_queue));
 	if (!queue) {
 		kfree(bdev);
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	queue->head = queue->tail = NULL;
@@ -143,7 +143,7 @@ int add_disk(struct gendisk* disk){
 		disk->name, disk->major, disk->first_minor);
 
 	int res = blk_scan_partitions(disk);
-	if (IS_ERR_VALUE(res) && res != NOT_FOUND) {
+	if (IS_ERR_VALUE(res) && res != -ENOENT) {
 		printk("BLK-core: failed to read \"%s\" partitions %d\n",
 				disk->name, res);
 	}
@@ -160,11 +160,11 @@ void remove_disk(struct gendisk* disk){
 }
 
 static int blkdev_open(struct inode *ino, struct file *file){
-	return NOT_IMPLEMENTED;
+	return -ENOSYS;
 }
 
 struct blkdev* blk_find_by_name(const char* name){
-	return ERR_PTR(NOT_IMPLEMENTED);
+	return ERR_PTR(-ENOSYS);
 }
 
 struct blkdev* blk_lookup(unsigned int major, unsigned int minor){

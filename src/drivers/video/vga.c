@@ -2,7 +2,7 @@
 #include <kernel/init.h>
 #include <uapi/headers.h>
 #include <device/vga.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <lib/string.h>
 
 #include <asm/page.h>
@@ -23,16 +23,16 @@ static uint8_t vga_support_color = 0;
 
 int __init vga_setup(struct video_info* video_info){
 	if (!video_info)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	if (video_info->width == 0 || video_info->height == 0)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	// VGA16 modes not supported
 	if (video_info->mode == 0x0D || video_info->mode == 0x0E ||
 		video_info->mode == 0x10 || video_info->mode == 0x12 ||
 		video_info->mode == 0x6A)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	vga_num_lines = video_info->height;
 	vga_num_columns =video_info->width;

@@ -1,7 +1,7 @@
 #include <kernel/sched.h>
 #include <kernel/interrupt.h>
 #include <device/ata.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #include "ata_internal.h"
 
@@ -45,7 +45,7 @@ static int8_t ata_polling(struct ATADevice* atadev){
 		if (status & ATA_SR_DRQ) return OK;
 	}
 
-	return TIMEOUT;
+	return -ETIME;
 }
 
 void ata_register_irq(char channel){

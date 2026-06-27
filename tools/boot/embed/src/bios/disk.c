@@ -1,4 +1,4 @@
-#include <def/err.h>
+#include <def/errno.h>
 #include <platform.h>
 #include <string.h>
 #include <stddef.h>
@@ -32,7 +32,7 @@ static int _disk_read_chs(struct disk* disk, uint64_t lba, void* buffer, uint16_
 	struct bios_disk_data* bdsk_data = (struct bios_disk_data*)disk->private;
 
 	if (lba > 0xFFFFFFFFULL || seccount > 255) {
-        return OUT_OF_BOUNDS;
+        return -ERANGE;
     }
 
 	uint32_t lba32 = (uint32_t)lba;
@@ -55,7 +55,7 @@ static int _disk_read_chs(struct disk* disk, uint64_t lba, void* buffer, uint16_
 	intcall(0x13, &ireg, &oreg);
 
 	if(oreg.eflags & X86_EFLAGS_CF){
-		return READ_FAIL;
+		return -EIO;
 	}
 
 	return SUCCESS;
@@ -82,14 +82,14 @@ static int _disk_read_dap(struct disk* disk, uint64_t lba, void* buffer, uint16_
 	intcall(0x13, &ireg, &oreg);
 
 	if(oreg.eflags & X86_EFLAGS_CF){
-		return READ_FAIL;
+		return -EIO;
 	}
 
 	return SUCCESS;
 }
 
 static int _nop(struct disk* disk, uint64_t lba, const void* buffer, uint16_t seccount){
-	return NOT_SUPPORTED;
+	return -ENOSYS;
 }
 
 int platform_disk_init(){
@@ -111,7 +111,7 @@ int platform_disk_init(){
 	intcall(0x13, &ireg, &oreg);
 
 	if(oreg.eflags & X86_EFLAGS_CF){
-		return DISK_NOT_READY;
+		return -EBUSY;
 	}
 
 	struct bios_disk_data* bdsk_data = (struct bios_disk_data*)malloc(sizeof(struct bios_disk_data));

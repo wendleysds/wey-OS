@@ -3,7 +3,7 @@
 #include <kernel/printk.h>
 #include <mm/page.h>
 #include <mm/vma.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <lib/string.h>
 #include <asm/idt.h>
 
@@ -76,7 +76,7 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr){
 	off_t file_offset = region->file_offset + region_offset;
 
 	struct page* page = page_alloc(0, 0x0);
-	if (!page) return NO_MEMORY;
+	if (!page) return -ENOMEM;
 
 	void* kernel_virt = (void*)page_to_virt(page);
 	memset(kernel_virt, 0x0, PAGE_SIZE);
@@ -112,7 +112,7 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr){
 static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
 	struct page* page = page_alloc(1, 0x0);
-	if (!page) return NO_MEMORY;
+	if (!page) return -ENOMEM;
 
 	void* kernel_virt = (void*)page_to_virt(page);
 	memset(kernel_virt, 0x0, PAGE_SIZE);
@@ -138,7 +138,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
 
 	if (page_addr < region->start || page_addr >= region->end){
-		return ACCESS_DENIED;
+		return -EFAULT;
 	}
 
 	uintptr_t phys = mmu_translate(
@@ -147,7 +147,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	);
 
 	struct page* page = phys_to_page(phys);
-	if (!page) return NOT_FOUND;
+	if (!page) return -ENOENT;
 
 	if(atomic_read(&page->refcount) == 1){
 		mmu_set_flags(
@@ -161,7 +161,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	}
 
 	struct page* new_page = page_alloc(1, 0x0);
-	if (!new_page) return NO_MEMORY;
+	if (!new_page) return -ENOMEM;
 
 	memcpy(
 		(void*)page_to_virt(new_page),

@@ -3,7 +3,7 @@
 #include <kernel/printk.h>
 #include <mm/kheap.h>
 #include <asm/idt.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <lib/string.h>
 #include <arch/i386/pic.h>
 
@@ -72,12 +72,12 @@ void interrupts_disable(){
 
 int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev){
 	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 	
 	struct irq_handler_node* node = kmalloc(sizeof(struct irq_handler_node));
 	if(!node){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
     node->handler = handler;
@@ -91,7 +91,7 @@ int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev){
 
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
 	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct irq_handler_node *cur, *prev = NULL;
@@ -113,7 +113,7 @@ int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
 		cur = cur->next;
 	}
 
-	return NOT_FOUND;
+	return -ENOENT;
 }
 
 static int irq_id_to_int_no(irq_id_t irq){
@@ -130,7 +130,7 @@ static int irq_id_to_int_no(irq_id_t irq){
 int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev){
 	int int_no = irq_id_to_int_no(irq);
 	if(int_no == IRQ_NOT_MAPPED){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	return interrupt_register(int_no, handler, dev);
@@ -139,7 +139,7 @@ int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev){
 int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev){
 	int int_no = irq_id_to_int_no(irq);
 	if(int_no == IRQ_NOT_MAPPED){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	return interrupt_unregister(int_no, handler, dev);

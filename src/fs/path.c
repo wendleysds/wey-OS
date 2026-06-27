@@ -1,6 +1,6 @@
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 extern struct mount *root_mount;
@@ -29,11 +29,11 @@ int path_iterate(const char** cursor, struct qstr* comp){
 
 int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
 	if (!parent->i_op || !parent->i_op->lookup)
-		return NOT_SUPPORTED;
+		return -ENOSYS;
 
 	struct inode *child = parent->i_op->lookup(parent, name);
 	if (IS_ERR_OR_NULL(child))
-		return child ? PTR_ERR(child) : NO_ENTRY;
+		return child ? PTR_ERR(child) : -ENOENT;
 
 	res->dentry = child;
 	res->mount = NULL;
@@ -48,7 +48,7 @@ int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
 }
 
 int vfs_walk_path(const char *path, struct path *res) {
-	if (!root_mount) return INVALID_STATE;
+	if (!root_mount) return -EINVAL;
 
 	struct mount *curr_mnt = root_mount;
 	struct inode *curr_ino = root_mount->mnt_root;
@@ -87,7 +87,7 @@ int vfs_walk_path(const char *path, struct path *res) {
 }
 
 struct inode* vfs_walk_parent(const char *path, struct qstr *last){
-	if(!root_mount) return ERR_PTR(INVALID_STATE);
+	if(!root_mount) return ERR_PTR(-EINVAL);
 
 	struct inode *cur = root_mount->mnt_root;
 	inode_get(cur);
@@ -123,11 +123,11 @@ struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 	}
 
 	inode_put(cur);
-	return ERR_PTR(INVALID_ARG);
+	return ERR_PTR(-EINVAL);
 }
 
 struct inode* vfs_walk(const char *path){
-	if(!root_mount) return ERR_PTR(INVALID_STATE);
+	if(!root_mount) return ERR_PTR(-EINVAL);
 
 	struct path p;
 

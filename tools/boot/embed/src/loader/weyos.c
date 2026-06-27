@@ -1,7 +1,7 @@
 #include <platform.h>
 #include <file.h>
 #include <utils.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <headers.h>
 #include <string.h>
 #include <loader.h>
@@ -26,12 +26,12 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 
 	if((setup_header.syssize * 16) < kernel_size){
 		printf("Kernel size is larger than syssize!\n");
-		return FILE_TOO_LARGE;
+		return -EFBIG;
 	}
 
 	if(setup_header.boot_sig != 0xAA55){
 		printf("Invalid signature! %x\n", setup_header.boot_sig );
-		return INVALID_FILE;
+		return -EINVAL;
 	}
 	
 	char buffer[4096];
@@ -48,8 +48,8 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 		(64 - (setup_header.setup_sectors  + 1)) * 512
 	);
 
-	while((bytes_readed = file->ops->read(file, buffer, sizeof(buffer))) != END_OF_FILE){
-		if(IS_STAT_ERR(bytes_readed)){
+	while((bytes_readed = file->ops->read(file, buffer, sizeof(buffer))) > 0){
+		if(IS_ERR_VALUE(bytes_readed)){
 			return bytes_readed;
 		}
 
@@ -66,8 +66,8 @@ int weyos_loader(entry_t* entry, fat_info_t* fat, struct load_info_struct* info_
 
 	bytes_readed = 0;
 	load_address = setup_header.pref_address;
-	while((bytes_readed = file->ops->read(file, buffer, sizeof(buffer))) != END_OF_FILE){
-		if(IS_STAT_ERR(bytes_readed)){
+	while((bytes_readed = file->ops->read(file, buffer, sizeof(buffer))) > 0){
+		if(IS_ERR_VALUE(bytes_readed)){
 			return bytes_readed;
 		}
 

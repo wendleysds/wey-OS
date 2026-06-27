@@ -2,32 +2,32 @@
 #include <exec/binfmts.h>
 #include <exec/elf.h>
 #include <mm/vma.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <lib/string.h>
 
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
 	if (!ehdr) {
-		return NULL_PTR;
+		return -EINVAL;
 	}
 
 	if(memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
-		return INVALID_FORMAT; // Not an ELF file
+		return -EINVAL; // Not an ELF file
 	}
 
 	if (ehdr->e_ident[EI_CLASS] != ELFCLASS32 || ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
-		return NOT_SUPPORTED; // Only 32-bit ELF files are supported
+		return -ENOTSUP; // Only 32-bit ELF files are supported
 	}
 
 	if (ehdr->e_machine != EM_386) {
-		return NOT_SUPPORTED; // Only x86 architecture is supported
+		return -ENOTSUP; // Only x86 architecture is supported
 	}
 
 	if (ehdr->e_type != ET_EXEC) {
-		return INVALID_ARG; // Not an executable ELF file
+		return -EINVAL; // Not an executable ELF file
 	}
 
 	if (ehdr->e_version != EV_CURRENT || ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
-		return NOT_SUPPORTED; // Unsupported ELF version
+		return -ENOTSUP; // Unsupported ELF version
 	}
 
 	return OK;
@@ -35,7 +35,7 @@ static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
 
 static int load_elf_binarie(struct binprm *bprm){
 	if(!bprm->file || !bprm->filename){
-		return NULL_PTR;
+		return -EINVAL;
 	}
 
 	int res = SUCCESS;
@@ -43,7 +43,7 @@ static int load_elf_binarie(struct binprm *bprm){
 	vfs_lseek(bprm->file, 0, SEEK_SET);
 	res = vfs_read(bprm->file, bprm->buff, sizeof(bprm->buff));
 
-	if(IS_STAT_ERR(res)){
+	if(IS_ERR_VALUE(res)){
 		return res;
 	}
 

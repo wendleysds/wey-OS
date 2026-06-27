@@ -1,5 +1,5 @@
 #include <mm/vma.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <def/config.h>
 
 #include <asm/paging.h>
@@ -28,11 +28,11 @@ struct vm_region* vma_add(
 	off_t file_offset
 ){
 	if (!mm){
-		return ERR_PTR(NULL_PTR);
+		return ERR_PTR(-EINVAL);
 	}
 
 	if (start >= end){
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	uintptr_t aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
@@ -52,7 +52,7 @@ struct vm_region* vma_add(
 	while (curr && curr->start < aligned_end) {
 		if (aligned_start < curr->end && aligned_end > curr->start) {
 			spin_unlock(&mm->spinlock);
-			return ERR_PTR(INVALID_ARG);
+			return ERR_PTR(-EINVAL);
 		}
 
 		prev = curr;
@@ -63,7 +63,7 @@ struct vm_region* vma_add(
 
 	struct vm_region* new_region = kzalloc(sizeof(struct vm_region));
 	if (!new_region){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	new_region->start = aligned_start;
@@ -137,7 +137,7 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
 
 	spin_unlock(&mm->spinlock);
 
-	return NOT_FOUND;
+	return -ENOENT;
 }
 
 void vma_clean(struct mm_struct* mm){

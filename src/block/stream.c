@@ -4,7 +4,7 @@
 #include <lib/div64.h>
 #include <mm/kheap.h>
 #include <fs/vfs.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
@@ -92,7 +92,7 @@ struct Stream* stream_dup(struct Stream* stream){
 
 int stream_read(struct Stream *stream, void *buffer, int total){
 	if(!stream || !buffer || total <= 0){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 
@@ -153,7 +153,7 @@ int stream_read(struct Stream *stream, void *buffer, int total){
 
 int stream_write(struct Stream *stream, const void *buffer, int total){
 	if(!stream || !buffer || total <= 0){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	int totalRemaining = total;
@@ -211,7 +211,7 @@ int stream_write(struct Stream *stream, const void *buffer, int total){
 
 off_t stream_seek(struct Stream *stream, off_t offset, uint8_t whence){
 	if(!stream){
-		return NULL_PTR;
+		return -EINVAL;
 	}
 
 	uint64_t size = (
@@ -230,11 +230,11 @@ off_t stream_seek(struct Stream *stream, off_t offset, uint8_t whence){
 		case SEEK_END:
 			target = size = offset;
 			break;
-		default: return INVALID_ARG;
+		default: return -EINVAL;
 	}
 
 	if(target > size){
-		return OVERFLOW;
+		return -ERANGE;
 	}
 
 	stream->pos = target;
@@ -242,7 +242,7 @@ off_t stream_seek(struct Stream *stream, off_t offset, uint8_t whence){
 }
 
 int stream_dispose(struct Stream *ptr){
-	if(!ptr) return INVALID_ARG;
+	if(!ptr) return -EINVAL;
 
 	int res = stream_flush(ptr);
 	if(IS_ERR_VALUE(res)){

@@ -1,7 +1,7 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <asm/idt.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #define ARG(x) long arg##x
 
@@ -17,7 +17,7 @@ extern void kernel_registers();
 extern void user_registers();
 
 static long _invsys(long a, ...){
-	return NO_ENTRY;
+	return -ENOENT;
 }
 
 static inline sys_fn_t syscall(long no){

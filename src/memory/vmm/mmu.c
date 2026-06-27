@@ -5,7 +5,7 @@
 #include <mm/memblock.h>
 #include <mm/page.h>
 #include <mm/kheap.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <kernel/init.h>
 #include <def/config.h>
 #include <def/linker.h>
@@ -73,7 +73,7 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr){
 int __init mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, mem_flags_t flags) {
 	pte_t *pte = walk_early(ctx, vaddr);
 	if(!pte){
-		return FAILED;
+		return -ENOMEM;
 	}
 
 	uint32_t arch_flags = mmu_flags_arch(flags);
@@ -452,7 +452,7 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 				mmu_munmap(ctx, roolback_virt_addr, i * PAGE_SIZE);
 			}
 
-			return NO_MEMORY;
+			return -ENOMEM;
 		}
 
 		pte_t val = ctx->ops->mk_pte(paddr, arch_flags);
@@ -562,12 +562,12 @@ struct paging_ctx* mmu_clone_context(struct paging_ctx *src) {
 
 int mmu_context_switch(struct paging_ctx *ctx){
 	if(!ctx){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	uintptr_t target_phys = mmu_translate(ctx, (uintptr_t)ctx->root);
 	if (target_phys & (PAGE_SIZE - 1)) {
-		return BAD_ALIGNMENT;
+		return -EINVAL;
 	}
 
 	uintptr_t curr_phys = paging_current_table_phys();

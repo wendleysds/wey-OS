@@ -2,7 +2,7 @@
 #include <kernel/init.h>
 #include <lib/string.h>
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 struct chrdev{
@@ -33,23 +33,23 @@ static inline unsigned int major_to_index(unsigned int major){
 
 static struct chrdev* reserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total, const char *name){
 	if (major >= MAJOR_MAX) {
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	if (minor_total > MINOR_MASK + 1 - base_minor) {
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	if (major == 0) {
 		major = find_free_major();;
 		if(major == 0){
-			return ERR_PTR(LIST_FULL);
+			return ERR_PTR(-ENOENT);
 		}
 	}
 
 	struct chrdev* cdev = (struct chrdev*)kmalloc(sizeof(struct chrdev));
 	if(!cdev){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	int i = major_to_index(major);
@@ -68,7 +68,7 @@ static struct chrdev* reserve_minors_region(unsigned int major, unsigned int bas
 			break;
 
 		kfree(cdev);
-		return ERR_PTR(LIST_FULL);
+		return ERR_PTR(-ENOENT);
 	}
 
 	cdev->major = major;
@@ -141,7 +141,7 @@ void chardev_unregister(unsigned int major, unsigned int base_minor,
 static int chrdev_open(struct inode *ino, struct file *file){
 
 
-	return NOT_IMPLEMENTED;
+	return -ENOSYS;
 }
 
 const struct file_operations def_chr_fops = {

@@ -1,5 +1,5 @@
 #include <def/compile.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <utils.h>
 #include <heap.h>
 #include <disk.h>
@@ -144,7 +144,7 @@ static uint32_t next_cluster(fat_info_t* fat, uint32_t cluster){
 	uint32_t entOffset = fatOffset % fat->headers.boot.bytesPerSec;
 
 	uint8_t sector[512];
-	if(IS_STAT_ERR(fat->disk->ops->read(
+	if(IS_ERR_VALUE(fat->disk->ops->read(
 			fat->disk, 
 			fatSecNum + fat->disk->mbr_partitions[0].lbaFirstSector, 
 			sector, 
@@ -178,7 +178,7 @@ static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint
 	
 	do{
 		uint32_t lba = cluster_to_lba(fat, currentCluster);
-		if(IS_STAT_ERR(fat->disk->ops->read(fat->disk, lba, buffer, 1))){
+		if(IS_ERR_VALUE(fat->disk->ops->read(fat->disk, lba, buffer, 1))){
 			return EOF;
 		}
 
@@ -212,16 +212,16 @@ static uint32_t fat_get_file_cluster(fat_info_t* fat, const char* filename, uint
 fat_info_t* platform_parse_fat(struct disk* disk){
 	uint8_t sec0[0x200];
 	if(disk->ops->read(disk, disk->mbr_partitions[0].lbaFirstSector, sec0, 1) != SUCCESS){
-		return ERR_PTR(READ_FAIL);
+		return ERR_PTR(-EIO);
 	}
 
 	if(!_valid_fat_sector(sec0)){
-        return ERR_PTR(INVALID_FS);
+        return ERR_PTR(-EINVAL);
     }
 
 	fat_info_t* fat = (fat_info_t*)malloc(sizeof(fat_info_t));
 	if(!fat){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	memcpy(&fat->headers, sec0, sizeof(struct FATHeaders));
@@ -232,7 +232,7 @@ fat_info_t* platform_parse_fat(struct disk* disk){
 
 static int _read(struct file *file, void *buffer, uint64_t count){
 	if(!file || !buffer || count == 0){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct fd* fd = (struct fd*)file->private;
@@ -240,10 +240,10 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 
 	uint32_t totalReaded = 0;
 
-	if(!fat) return INVALID_ARG;
+	if(!fat) return -EINVAL;
 
 	if (file->pos >= file->size) {
-		return END_OF_FILE;
+		return 0;
 	}
 
 	uint32_t cursor = file->pos;
@@ -252,7 +252,7 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 	/* clamp remaining to file size */
 	if (remaining > file->size - cursor) {
 		remaining = file->size - cursor;
-		if (remaining == 0) return END_OF_FILE;
+		if (remaining == 0) return 0;
 	}
 
 	uint32_t clusterSize = fat->headers.boot.bytesPerSec * fat->headers.boot.secPerClus;
@@ -267,8 +267,8 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 
 	while (remaining > 0) {
 		uint32_t lba = cluster_to_lba(fat, cluster);
-		if (IS_STAT_ERR(fat->disk->ops->read(fat->disk, lba, clusterBuf, fat->headers.boot.secPerClus))) {
-			return READ_FAIL;
+		if (IS_ERR_VALUE(fat->disk->ops->read(fat->disk, lba, clusterBuf, fat->headers.boot.secPerClus))) {
+			return -EIO;
 		}
 
 		uint32_t toCopy = (remaining < bytesLeftInCluster) ? remaining : bytesLeftInCluster;
@@ -302,7 +302,7 @@ static int _read(struct file *file, void *buffer, uint64_t count){
 
 static int _lseek(struct file *file, off_t offset, uint8_t whence){
 	if(!file){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct fd* fd = (struct fd*)file->private;
@@ -320,11 +320,11 @@ static int _lseek(struct file *file, off_t offset, uint8_t whence){
 			target = filesize + offset;
 			break;
 		default:
-			return INVALID_ARG;
+			return -EINVAL;
 	}
 
 	if(target > filesize){
-		return OVERFLOW;
+		return -ERANGE;
 	}
 
 	uint32_t clusterSize = fd->fat->headers.boot.bytesPerSec * fd->fat->headers.boot.secPerClus;
@@ -334,7 +334,7 @@ static int _lseek(struct file *file, off_t offset, uint8_t whence){
 	for(uint32_t i = 0; i < clusterOffset; i++){
 		cluster = next_cluster(fd->fat, cluster);
 		if(cluster >= EOF) {
-			return END_OF_FILE; // Reached end of file
+			return 0; // Reached end of file
 		}
 	}
 
@@ -359,7 +359,7 @@ struct file* platform_open_file(fat_info_t* fat_info, const char* path){
 	struct file* file = file_get();
 	
 	if(!file){
-		return ERR_PTR(NOT_FOUND); // pull empty
+		return ERR_PTR(-ENOENT); // pull empty
 	}
 	
 	char buffer[128];
@@ -373,7 +373,7 @@ struct file* platform_open_file(fat_info_t* fat_info, const char* path){
 		dirCluster = fat_get_file_cluster(fat_info, token, dirCluster, &file->size);
 		if(dirCluster >= EOF){
 			file_ret(file);
-			return ERR_PTR(FILE_NOT_FOUND);
+			return ERR_PTR(-ENOENT);
 		}
 	} while ((token = strtok(NULL, "/")));
 

@@ -1,6 +1,6 @@
 #include <kernel/init.h>
 #include <mm/page.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
 #include <lib/string.h>
@@ -74,13 +74,13 @@ static const struct super_operations ramfs_sops = {
 static struct inode* ramfs_mount(const struct file_system_type* self, const char* dev_name, void* data){
 	struct super_block* sb = super_alloc();
 	if(!sb){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	struct ramfs_sb* rsb = kzalloc(sizeof(struct ramfs_sb));
 	if(!rsb){
 		kfree(sb);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	rsb->next_ino = 1;
@@ -93,7 +93,7 @@ static struct inode* ramfs_mount(const struct file_system_type* self, const char
 	if(!root){
 		kfree(sb);
 		kfree(rsb);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	root->mode = S_IFDIR;

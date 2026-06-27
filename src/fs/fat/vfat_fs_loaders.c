@@ -1,5 +1,5 @@
 #include <lib/string.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #include "vfat_fs_internal.h"
 
@@ -30,12 +30,12 @@ static int fat12_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
     fatTotalClusters /= boot->secPerClus;
 
     if (fatTotalClusters < 1 || fatTotalClusters >= 4085){
-        return INVALID_FS;
+        return -EINVAL;
     }
 
     uint8_t *table = (uint8_t *)kmalloc(fatBytes);
     if (!table){
-        return NO_MEMORY;
+        return -ENOMEM;
     }
 
     stream_seek_lba(stream, fatStartSector, SEEK_SET);
@@ -80,12 +80,12 @@ static int fat16_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
     fatTotalClusters /= boot->secPerClus;
 
     if (fat->totalClusters < 4085 || fat->totalClusters >= 65525){
-        return INVALID_FS;
+        return -EINVAL;
     }
 
     uint16_t *table = (uint16_t *)kmalloc(fatBytes);
     if (!table){
-        return NO_MEMORY;
+        return -ENOMEM;
     }
 
     stream_seek_lba(stream, fatStartSector, SEEK_SET);
@@ -139,7 +139,7 @@ static int fat32_load(struct FAT* fat, struct Stream* stream, const uint8_t* sec
 
     uint32_t *table = (uint32_t *)kmalloc(fatBytes);
     if (!table){
-        return NO_MEMORY;
+        return -ENOMEM;
     }
 
     stream_seek_lba(stream, fatStartSector, SEEK_SET);

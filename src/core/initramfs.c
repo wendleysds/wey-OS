@@ -1,7 +1,7 @@
 #include <kernel/init.h>
 #include <kernel/panic.h>
 #include <kernel/printk.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <lib/cpio.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
@@ -22,7 +22,7 @@ int unpack_initrd(){
 		__initramfs_start,
 		(size_t)__initramfs_size,
 		&cursor,
-		&cpio)) == OK)
+		&cpio)) > 0)
 	{
 		printk("initrd: name=%s mode=%#o filesize=%lu content=%p\n",
 			cpio.name ? cpio.name : "(null)",
@@ -51,12 +51,12 @@ int unpack_initrd(){
 			}
 
 			if((size_t)written != cpio.filesize){
-				return ERROR_IO;
+				return -EIO;
 			}
 
 			vfs_close(file);
 		}
 	}
 
-	return last_err == END_OF_FILE ? OK : last_err;
+	return last_err;
 }

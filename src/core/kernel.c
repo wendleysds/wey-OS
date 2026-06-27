@@ -5,7 +5,7 @@
 #include <kernel/fork.h>
 #include <device/terminal.h>
 #include <lib/assert.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
@@ -40,7 +40,7 @@ static initcall_entry_t* initcall_levels[] __initdata = {
 static __init void _do_initcall_level(int level){
 	for(initcall_entry_t* fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++){
 		int res = initcall_from_entry(fn)();
-		if(IS_STAT_ERR(res)){
+		if(IS_ERR_VALUE(res)){
 			panic("initcall '%#x' returned status %d\n", 
 				initcall_from_entry(fn), 
 				res
@@ -60,7 +60,7 @@ static int init(void* args){
 
 	printk("unpack status: %d\n", unpack_initrd());
 
-	kernel_exec("/init", 0x0, 0x0);
+	kernel_exec("/bash", 0x0, 0x0);
 
 	printk("OK\n");
 

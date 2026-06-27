@@ -1,10 +1,10 @@
 #include <device/blkdev.h>
 #include <mm/kheap.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 static struct request* bio_to_request(struct bio *bio){
 	if (!bio || !bio->bdev || !bio->bdev->disk){
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	const sector_t start   = bio->bdev->start_sector;
@@ -12,18 +12,18 @@ static struct request* bio_to_request(struct bio *bio){
 	const sector_t capacity = bio->bdev->nr_sectors;
 
 	if (bio->sector < start) {
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	const sector_t relative_sector = bio->sector - start;
 
 	if (relative_sector + nr_sectors > capacity) {
-		return ERR_PTR(OUT_OF_BOUNDS);
+		return ERR_PTR(-ERANGE);
 	}
 
 	struct request *rq = kzalloc(sizeof(*rq));
 	if (!rq){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	rq->sector     = bio->sector;

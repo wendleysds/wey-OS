@@ -2,7 +2,7 @@
 #include <mm/memblock.h>
 #include <sync/spinlock.h>
 #include <kernel/printk.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <kernel/init.h>
 #include <def/config.h>
 
@@ -208,24 +208,24 @@ struct page* page_alloc(uint8_t order, uint16_t flags) {
 
 int page_free(struct page *page){
 	if (!page)
-		return INVALID_ARG;
+		return -EINVAL;
 
 	spin_lock(&global_zone.lock);
 
 	int res = SUCCESS;
 
 	if (page->flags & PG_RESERVED){
-		res = INVALID_STATE;
+		res = -EINVAL;
 		goto out;
 	}
 
 	if (atomic_read(&page->refcount) > 1){
-		res = INVALID_STATE;
+		res = -EINVAL;
 		goto out;
 	}
 
 	if (page->flags & PG_BUDDY){
-		res = INVALID_STATE;
+		res = -EINVAL;
 		goto out;
 	}
 

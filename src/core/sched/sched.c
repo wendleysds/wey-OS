@@ -2,7 +2,7 @@
 #include <kernel/printk.h>
 #include <sync/spinlock.h>
 #include <def/compile.h>
-#include <def/status.h>
+#include <def/errno.h>
 #include <lib/string.h>
 #include <mm/kheap.h>
 
@@ -62,7 +62,7 @@ static int __init create_idle_task(){
 	memset(&idle_task, 0x0, sizeof(struct task));
 	void* ksp = kzalloc(PROC_KERNEL_STACK_SIZE);
 	if(!ksp){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	memcpy(idle_task.name, "idle task", sizeof(idle_task.name));

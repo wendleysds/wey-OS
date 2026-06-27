@@ -4,7 +4,7 @@
 #include <kernel/printk.h>
 #include <mm/kheap.h>
 #include <mm/memblock.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <def/config.h>
 #include <uapi/headers.h>
 #include <lib/string.h>
@@ -44,7 +44,7 @@ static int vt_data_con_setup(struct vt_data *vt){
 	vt->vt_size_row = vt->vt_cols << 1; // char + attr
 	vt->screenbuffer_size = vt->vt_rows * vt->vt_size_row;
 	if(!vt->screenbuffer_size){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	return SUCCESS;
@@ -69,7 +69,7 @@ static __init int vt_early_alloc(){
 	struct vt_data *vt = (struct vt_data*)memblock_alloc(sizeof(struct vt_data), 1);
 
 	if(!vt){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	vt = (struct vt_data*)__va(vt);
@@ -81,7 +81,7 @@ static __init int vt_early_alloc(){
 
 	vt->screenbuffer = (unsigned short*)memblock_alloc(vt->screenbuffer_size, 1);
 	if(!vt->screenbuffer){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	vt->screenbuffer = (unsigned short*)__va(vt->screenbuffer);
@@ -96,7 +96,7 @@ static __init int vt_early_alloc(){
 
 static int vt_alloc(int currcon){
 	if(currcon >= TERMINALS_MAX || currcon < 0){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct vt* terminal = terminal_get(currcon);
@@ -108,7 +108,7 @@ static int vt_alloc(int currcon){
 	struct vt_data *vt = (struct vt_data*)kzalloc(sizeof(struct vt_data));
 
 	if(!vt){
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	int res = vt_data_con_setup(vt);
@@ -121,7 +121,7 @@ static int vt_alloc(int currcon){
 	
 	if(!vt->screenbuffer){
 		kfree(vt);
-		return NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	vt_data_setup(vt);

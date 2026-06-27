@@ -1,14 +1,14 @@
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
 	if(!path){
-		return ERR_PTR(INVALID_ARG);
+		return ERR_PTR(-EINVAL);
 	}
 
 	struct inode* ino = vfs_walk(path); // always return ino->refcount >= 1
 	if(IS_ERR(ino)){
-		if((PTR_ERR(ino) == FILE_NOT_FOUND || PTR_ERR(ino) == NO_ENTRY) && (flags & O_CREAT)){
+		if((PTR_ERR(ino) == -ENOENT || PTR_ERR(ino) == -ENOENT) && (flags & O_CREAT)){
 			int res = vfs_create(path, mode);
 			if(IS_ERR_VALUE(res)) return ERR_PTR(res);
 
@@ -22,7 +22,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
 	struct file* f = (struct file*)kmalloc(sizeof(struct file));
 	if(!f){
 		inode_put(ino);
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	if(flags & O_TRUNC){
@@ -55,7 +55,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
 
 int vfs_close(struct file *file){
 	if(!file){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	int res = SUCCESS;

@@ -1,7 +1,7 @@
 #include <fs/vfs.h>
 #include <mm/page.h>
 #include <mm/kheap.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <def/config.h>
 #include <lib/string.h>
 #include <stddef.h>
@@ -13,7 +13,7 @@ static int ramfs_read(struct file *file, void *buffer, uint32_t count){
 	struct ramfs_inode *rino = inode->private_data;
 
 	if(file->pos >= inode->size){
-		return END_OF_FILE;
+		return 0;
 	}
 
 	size_t cursor = file->pos;
@@ -67,14 +67,14 @@ static int ramfs_write(struct file *file, const void *buffer, uint32_t count){
 		if(cur_page_index >= rino->page_capacity){
 			size_t new_cap = rino->page_capacity ? rino->page_capacity * 2 : 4;
 			int res = ramfs_grow_pages_arr(rino, new_cap);
-			if(res) return total_written ? total_written : NO_MEMORY;;
+			if(res) return total_written ? total_written : -ENOMEM;;
 		}
 
 		struct page *page = rino->pages[cur_page_index];
 		if(!page){
 			page = page_alloc(0,PG_KERNEL);
 			if(!page){
-				return total_written ? total_written : NO_MEMORY;
+				return total_written ? total_written : -ENOMEM;
 			}
 
 			memset((void*)page_to_virt(page), 0x0, PAGE_SIZE);
@@ -117,11 +117,11 @@ off_t ramfs_lseek(struct file *file, off_t offset, int whence){
 			target = (off_t)filesize + offset;
 			break;
 		default:
-			return INVALID_ARG;
+			return -EINVAL;
 	}
 
 	if(target < 0){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	if(target > (off_t)filesize){

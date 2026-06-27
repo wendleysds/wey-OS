@@ -1,7 +1,7 @@
 #include <device/blkdev.h>
 #include <kernel/printk.h>
 #include <lib/string.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <mm/kheap.h>
 #include <fs/partition.h>
 
@@ -18,7 +18,7 @@ static void scan_endio(struct bio *bio){
 
 static int block_read(struct blkdev* dev, sector_t sector, unsigned int nr_sectors, void* buffer){
 	struct bio* bio = kmalloc(sizeof(struct bio));
-	if(!bio) return NO_MEMORY;
+	if(!bio) return -ENOMEM;
 	memset(bio, 0x0, sizeof(struct bio));
 
 	struct sync_wait wait = {0};
@@ -44,7 +44,7 @@ static int block_read(struct blkdev* dev, sector_t sector, unsigned int nr_secto
 int mbr_is_valid(void *sector0){
 	uint8_t* sec0 = sector0;
 	if (sec0[510] != 0x55 || sec0[511] != 0xAA) {
-		return INVALID_FORMAT;
+		return -EINVAL;
 	}
 
 	struct MBRPartitionEntry *parts = (struct MBRPartitionEntry*)(sec0 + 0x1BE);
@@ -64,11 +64,11 @@ int mbr_is_valid(void *sector0){
 		}
 	}
 
-	return NOT_FOUND;
+	return -ENOENT;
 }
 
 int gpt_is_valid(void *sector1){
-	return NOT_IMPLEMENTED;	
+	return -ENOSYS;	
 }
 
 int partition_detect(void *sector0, partition_entry_t *out_type){
@@ -79,10 +79,10 @@ int partition_detect(void *sector0, partition_entry_t *out_type){
 	}
 
 	if(res == GPT_PARTITION){
-		return NOT_SUPPORTED;
+		return -ENOTSUP;
 	}
 
-	return NOT_FOUND; // Fallback
+	return -ENOENT; // Fallback
 }
 
 static void parse_mbr_partitions(struct gendisk* disk, uint8_t *sector0){
@@ -101,7 +101,7 @@ static void parse_mbr_partitions(struct gendisk* disk, uint8_t *sector0){
 
 		struct blkdev* bdev_part = (struct blkdev*)kmalloc(sizeof(struct blkdev));
 		if(!bdev_part){
-			res = NO_MEMORY;
+			res = -ENOMEM;
 			goto parse_fail;
 		}
 
@@ -147,7 +147,7 @@ int blk_scan_partitions(struct gendisk* disk){
 			parse_mbr_partitions(disk, sec0);
 			break;
 
-		default: return NOT_SUPPORTED;
+		default: return -ENOTSUP;
 	}
 
 	return SUCCESS;

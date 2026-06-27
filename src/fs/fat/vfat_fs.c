@@ -1,7 +1,7 @@
 #include <device/blkdev.h>
 #include <kernel/init.h>
 #include <lib/string.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/stat.h>
 
 #include "vfat_fs_internal.h"
@@ -102,13 +102,13 @@ static fat_type_t _fat_get_type(const uint8_t* sector0Buffer){
 static struct FAT* fat_init(struct blkdev* bdev){
 	struct Stream* stream = stream_new(bdev);
     if(!stream){
-        return ERR_PTR(NO_MEMORY);
+        return ERR_PTR(-ENOMEM);
     }
 
     struct FAT* fat = (struct FAT*)kmalloc(sizeof(struct FAT));
     if(!fat){
         stream_dispose(stream);
-        return ERR_PTR(NO_MEMORY);
+        return ERR_PTR(-ENOMEM);
     }
 
     int8_t res;
@@ -118,13 +118,13 @@ static struct FAT* fat_init(struct blkdev* bdev){
     }
 
     if(!_valid_fat_sector(sector0)){
-        res = INVALID_FS;
+        res = -EINVAL;
         goto err;
     }
 
     fat_type_t type = _fat_get_type(sector0);
     if (type >= FAT_TYPES_COUNT || type < 0 || type == FAT_INVALID) {
-        res = INVALID_FS;
+        res = -EINVAL;
         goto err;
     }
 
@@ -146,7 +146,7 @@ err:
 
 static struct inode* fat_mount(const struct file_system_type* fs_type, int flags, const char* dev_name, void* data){
     if(!fs_type || !dev_name){
-        return ERR_PTR(INVALID_ARG);
+        return ERR_PTR(-EINVAL);
     }
 
 	// TODO: Add lookup with dev name
@@ -157,20 +157,20 @@ static struct inode* fat_mount(const struct file_system_type* fs_type, int flags
 
 	struct super_block* fat_sb = alloc_super();
 	if(!fat_sb){
-		return ERR_PTR(NO_MEMORY);
+		return ERR_PTR(-ENOMEM);
 	}
 
     struct inode* fat_root = (struct inode*)kmalloc(sizeof(struct inode));
     if(!fat_root){
 		kfree(fat_sb);
-        return ERR_PTR(NO_MEMORY);
+        return ERR_PTR(-ENOMEM);
     }
 
     struct FATFileDescriptor* root_fd = (struct FATFileDescriptor*)kmalloc(sizeof(struct FATFileDescriptor));
     if(!root_fd){
         kfree(fat_sb);
         kfree(fat_root);
-        return ERR_PTR(NO_MEMORY);
+        return ERR_PTR(-ENOMEM);
     }
 
     struct FAT* fat = fat_init(bdev);
@@ -211,7 +211,7 @@ static struct inode* fat_mount(const struct file_system_type* fs_type, int flags
 
 static int fat_unmount(struct super_block* sb){
     if(!sb){
-        return INVALID_ARG;
+        return -EINVAL;
     }
 
     if(sb->private_data){
@@ -231,7 +231,7 @@ static int fat_unmount(struct super_block* sb){
             kfree(fat->table.fat32);
             break;
         default:
-            return INVALID_FS;
+            return -EINVAL;
         }
 
         kfree(fat);

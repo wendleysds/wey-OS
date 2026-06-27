@@ -1,5 +1,5 @@
 #include "boot.h"
-#include <def/status.h>
+#include <def/errno.h>
 #include <io/ports.h>
 
 #define TRIES 32
@@ -22,7 +22,7 @@ static int have_8042(void)
 		status = inb_p(0x64);
 		if (status == 0xFF) {
 			if (!--ffs)
-				return NOT_EXISTS;
+				return -ENOENT;
 		}
 		if (status & 1) {
 			inb_p(0x60);
@@ -31,7 +31,7 @@ static int have_8042(void)
 		}
 	}
 
-	return FAILED;
+	return -ENOENT;
 }
 
 static void from_bios(){
@@ -84,5 +84,5 @@ int enable_a20(){
 		}
 	}
 
-	return FAILED;
+	return 1;
 }

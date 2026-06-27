@@ -1,7 +1,7 @@
 #include <platform.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <string.h>
 #include <utils.h>
 #include "bios.h"
@@ -99,7 +99,7 @@ int platform_get_memory_map(struct e820_entry* table, int tablesize, uint32_t *c
 			break;
 
 		if (oreg.eax != SMAP) {
-			return FAILED;
+			return -EAGAIN;
 		}
 
 		*desc++ = buf;

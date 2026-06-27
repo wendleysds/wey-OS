@@ -1,5 +1,5 @@
 #include <device/ata.h>
-#include <def/err.h>
+#include <def/errno.h>
 
 #include "ata_internal.h"
 
@@ -27,7 +27,7 @@ int ata_flush(struct ATADevice* atadev) {
 
 static int _pio_28_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint32_t lba, uint8_t totalSectors){
 	if(cmd != ATA_CMD_READ_PIO && cmd != ATA_CMD_WRITE_PIO){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct ATAChannel* ch = atadev->channel;
@@ -50,7 +50,7 @@ static int _pio_28_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint32_t lba, u
 
 static int _pio_48_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint64_t lba, uint16_t totalSectors){
 	if(cmd != ATA_CMD_READ_PIO_EXT && cmd != ATA_CMD_WRITE_PIO_EXT){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	struct ATAChannel* ch = atadev->channel;
@@ -135,14 +135,14 @@ static int _pio_write(struct ATADevice* atadev, const void* buffer, int totalSec
 
 int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned int seccount, void* buffer) {
 	if(!atadev->exists){
-		return INVALID_ARG;
+		return -EINVAL;
 	}
 
 	if(seccount > 0xFFFF){
-		return OUT_OF_BOUNDS;
+		return -ERANGE;
 	}
 
-	int ret = OUT_OF_BOUNDS;
+	int ret = -ERANGE;
 	const int PIO28_MAX_LBA = 0x0FFFFFFF;
 	if(sector > PIO28_MAX_LBA && atadev->info.supports_lba48){
 		seccount &= 0xFFFF;

@@ -1,5 +1,5 @@
 #include <def/config.h>
-#include <def/err.h>
+#include <def/errno.h>
 #include <fs/vfs.h>
 #include <kernel/init.h>
 #include <lib/string.h>
@@ -81,14 +81,14 @@ static int do_umount(struct mount* mount){
 	int ret = SUCCESS;
 
 	if (!list_empty(&mount->children)) {
-		ret = BUSY;
+		ret = -EBUSY;
 		goto out_unlock;
 	}
 
 	sb = mount->mnt_sb;
 	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
 		if (atomic_read(&ino->refcount) > 1) {
-			ret = BUSY;
+			ret = -EBUSY;
 			goto out_unlock;
 		}
 	}
@@ -130,7 +130,7 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 	memset(&target_point, 0x0, sizeof(struct path));
 
 	if (!target_fs) {
-		return NO_ENTRY;
+		return -ENOENT;
 	}
 
 	if (root_mount) {
@@ -142,7 +142,7 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 
 	mount = kmalloc(sizeof(*mount));
 	if (!mount) {
-		ret = NO_MEMORY;
+		ret = -ENOMEM;
 		goto out_point;
 	}
 
@@ -152,7 +152,7 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 
 	mount->name = dup_mount_name(mountpoint);
 	if (!mount->name) {
-		ret = NO_MEMORY;
+		ret = -ENOMEM;
 		goto out_mount;
 	}
 
@@ -160,7 +160,7 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 
 	root = target_fs->mount(target_fs, source, data);
 	if (IS_ERR_OR_NULL(root)) {
-		ret = root ? PTR_ERR(root) : FAILED;
+		ret = root ? PTR_ERR(root) : -EAGAIN;
 		spin_unlock(&mount_lock);
 		goto out_mount;
 	}
