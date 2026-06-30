@@ -22,12 +22,13 @@ struct clockevent {
 
 int clock_init(uint32_t timer_hz);
 void clock_set_time_ns(time_ns_t time_ns);
+void clock_set_realtime_ns(time_ns_t time_ns);
 
 tick_t clock_get_ticks(void);
-time_ns_t clock_get_time_ns(void);
+time_ns_t clock_get_monotonic_ns(void);
+time_ns_t clock_get_realtime_ns(void);
 
 int clocksource_register(const struct clocksource* source);
-time_ns_t clocksource_read_ns(void);
 
 int clockevent_register(const struct clockevent* event);
 int clockevent_start_periodic(uint32_t hz);
