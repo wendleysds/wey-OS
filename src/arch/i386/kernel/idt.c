@@ -1,4 +1,5 @@
 #include <kernel/sched.h>
+#include <kernel/clock.h>
 #include <kernel/interrupt.h>
 #include <kernel/printk.h>
 #include <mm/kheap.h>
@@ -27,8 +28,6 @@ static struct irq_desc irq_table[TOTAL_INTERRUPTS];
 
 extern void kernel_registers();
 extern void user_registers();
-
-volatile int need_resched = 0;
 
 static inline void _idt_load(struct IDTr_ptr* ptr){
 	__asm__ volatile ("lidt (%0)" : : "r"(ptr));
@@ -252,7 +251,7 @@ void __cdecl interrupt_handler(struct registers* regs){
 	}
 
 	if(info.route.irq_id == IRQ_WR_TIMER)
-		need_resched = 1;
+		clockevent_fire();
 
 	if(likely(current))
 		*regs = current->regs;

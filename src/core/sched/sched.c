@@ -1,3 +1,4 @@
+#include <kernel/clock.h>
 #include <kernel/sched.h>
 #include <kernel/printk.h>
 #include <sync/spinlock.h>
@@ -11,6 +12,7 @@ static LIST_HEAD(_terminateQueue);
 
 static volatile uint8_t scheduling = 0;
 static spinlock_t scheduler_spinlock;
+volatile int need_resched = 0;
 
 static struct task idle_task;
 
@@ -35,6 +37,11 @@ static struct task* _next(){
 	spin_unlock(&scheduler_spinlock);
 
 	return next_task;
+}
+
+// Request resched on every tick
+static void scheduler_tick(void* unused){
+	need_resched = 1;
 }
 
 asmlinkage void schedule(){
@@ -80,6 +87,10 @@ int __init scheduler_init(){
 	INIT_LIST_HEAD(&_readyQueue);
 	INIT_LIST_HEAD(&_terminateQueue);
 	scheduling = 0;
+
+	if(clockevent_register_listener(scheduler_tick, 0x0) != SUCCESS){
+		return -ENOMEM;
+	}
 
 	return create_idle_task();
 }
