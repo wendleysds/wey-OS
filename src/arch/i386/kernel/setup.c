@@ -211,7 +211,10 @@ static __init void setup_memblock(void){
 	memblock_reserve(0x0, KiB(64));
 
 	// Reserve boot tags
-	memblock_reserve(boot_header.tags_ptr, boot_header.tags_size);
+	memblock_reserve(
+		__pa(boot_header.tags_ptr), 
+		boot_header.tags_size
+	);
 
 	// BRK
 	if(_brk_ptr > _brk_start){
