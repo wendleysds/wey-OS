@@ -4,8 +4,9 @@
 #include <lib/string.h>
 #include <asm/paging.h>
 #include <asm/page.h>
-#include <stdint.h>
 #include <stddef.h>
+
+#include <io/ports.h>
 
 // Pre-memblock brk early allocator
 // Synchronized boot and normal phases
@@ -16,49 +17,40 @@ extern unsigned long _brk_start;
 extern unsigned long _brk_ptr;
 extern unsigned long _brk_end;
 
-void* __init early_alloc_boot(size_t size, size_t align){
+static inline size_t early_align(size_t value, size_t alignment){
+	if(alignment == 0){
+		alignment = 1;
+	}
+
+	return ALIGN(value, alignment);
+}
+
+static void* __init early_alloc_internal(size_t size, size_t align, size_t *ptr, size_t end){
 	if(size == 0){
 		return NULL;
 	}
 
-	size_t* p = (size_t*)__pa(_brk_ptr);
-	size_t* e = (size_t*)__pa(_brk_end);
+	size_t cur = early_align(*ptr, align);
 
-	if(align == 0){
-		align = 1;
-	}
-
-	*p = ALIGN(*p, align);
-
-	if(*p + size > *e){
+	if(cur + size > end){
 		return NULL;
 	}
 
-	void* ret = (void*)*p;
-	*p += size;
+	void* ret = (void*)cur;
+	*ptr = cur + size;
 
 	memset(ret, 0, size);
 	return ret;
 }
 
+void* __init early_alloc_boot(size_t size, size_t align){
+	size_t *boot_brk_ptr = (size_t *)__pa(&_brk_ptr);
+	size_t *boot_brk_end = (size_t *)__pa(&_brk_end);
+
+	const size_t end = (size_t)__pa(*boot_brk_end);
+	return early_alloc_internal(size, align, boot_brk_ptr, end);
+}
+
 void* __init early_alloc(size_t size, size_t align){
-	if(size == 0){
-		return NULL;
-	}
-
-	if(align == 0){
-		align = 1;
-	}
-
-	_brk_ptr = ALIGN(_brk_ptr, align);
-
-	if(_brk_ptr + size > _brk_end){
-		return NULL;
-	}
-
-	void* ret = (void*)_brk_ptr;
-	_brk_ptr += size;
-
-	memset(ret, 0, size);
-	return ret;
+	return early_alloc_internal(size, align, (size_t *)&_brk_ptr, (size_t)_brk_end);
 }
