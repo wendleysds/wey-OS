@@ -76,5 +76,6 @@ static inline uint16_t gs(void){
 extern uint8_t mainDriverNum;
 void __regparm(3) intcall(uint8_t int_no, const struct biosregs *ireg, struct biosregs *oreg);
 void initregs(struct biosregs *reg);
+int enable_a20();
 
 #endif

@@ -75,6 +75,8 @@ int platform_init(){
 
 	keyboard_init();
 
+	enable_a20();
+
 	return SUCCESS;
 }
 
