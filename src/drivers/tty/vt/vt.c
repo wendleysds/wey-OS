@@ -73,6 +73,7 @@ static __init int vt_early_alloc(){
 	}
 
 	vt = (struct vt_data*)__va(vt);
+	memset(vt, 0x0, sizeof(struct vt_data));
 
 	int res = vt_data_con_setup(vt);
 	if(IS_ERR_VALUE(res)){
