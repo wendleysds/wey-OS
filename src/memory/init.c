@@ -55,22 +55,23 @@ static void __init paging_map_ram(void){
 			start = MAX(start, last_phys_mapped);
 		}
 
-		for(uintptr_t phys = start; phys < end; phys += PAGE_SIZE){
-			if(mmu_early_mmap(
-				&kernel_ctx,
-				__va(phys),
-				phys,
-				(MEM_READ | MEM_WRITE)
-			)) {
-				printk("Failed to map RAM at %#lx\n", phys);
-				continue;
-			}
+		if(mmu_early_mmap(
+			&kernel_ctx,
+			__va(start),
+			start,
+			end - start,
+			(MEM_READ | MEM_WRITE)
+		)) {
+			printk("Failed to map RAM at %#lx\n", start);
+			continue;
 		}
+
+		last_phys_mapped = end - 1;
 	}
 
 	arch_paging_ops.flush_all();
 
-	max_pfn_mapped = max_phys >> PAGE_SHIFT;
+	max_pfn_mapped = (last_phys_mapped + 1) >> PAGE_SHIFT;
 
 	printk("Memory: Max PFN mapped = %#lx/%#lx (max_phys=0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
 }
@@ -143,16 +144,14 @@ static __init int vmemmap_populate(void) {
 					KERNEL_VMEMMAP_START +
 					(sec_start * sizeof(struct page));
 
-				size_t total = 0;
-				for (size_t off = 0; off < map_size; off += PAGE_SIZE, total += PAGE_SIZE) {
-					if(mmu_early_mmap(
-						ctx,
-						vaddr_base + off,
-						phys_meta + off,
-						(MEM_READ | MEM_WRITE)
-					)) {
-						return -ENOMEM;
-					}
+				if(mmu_early_mmap(
+					ctx,
+					vaddr_base,
+					phys_meta,
+					map_size,
+					(MEM_READ | MEM_WRITE)
+				)) {
+					return -ENOMEM;
 				}
 
 				pages = (struct page *)vaddr_base;

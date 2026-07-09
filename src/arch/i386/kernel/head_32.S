@@ -40,6 +40,21 @@ __start_32:
 
 	mov [pa(boot_hdr_ptr)], esi
 
+	mov eax, 1
+	cpuid
+
+	bt edx, 3
+	jnc .no_pse ; no pse
+
+	mov eax, cr4
+	or eax, (1 << 4)  ; CR4.PSE
+	mov cr4, eax
+
+	xor eax, eax
+	mov al, 1
+	mov byte [pa(supports_pse)], al
+
+.no_pse:
 	call mk_early_pgtbl_32
 
 enable_paging:
@@ -63,6 +78,10 @@ l1:
 	jmp $
 
 section .data
+
+global supports_pse
+
+supports_pse: db 0x0
 
 boot_hdr_ptr: dd 0x0
 

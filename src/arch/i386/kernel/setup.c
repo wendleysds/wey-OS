@@ -15,6 +15,7 @@
 #include <asm/paging.h>
 #include <arch/i386/pic.h>
 #include <lib/string.h>
+#include <asm-generic/paging_ctx.h>
 
 #include "e820.h"
 #include <uapi/headers.h>
@@ -36,6 +37,7 @@ static struct gdt_entry gdt[TOTAL_GDT_SEGMENTS];
 static struct gdt_descriptor gdt_descriptor;
 
 extern void fault_init();
+extern uint8_t supports_pse;
 
 static int pit_clockevent_start(void* data, uint32_t hz){
 	pic_init(hz);
@@ -174,6 +176,32 @@ static __init void setup_video(void){
 	memcpy(&video_info, &video, sizeof(struct video_info));
 }
 
+static __init void check_pse(void){
+	struct paging_size* sizes = (struct paging_size*)arch_paging_fmt.sizes;
+	uint8_t idx = 0;
+
+#if X86_32 == 1
+	if(supports_pse){
+		sizes[idx++] = (struct paging_size){
+			.level = 1,
+			.buddy_order = 10,
+			.size = MiB(4),
+			.flag = _PAGE_PSIZE,
+		};
+	}
+#endif
+
+	sizes[idx++] = (struct paging_size){
+		.level = 2,
+		.buddy_order = 0,
+		.size = KiB(4),
+	};
+
+	*((uint8_t*)&arch_paging_fmt.nr_sizes) = idx;
+
+	memcpy((void*)arch_paging_fmt.sizes, sizes, sizeof(struct paging_size) * idx);
+}
+
 static __init void setup_memblock(void){
 	struct boot_tag_e820* e820 = (void*)boot_find_tag(
 		&boot_header, 
@@ -247,6 +275,8 @@ __init void setup_arch(void){
 	idt_init();
 
 	fault_init();
+
+	check_pse();
 
 	setup_swapper();
 

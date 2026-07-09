@@ -1,3 +1,4 @@
+#include "asm-generic/paging_fmt.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <mm/mmu.h>
@@ -38,10 +39,29 @@ struct paging_ctx kernel_ctx = {
 	.ops = &arch_paging_ops,
 };
 
-static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr){
+static inline const struct paging_size *choose_page_size(struct paging_ctx *ctx, uintptr_t addr, size_t remaining){
+	for (size_t i = 0; i < ctx->fmt->nr_sizes; i++) {
+		const struct paging_size *ps = &ctx->fmt->sizes[i];
+
+		if(ps->buddy_order > MAX_ORDER)
+			continue;
+
+		if ((addr & (ps->size - 1)) != 0)
+			continue;
+
+		if (remaining < ps->size)
+			continue;
+
+		return ps;
+	}
+
+	return &ctx->fmt->sizes[ctx->fmt->nr_sizes - 1];
+}
+
+static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr, uint8_t stop_level){
 	void *table = ctx->root;
 
-	for (int i = 0; i < ctx->fmt->levels; i++) {
+	for (int i = 0; i <= stop_level; i++) {
 		size_t idx = (vaddr >> ctx->fmt->lvl[i].shift) & ctx->fmt->lvl[i].mask;
 		pte_t *entry = &((pte_t*)table)[idx];
 
@@ -67,20 +87,32 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr){
 		table = ctx->ops->pte_to_virt(*entry);
 	}
 
-	return NULL;
+	unreachable();
 }
 
-int __init mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, mem_flags_t flags) {
-	pte_t *pte = walk_early(ctx, vaddr);
-	if(!pte){
-		return -ENOMEM;
+int __init mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, size_t size, mem_flags_t flags) {
+	const uint32_t arch_flags = mmu_flags_arch(flags);
+	size = ALIGN(size, PAGE_SIZE);
+
+	while (size > 0) {
+		const struct paging_size* pg = choose_page_size(
+			ctx, vaddr, size
+		);
+
+		pte_t *pte = walk_early(ctx, vaddr, pg->level);
+		if(!pte){
+			return -ENOMEM;
+		}
+
+		pte_t val = ctx->ops->mk_pte(paddr, arch_flags | pg->flag);
+
+		ctx->ops->set_pte(pte, val);
+		ctx->ops->flush_tlb_one(vaddr);
+
+		vaddr += PAGE_SIZE;
+		paddr += PAGE_SIZE;
+		size -= pg->size;
 	}
-
-	uint32_t arch_flags = mmu_flags_arch(flags);
-	pte_t val = ctx->ops->mk_pte(paddr, arch_flags);
-
-	ctx->ops->set_pte(pte, val);
-	ctx->ops->flush_tlb_one(vaddr);
 
 	return OK;
 }
@@ -104,11 +136,11 @@ static inline void free_context(struct paging_ctx* ctx){
 	kfree(ctx);
 }
 
-static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry, uint8_t user_table) {
+static void* ensure_table(const struct paging_ctx *restrict ctx, pte_t *entry, uint8_t user_table, uint8_t order) {
 	const struct paging_ops *restrict ops = ctx->ops;
 
 	if (!ops->pte_present(*entry)) {
-		struct page* page = page_alloc(0, PG_KERNEL | PG_TABLE);
+		struct page* page = page_alloc(order, PG_KERNEL | PG_TABLE);
 		if(!page) return NULL;
 
 		uintptr_t new_tbl = page_to_virt(page);
@@ -159,17 +191,15 @@ static int walk_to(struct paging_ctx *ctx, uintptr_t va, struct walk_level *leve
 }
 
 #ifdef USE_GENERIC_WALKER
-static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t create, uint8_t user_table) {
+static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t create, uint8_t user_table, uint8_t leaf_order) {
 	const struct paging_format *restrict fmt = ctx->fmt;
 	const struct paging_ops *restrict ops = ctx->ops;
 
 	typeof(ops->pte_present) pte_present = ops->pte_present;
 	typeof(ops->pte_leaf) pte_leaf = ops->pte_leaf;
 	
-	void *table = ctx->root;
-	uint8_t levels = fmt->levels;
-
-	for (uint8_t i = 0; i < levels; i++) {
+	const void *table = ctx->root;
+	for (uint8_t i = 0; i <= stop_level; i++) {
 		const struct paging_level *restrict lvl = &fmt->lvl[i];
 		size_t idx = (vaddr >> lvl->shift) & lvl->mask;
 		pte_t *entry = &((pte_t*)table)[idx];
@@ -184,12 +214,11 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 			table = ops->pte_to_virt(pte_val);
 		} 
 		else if (create) {
-			table = ensure_table(ctx, entry, user_table);
-			if (unlikely(!table)) return NULL;
+			const int is_leaf = pte_leaf(pte_val, i);
+			table = ensure_table(ctx, entry, user_table, is_leaf ? leaf_order : 0);
 
-			if (pte_leaf(pte_val, i)) {
-				return entry;
-			}
+			if (unlikely(!table)) return NULL;
+			if (is_leaf) return entry;
 		}
 		else {
 			return NULL;
@@ -410,12 +439,12 @@ static void* clone_level(
 	return new_table;
 }
 
-static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t user_table) {
-	return walker(ctx, vaddr, 1, user_table);
+static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t page_order, uint8_t user_table) {
+	return walker(ctx, vaddr, stop_level, 1, user_table, page_order);
 }
 
-static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr) {
-	return walker(ctx, vaddr, 0, 0x0);
+static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level) {
+	return walker(ctx, vaddr, stop_level, 0, 0, 0);
 }
 
 int __init mmu_init(){
@@ -439,17 +468,22 @@ int __init mmu_init(){
 }
 
 int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t size, mem_flags_t mem_flags){
-	size_t count = ALIGN(size, PAGE_SIZE) / PAGE_SIZE;
+	size = ALIGN(size, PAGE_SIZE);
 
 	uintptr_t roolback_virt_addr = vaddr;
+	const size_t original_size = size;
 
 	const uint32_t arch_flags = mmu_flags_arch(mem_flags);
-	for(size_t i = 0; i < count; i++){
-		pte_t *pte = walk_create(ctx, vaddr, mem_flags & MEM_USER);
+	while (size > 0){
+		const struct paging_size* pg = choose_page_size(
+			ctx, vaddr, size
+		);
+
+		pte_t *pte = walk_create(ctx, vaddr, pg->level, pg->buddy_order, mem_flags & MEM_USER);
 
 		if(unlikely(!pte)){
-			if(i > 0){
-				mmu_munmap(ctx, roolback_virt_addr, i * PAGE_SIZE);
+			if(size != original_size){
+				mmu_munmap(ctx, roolback_virt_addr, original_size);
 			}
 
 			return -ENOMEM;
@@ -461,6 +495,7 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 
 		vaddr += PAGE_SIZE;
 		paddr += PAGE_SIZE;
+		size -= pg->size;
 	}
 
 	return OK;
@@ -501,7 +536,7 @@ void mmu_munmap(struct paging_ctx *ctx, uintptr_t vaddr, size_t size) {
 }
 
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr){
-	pte_t* pte = walk(ctx, vaddr);
+	pte_t* pte = walk(ctx, vaddr, ctx->fmt->levels);
 	if(pte){
 		return ctx->ops->pte_phys(*pte);
 	}
@@ -511,7 +546,7 @@ uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr){
 
 void mmu_set_flags(struct paging_ctx *ctx, uintptr_t vaddr, mem_flags_t flags){
 	const struct paging_ops *restrict ops = ctx->ops;
-	pte_t* pte = walk(ctx, vaddr);
+	pte_t* pte = walk(ctx, vaddr, ctx->fmt->levels);
 
 	if(pte){
 		int arch_flags = mmu_flags_arch(flags);
@@ -533,7 +568,7 @@ void mmu_set_flags_range(struct paging_ctx *ctx, uintptr_t vaddr, size_t size, m
 }
 
 mem_flags_t mmu_get_flags(struct paging_ctx *ctx, uintptr_t vaddr){
-	pte_t* pte = walk(ctx, vaddr);
+	pte_t* pte = walk(ctx, vaddr, ctx->fmt->levels);
 	if(pte){
 		return arch_mmu_flags(ctx->ops->pte_flags(*pte));
 	}

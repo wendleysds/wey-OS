@@ -10,10 +10,19 @@ struct paging_level {
 	uint64_t mask;
 };
 
+struct paging_size {
+	uint8_t level;
+	uint8_t buddy_order;
+	size_t size;
+	uint32_t flag;
+};
+
 struct paging_format {
 	uint8_t levels;
-	struct paging_level lvl[MAX_LEVELS];
-	uint64_t page_size;
+	const struct paging_level lvl[MAX_LEVELS];
+
+	uint8_t nr_sizes;
+	const struct paging_size sizes[MAX_LEVELS];
 };
 
 #endif

@@ -75,7 +75,6 @@ const struct paging_format arch_paging_fmt = {
 		{ .shift = 22, .mask = 0x3FF },
 		{ .shift = 12, .mask = 0x3FF }
 	},
-	.page_size = PAGE_SIZE
 };
 
 int mmu_flags_arch(mem_flags_t flags){

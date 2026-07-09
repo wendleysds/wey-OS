@@ -27,7 +27,7 @@ struct paging_ctx;
 extern int mmu_flags_arch(mem_flags_t flags);
 extern mem_flags_t arch_mmu_flags(int flags);
 
-int mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, mem_flags_t flags);
+int mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, size_t	size, mem_flags_t flags);
 
 int mmu_init(void);
 
