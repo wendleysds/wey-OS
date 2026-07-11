@@ -1,2 +1,1 @@
-#subdir-y +=  char/
-subdir-y += video/ tty/ base/ ata/
+subdir-y += video/ tty/ base/ ata/ input/
