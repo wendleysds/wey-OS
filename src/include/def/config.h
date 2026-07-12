@@ -83,11 +83,6 @@
 #define FILE_DESCRIPTORS_MAX 64
 #define FILESYSTEMS_MAX 8
 
-/*Devices*/
-#define MAJOR_MAX 12
-#define MINOR_MAX 12
-#define DEVICES_MAX ((MAJOR_MAX + MINOR_MAX) * 2)
-
 /*Processes*/
 #define PROC_MAX 32
 #define PROC_NAME_MAX 32

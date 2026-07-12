@@ -5,9 +5,12 @@
 #include <lib/list.h>
 #include <sys/types.h>
 
-#define DEVMEM_MAJOR    1
-#define DEVCHAR_MAJOR   2
-#define DEVBLOCK_MAJOR  3
+enum device_type {
+	DEVICE_CLASS_NONE = 0,
+	DEVICE_CLASS_BLOCK,
+	DEVICE_CLASS_CHAR,
+	DEVICE_CLASS_TTY,
+};
 
 #define MINOR_BITS 20
 #define MINOR_MASK ((1U << MINOR_BITS) - 1)
@@ -16,13 +19,11 @@
 #define MINOR(devt) ((unsigned int)((devt) & MINOR_MASK))
 #define MAJOR(devt) ((unsigned int)((devt) >> MINOR_BITS))
 
+// Base struct for all devices
 struct device {
-	uint16_t id;
-	uint8_t type;
-	char name[16];
-
-	uint32_t mode;
-	uint8_t flags;
+	int id;
+	const char* name;
+	enum device_type type;
 
 	void* driver_data;
 
@@ -34,6 +35,8 @@ struct device {
 int __must_check device_register(struct device *dev);
 void device_unregister(struct device *dev);
 
-struct device* device_get_name(const char* name);
+struct device* device_get_by_name(const char* name);
+struct device* device_get_by_devt(dev_t devt);
+struct device* device_get_by_id(int id);
 
 #endif

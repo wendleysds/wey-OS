@@ -1,6 +1,7 @@
 #ifndef _BLKDEV_H
 #define _BLKDEV_H
 
+#include <kernel/device.h>
 #include <sync/spinlock.h>
 #include <sys/types.h>
 #include <lib/list.h>
@@ -94,8 +95,8 @@ struct blkdev {
 	struct request_queue *queue;
 
 	struct gendisk *disk;
-	struct device *bdev;
 	struct list_head list;
+	struct device dev;
 };
 
 extern struct elevator_ops fifo_elevator;

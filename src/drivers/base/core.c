@@ -1,71 +1,96 @@
-#include <kernel/printk.h>
 #include <kernel/device.h>
 #include <kernel/init.h>
 #include <lib/string.h>
-#include <def/config.h>
 #include <def/errno.h>
 
-struct device* devices[DEVICES_MAX] = { 0 };
-uint16_t next_id = 1;
+static LIST_HEAD(devices);
 
-int __must_check device_register(struct device *dev){
-	int freeIndex = -1;
-    for (int i = 0; i < DEVICES_MAX; i++){
-		if(devices[i]){
-			if(dev->id == devices[i]->id || dev->devt == devices[i]->devt){
-				return -EINVAL;
-			}
-		}else if(freeIndex == -1){
-			freeIndex = i;
+static int next_id = 1;
+
+static int duplicate_device(dev_t dev){
+	struct device* pos;
+	list_for_each_entry(pos, &devices, list){
+		if(pos->devt == dev){
+			return 1;
 		}
-    }
-
-	if(freeIndex != -1){
-		devices[freeIndex] = dev;
-		dev->id = next_id++;
-		return SUCCESS;
 	}
 
-    printk("device_register(): device '%s' not registered! max devices reached\n", dev->name);
+	return 0;
+}
 
-    return -ENOENT;
+int __must_check device_register(struct device *dev){
+	if(!dev){
+		return -EINVAL;
+	}
+
+	if(duplicate_device(dev->devt)){
+		return -EEXIST;
+	}
+
+	INIT_LIST_HEAD(&dev->list);
+
+	dev->id = next_id++;
+	list_add_tail(&dev->list, &devices);
+
+	return SUCCESS;
 }
 
 void device_unregister(struct device *dev){
-    for (int i = 0; i < DEVICES_MAX; i++){
-        struct device* d = devices[i];
-        if(d->id == dev->id){
-            devices[i] = 0x0;
-            return;
-        }
-    }
+	if(!dev){
+		return;
+	}
+
+	if(dev->id == 0){
+		return;
+	}
+
+	if(list_empty(&dev->list)){
+		return;
+	}
+
+	dev->id = 0;
+	list_remove(&dev->list);
 }
 
-struct device* device_get_name(const char* name){
-    for (int i = 0; i < DEVICES_MAX; i++){
-        struct device* d = devices[i];
-        if(strcmp(d->name, name) == 0){
-            return d;
-        }
-    }
+struct device* device_get_by_name(const char* name){
+	if(!name){
+		return NULL;
+	}
 
-    return 0x0;
+	struct device* pos;
+	list_for_each_entry(pos, &devices, list){
+		if(strcmp(pos->name, name) == 0){
+			return pos;
+		}
+	}
+
+	return NULL;
+}
+struct device* device_get_by_devt(dev_t devt){
+	struct device* pos;
+	list_for_each_entry(pos, &devices, list){
+		if(pos->devt == devt){
+			return pos;
+		}
+	}
+
+	return NULL;
 }
 
-struct device* device_get_id(uint16_t id){
-    for (int i = 0; i < DEVICES_MAX; i++){
-        struct device* d = devices[i];
-        if(d->id == id){
-            return d;
-        }
-    }
+struct device* device_get_by_id(int id){
+	struct device* pos;
+	list_for_each_entry(pos, &devices, list){
+		if(pos->id == id){
+			return pos;
+		}
+	}
 
-    return 0x0;
+	return NULL;
 }
 
 static int __init device_init(){
-	memset(devices, 0x0, sizeof(devices));
 	next_id = 1;
+	INIT_LIST_HEAD(&devices);
 	return SUCCESS;
 }
 

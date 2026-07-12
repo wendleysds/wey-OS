@@ -34,11 +34,12 @@ typedef uint64_t timespan; // in seconds
 
 typedef uint64_t tick_t;
 
-
 typedef uint32_t cpu_id_t;
 
 typedef uintptr_t flags_t;
 typedef uintptr_t reg_t;
+
+typedef intptr_t ssize_t;
 
 #ifdef __cplusplus
 }

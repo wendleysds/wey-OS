@@ -5,20 +5,21 @@
 #include <def/errno.h>
 #include <fs/vfs.h>
 
+#define CHRDEV_MAJOR_HASH_SIZE 31
+
 struct chrdev{
-	const struct file_operations *ops;
+	char name[32];
 	struct chrdev* next;
 	unsigned int major;
 	unsigned int first_minor; 
 	unsigned int minors_total;
-	char name[32];
-	struct list_head list;
-} * chrdevs[MAJOR_MAX];
+	const struct file_operations *ops;
+} * chrdevs[CHRDEV_MAJOR_HASH_SIZE];
 
 static spinlock_t cdev_lock;
 
 static int find_free_major(){
-	for(int i = MAJOR_MAX-1; i > 0; i--){
+	for(int i = CHRDEV_MAJOR_HASH_SIZE-1; i > 0; i--){
 		if(chrdevs[i] == NULL){
 			return i;
 		}
@@ -28,11 +29,11 @@ static int find_free_major(){
 }
 
 static inline unsigned int major_to_index(unsigned int major){
-	return major % MAJOR_MAX;
+	return major % CHRDEV_MAJOR_HASH_SIZE;
 }
 
 static struct chrdev* reserve_minors_region(unsigned int major, unsigned int base_minor, unsigned int minor_total, const char *name){
-	if (major >= MAJOR_MAX) {
+	if (major >= CHRDEV_MAJOR_HASH_SIZE) {
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -45,6 +46,13 @@ static struct chrdev* reserve_minors_region(unsigned int major, unsigned int bas
 		if(major == 0){
 			return ERR_PTR(-ENOENT);
 		}
+	}
+
+	size_t name_len = strnlen(name, sizeof(chrdevs[0]->name));
+	if (name_len == 0) {
+		return ERR_PTR(-EINVAL);
+	} else if (name_len >= 32) {
+		return ERR_PTR(-ENAMETOOLONG);
 	}
 
 	struct chrdev* cdev = (struct chrdev*)kmalloc(sizeof(struct chrdev));
@@ -75,6 +83,7 @@ static struct chrdev* reserve_minors_region(unsigned int major, unsigned int bas
 	cdev->first_minor = base_minor;
 	cdev->minors_total = minor_total;
 	strncpy(cdev->name, name, sizeof(cdev->name));
+	cdev->name[name_len] = '\0';
 
 	if (!prev) {
 		cdev->next = cur;
@@ -139,8 +148,6 @@ void chardev_unregister(unsigned int major, unsigned int base_minor,
 }
 
 static int chrdev_open(struct inode *ino, struct file *file){
-
-
 	return -ENOSYS;
 }
 

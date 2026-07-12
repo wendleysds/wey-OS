@@ -6,20 +6,22 @@
 #include <def/errno.h>
 #include <fs/vfs.h>
 
+#define BLKDEV_MAJOR_HASH_SIZE 31
+
 static struct blk_major_name{
 	char name[32];
 	int major;
 	struct blk_major_name *next;
-} * major_names[MAJOR_MAX];
+} * major_names[BLKDEV_MAJOR_HASH_SIZE];
 
-static struct list_head disks[MAJOR_MAX];
+static struct list_head disks[BLKDEV_MAJOR_HASH_SIZE];
 
 static inline unsigned int major_to_index(unsigned int major){
-	return major % MAJOR_MAX;
+	return major % BLKDEV_MAJOR_HASH_SIZE;
 }
 
 static int find_free_major(){
-	for(int i = MAJOR_MAX-1; i > 0; i--){
+	for(int i = BLKDEV_MAJOR_HASH_SIZE - 1; i > 0; i--){
 		if(major_names[i] == NULL){
 			return i;
 		}
@@ -29,11 +31,10 @@ static int find_free_major(){
 }
 
 int blkdev_register(unsigned int major, const char* name){
-	if (major >= MAJOR_MAX) {
+	if (major >= BLKDEV_MAJOR_HASH_SIZE) {
 		return -EINVAL;
 	}
 
-	int ret = SUCCESS;
 	struct blk_major_name** cur, *entry;
 
 	if(major == 0){
@@ -41,18 +42,7 @@ int blkdev_register(unsigned int major, const char* name){
 		if(major == 0){
 			return -ENOENT;
 		}
-
-		ret = major;
 	}
-
-	entry = kmalloc(sizeof(struct blk_major_name));
-	if(!entry){
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	strncpy(entry->name, name, sizeof(entry->name));
-	entry->major = major;
 
 	for (cur = &major_names[major_to_index(major)]; *cur; cur = &(*cur)->next) {
 		if ((*cur)->major == major){
@@ -60,16 +50,28 @@ int blkdev_register(unsigned int major, const char* name){
 		}
 	}
 
-	if (!*cur){
-		*cur = entry;
-		goto out;
+	if(*cur){
+		return -ENOENT;
 	}
-		
-	ret = -ENOENT;
-	kfree(entry);
 
-out:
-	return ret;
+	size_t name_len = strnlen(name, sizeof(entry->name));
+	if (name_len == 0) {
+		return -EINVAL;
+	} else if (name_len >= 32) {
+		return -ENAMETOOLONG;
+	}
+
+	entry = kmalloc(sizeof(struct blk_major_name));
+	if(!entry){
+		return -ENOMEM;
+	}
+
+	strncpy(entry->name, name, name_len);
+	entry->name[name_len] = '\0';
+	entry->major = major;
+	*cur = entry;
+
+	return SUCCESS;
 }
 
 void blkdev_unregister(unsigned int major, const char *name){
@@ -78,7 +80,7 @@ void blkdev_unregister(unsigned int major, const char *name){
 	if (!name)
 		return;
 
-	if (major >= MAJOR_MAX)
+	if (major >= BLKDEV_MAJOR_HASH_SIZE)
 		return;
 
 	cur = &major_names[major_to_index(major)];
@@ -100,10 +102,11 @@ int add_disk(struct gendisk* disk){
 	if (!disk)
 		return -EINVAL;
 
-	if (disk->major >= MAJOR_MAX)
+	if (disk->major >= BLKDEV_MAJOR_HASH_SIZE)
 		return -EINVAL;
 
-	if (!major_names[major_to_index(disk->major)])
+	struct blk_major_name* entry = major_names[major_to_index(disk->major)];
+	if (!entry)
 		return -EINVAL;
 
 	if (disk->minors_total <= 0)
@@ -135,6 +138,22 @@ int add_disk(struct gendisk* disk){
 	bdev->queue = queue;
 	disk->bdev = bdev;
 
+	struct device* dev = &bdev->dev;
+	dev->type = DEVICE_CLASS_BLOCK;
+	dev->devt = MKDEV(disk->major, disk->first_minor);
+	dev->driver_data = bdev;
+	dev->name = disk->name;
+
+	int res = device_register(dev);
+
+	if(res != SUCCESS){
+		kfree(queue);
+		kfree(bdev);
+		printk("BLK: failed to register disk \"%s\" (major=%u minor=%u) with error %d\n",
+			disk->name, disk->major, disk->first_minor, res);
+		return res;
+	}
+
 	INIT_LIST_HEAD(&bdev->list);
 	list_add_tail(&disk->list, &disks[disk->major]);
 	list_add_tail(&bdev->list, &disk->blkdevs);
@@ -142,7 +161,7 @@ int add_disk(struct gendisk* disk){
 	printk("BLK: added disk \"%s\" (major=%u minor=%u)\n",
 		disk->name, disk->major, disk->first_minor);
 
-	int res = blk_scan_partitions(disk);
+	res = blk_scan_partitions(disk);
 	if (IS_ERR_VALUE(res) && res != -ENOENT) {
 		printk("BLK-core: failed to read \"%s\" partitions %d\n",
 				disk->name, res);
@@ -157,6 +176,8 @@ void remove_disk(struct gendisk* disk){
         list_remove(&pos->list);
         kfree(pos);
     }
+
+	// TODO: Remove disk from list and clear memory
 }
 
 static int blkdev_open(struct inode *ino, struct file *file){
@@ -200,7 +221,7 @@ const struct file_operations def_blk_fops = {
 
 static __init int blkdev_init(){
 	memset(major_names, 0x0, sizeof(major_names));
-	for (int i = 0; i < MAJOR_MAX; i++){
+	for (int i = 0; i < BLKDEV_MAJOR_HASH_SIZE; i++){
     	INIT_LIST_HEAD(&disks[i]);
 	}
 
