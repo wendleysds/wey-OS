@@ -65,12 +65,6 @@ static inline enum vt_intensity color_intensity(terminal_color_t c){
 }
 
 int terminal_early_init();
-
 int terminal_init();
-void terminal_clean(struct vt_data* vt);
-void terminal_puts(struct vt_data* vt, const char* s);
-void terminal_scroll(struct vt_data *vt, unsigned int top, unsigned int bottom, terminal_scroll_t scroll_dir, unsigned int lines);
-int terminal_font_set(struct vt_data *vt, struct font_info* font);
-struct font_info* terminal_font_get(struct vt_data *vt);
 
 #endif

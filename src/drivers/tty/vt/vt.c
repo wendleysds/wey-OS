@@ -18,7 +18,7 @@ extern const struct consw vgadrv_consw;
 
 int cur_vt, last_vt;
 
-struct vt* terminal_get(int index){
+static struct vt* terminal_get(int index){
 	if(index >= TERMINALS_MAX || index < 0){
 		return NULL;
 	}
@@ -133,6 +133,72 @@ static int vt_alloc(int currcon){
 	return SUCCESS;
 }
 
+static void vt_redraw(struct vt_data *vt){
+	if(!vt->vt_sw->putc){
+		return;
+	}
+
+	for(int row = 0; row < vt->vt_rows; row++){
+		for(int col = 0; col < vt->vt_cols; col++){
+			int pos = row * vt->vt_cols + col;
+			vt->vt_sw->putc(
+				vt,
+				vt->screenbuffer[pos],
+				col,
+				row
+			);
+		}
+	}
+}
+
+static void vt_scroll(struct vt_data *vt, unsigned int top, unsigned int bottom, terminal_scroll_t scroll_dir, unsigned int lines){
+	if (!lines || top >= bottom)
+		return;
+
+	if (lines > bottom - top)
+		lines = bottom - top;
+
+	uint16_t *buf = vt->screenbuffer;
+	unsigned int cols = vt->vt_cols;
+	unsigned int stride = cols;
+
+	unsigned int region_rows = bottom - top;
+	unsigned int copy_rows = region_rows - lines;
+
+	if (scroll_dir == TERMINAL_SCROLL_UP) {
+		memmove(
+			&buf[top * stride],
+			&buf[(top + lines) * stride],
+			copy_rows * stride * sizeof(uint16_t)
+		);
+
+		for (unsigned int row = bottom - lines; row < bottom; row++) {
+			uint16_t *line = &buf[row * stride];
+			for (unsigned int col = 0; col < cols; col++)
+				line[col] = vt->vt_erase_char;
+		}
+
+	} else {
+		memmove(
+			&buf[(top + lines) * stride],
+			&buf[top * stride],
+			copy_rows * stride * sizeof(uint16_t)
+		);
+
+		for (unsigned int row = top; row < top + lines; row++) {
+			uint16_t *line = &buf[row * stride];
+			for (unsigned int col = 0; col < cols; col++)
+				line[col] = vt->vt_erase_char;
+		}
+	}
+
+	if(vt_is_visible(vt) && vt->vt_sw->scroll){
+		vt->vt_sw->scroll(vt, top, bottom, scroll_dir, lines);
+	}else if(vt_is_visible(vt)){
+		vt_redraw(vt);
+	}
+}
+
 static void vt_putc(struct vt_data *vt, char ch){
 	if(!vt->vt_sw->putc){
 		return;
@@ -187,30 +253,12 @@ static void vt_putc(struct vt_data *vt, char ch){
 	}
 
 	if (vt->state.y >= vt->vt_rows) {
-		terminal_scroll(vt, vt->vt_top, vt->vt_bottom, TERMINAL_SCROLL_UP, 1);
+		vt_scroll(vt, vt->vt_top, vt->vt_bottom, TERMINAL_SCROLL_UP, 1);
 		vt->state.y--;
 	}
 }
 
-static void vt_redraw(struct vt_data *vt){
-	if(!vt->vt_sw->putc){
-		return;
-	}
-
-	for(int row = 0; row < vt->vt_rows; row++){
-		for(int col = 0; col < vt->vt_cols; col++){
-			int pos = row * vt->vt_cols + col;
-			vt->vt_sw->putc(
-				vt,
-				vt->screenbuffer[pos],
-				col,
-				row
-			);
-		}
-	}
-}
-
-void vt_switch(int new_vt){
+static void vt_switch(int new_vt){
     if (new_vt == cur_vt)
         return;
 
@@ -230,8 +278,7 @@ void vt_switch(int new_vt){
     new->vt_sw->cursor(new, 1);
 }
 
-
-void terminal_puts(struct vt_data *vt, const char *s){
+void vt_puts(struct vt_data *vt, const char *s){
 	vt->vt_sw->cursor(vt, 0);
 	while (*s) {
 		vt_putc(vt, *s++);
@@ -239,7 +286,7 @@ void terminal_puts(struct vt_data *vt, const char *s){
 	vt->vt_sw->cursor(vt, 1);
 }
 
-static void _vt_console_write_impl(struct vt_data *vt, const char *buf, int length){
+static void vt_write(struct vt_data *vt, const char *buf, int length){
 	if (!vt)
 		return;
 
@@ -250,8 +297,25 @@ static void _vt_console_write_impl(struct vt_data *vt, const char *buf, int leng
 	vt->vt_sw->cursor(vt, 1);
 }
 
-static void _vt_console_write(const char *buf, int length){
-	_vt_console_write_impl(terminal_get(cur_vt)->data, buf, length);
+static void vt_clean(struct vt_data* vt){
+	if(vt_is_visible(vt) && vt->vt_sw->clean){
+		vt->vt_sw->clean(vt);
+	}
+
+	uint16_t *buf = vt->screenbuffer;
+	unsigned int cells = vt->screenbuffer_size / sizeof(uint16_t);
+
+	for (unsigned int i = 0; i < cells; i++)
+		buf[i] = vt->vt_erase_char;
+
+
+	if(!vt->vt_sw->clean && vt_is_visible(vt)){
+		vt_redraw(vt);
+	}
+}
+
+static void vt_write_current_active(const char *buf, int length){
+	vt_write(terminal_get(cur_vt)->data, buf, length);
 }
 
 static int __init terminal_common_init(int early){
@@ -281,7 +345,7 @@ static int __init terminal_common_init(int early){
 
 	cur_vt = last_vt = FIRST_VT_INDEX;
 
-	printk_set_echo(_vt_console_write);
+	printk_set_echo(vt_write_current_active);
 
 	printk_show_buffer();
 
@@ -301,67 +365,4 @@ int __init terminal_init(){
 	return terminal_common_init(0);
 }
 
-void terminal_clean(struct vt_data* vt){
-	if(vt_is_visible(vt) && vt->vt_sw->clean){
-		vt->vt_sw->clean(vt);
-	}
 
-	uint16_t *buf = vt->screenbuffer;
-	unsigned int cells = vt->screenbuffer_size / sizeof(uint16_t);
-
-	for (unsigned int i = 0; i < cells; i++)
-		buf[i] = vt->vt_erase_char;
-
-
-	if(!vt->vt_sw->clean && vt_is_visible(vt)){
-		vt_redraw(vt);
-	}
-}
-
-void terminal_scroll(struct vt_data *vt, unsigned int top, unsigned int bottom, terminal_scroll_t scroll_dir, unsigned int lines){
-	if (!lines || top >= bottom)
-        return;
-
-    if (lines > bottom - top)
-        lines = bottom - top;
-
-    uint16_t *buf = vt->screenbuffer;
-    unsigned int cols = vt->vt_cols;
-    unsigned int stride = cols;
-
-    unsigned int region_rows = bottom - top;
-    unsigned int copy_rows = region_rows - lines;
-
-    if (scroll_dir == TERMINAL_SCROLL_UP) {
-        memmove(
-            &buf[top * stride],
-            &buf[(top + lines) * stride],
-            copy_rows * stride * sizeof(uint16_t)
-        );
-
-        for (unsigned int row = bottom - lines; row < bottom; row++) {
-            uint16_t *line = &buf[row * stride];
-            for (unsigned int col = 0; col < cols; col++)
-                line[col] = vt->vt_erase_char;
-        }
-
-    } else {
-        memmove(
-            &buf[(top + lines) * stride],
-            &buf[top * stride],
-            copy_rows * stride * sizeof(uint16_t)
-        );
-
-        for (unsigned int row = top; row < top + lines; row++) {
-            uint16_t *line = &buf[row * stride];
-            for (unsigned int col = 0; col < cols; col++)
-                line[col] = vt->vt_erase_char;
-        }
-    }
-
-	if(vt_is_visible(vt) && vt->vt_sw->scroll){
-		vt->vt_sw->scroll(vt, top, bottom, scroll_dir, lines);
-	}else if(vt_is_visible(vt)){
-		vt_redraw(vt);
-	}
-}
