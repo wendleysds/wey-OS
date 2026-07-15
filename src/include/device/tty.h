@@ -1,0 +1,40 @@
+#ifndef _TTY_H
+#define _TTY_H
+
+#include <lib/list.h>
+#include <stddef.h>
+
+struct tty_struct;
+struct tty_driver;
+struct device;
+struct file;
+
+struct tty_ops {
+	int (*install)(struct tty_driver *, struct tty_struct *new_tty);
+	int (*open)(struct tty_struct *, struct file *file);
+	int (*write)(struct tty_struct *, const char *buffer, size_t count);
+};
+
+struct tty_driver {
+	const char *name;
+	unsigned int major;
+	unsigned int minor_start;
+	unsigned int num;
+
+	struct tty_struct** ttys;
+	struct device** devs;
+
+	const struct tty_ops *ops;
+	struct list_head list;
+
+};
+
+struct tty_struct {
+	int index;
+	struct tty_driver *driver;
+};
+
+struct tty_driver* tty_alloc_drive();
+int tty_register_driver(struct tty_driver* driver);
+
+#endif
