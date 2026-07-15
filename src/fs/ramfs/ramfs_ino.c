@@ -80,7 +80,7 @@ struct inode* ramfs_lookup(struct inode *dir, struct qstr *name){
 	return NULL;
 }
 
-static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mode, uint8_t isDir){
+static int ramfs_create_common(struct inode *dir, struct qstr *name, umode_t mode, uint8_t isDir, dev_t dev){
 	struct ramfs_inode *rdir = dir->private_data;
 
 	struct inode *existing = ramfs_lookup(dir, name);
@@ -108,10 +108,14 @@ static int ramfs_create_common(struct inode *dir, struct qstr *name, uint16_t mo
 
 	rino->name = rino_name;
 	rino->parent = rdir;
-	rino->isDir = isDir;
-	inode->mode = mode;
 	inode->i_op = &ramfs_iops;
-	inode->i_fop = &ramfs_fops;
+	inode->mode = mode;
+	inode->dev = dev;
+
+	if(S_ISREG(mode) || S_ISDIR(mode))
+		inode->i_fop = &ramfs_fops;
+	else
+		inode_init_special(inode, mode, dev);
 
 	spin_lock(&rdir->spinlock);
 	list_add(&rino->sibling, &rdir->children);
@@ -128,12 +132,12 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 	struct ramfs_inode *rino;
 	list_for_each_entry(rino, &rdir->children, sibling){
 		if(strlen(rino->name) == name->len && strncmp(rino->name, name->name, name->len) == 0){
-			if(rino->isDir && isFile){
+			if(S_ISDIR(rino->ino->mode) && isFile){
 				spin_unlock(&rdir->spinlock);
 				return -EINVAL;
 			}
 
-			if(rino->isDir){
+			if(S_ISDIR(rino->ino->mode)){
 				if(!list_empty(&rino->children)){
 					spin_unlock(&rdir->spinlock);
 					return -ENOTEMPTY;
@@ -153,12 +157,13 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 }
 
 
-static int ramfs_create(struct inode *dir, struct qstr *name, uint16_t mode){
-	return ramfs_create_common(dir, name, mode, 0);
+static int ramfs_create(struct inode *dir, struct qstr *name, umode_t mode){
+	if(S_ISDIR(mode)) return -EINVAL;
+	return ramfs_create_common(dir, name, mode, 0, 0);
 }
 
 static int ramfs_mkdir(struct inode *dir, struct qstr *name){
-	return ramfs_create_common(dir, name, S_IFDIR, 1);
+	return ramfs_create_common(dir, name, S_IFDIR, 1, 0);
 }
 
 static int ramfs_unlink(struct inode *dir, struct qstr *name){
@@ -208,8 +213,8 @@ static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
 	return OK;
 }
 
-static int ramfs_mknod(struct inode *dir, struct qstr *name, uint16_t mode, dev_t dev){
-	return -ENOSYS;
+static int ramfs_mknod(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev){
+	return ramfs_create_common(dir, name, mode, S_ISDIR(mode), dev);
 }
 
 const struct inode_operations ramfs_iops = {

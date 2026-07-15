@@ -103,13 +103,13 @@ struct file_operations {
 
 struct inode_operations {
 	struct inode* (*lookup)(struct inode *dir, struct qstr *name);
-	int (*create)(struct inode *dir, struct qstr *name, uint16_t mode);
+	int (*create)(struct inode *dir, struct qstr *name, umode_t mode);
 	int (*unlink)(struct inode *dir, struct qstr *name);
 	int (*mkdir)(struct inode *dir, struct qstr *name);
 	int (*rmdir)(struct inode *dir, struct qstr *name);
 	int (*getattr)(struct inode *ino, struct stat* restrict statbuf);
 	int (*setarrt)(struct inode *ino, struct iattr* attr);
-	int (*mknod)(struct inode *dir, struct qstr *name, uint16_t mode, dev_t dev);
+	int (*mknod)(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev);
 };
 
 struct file_system_type{
@@ -163,6 +163,9 @@ struct path {
 	struct inode *dentry;
 };
 
+extern const struct file_operations def_blk_fops;
+extern const struct file_operations def_chr_fops;
+
 int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, unsigned int flags, void* data);
 int vfs_umount(const char *mountpoint);
 
@@ -198,6 +201,7 @@ void destroy_super(struct super_block* sb);
 
 struct inode* inode_alloc(struct super_block *sb);
 struct inode* inode_new(struct super_block *sb);
+void inode_init_special(struct inode* inode, umode_t mode, dev_t dev);
 void inode_destroy(struct inode*);
 
 static inline void inode_get(struct inode* ino){

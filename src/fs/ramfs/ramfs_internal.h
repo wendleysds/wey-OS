@@ -8,13 +8,12 @@ struct page;
 struct inode;
 
 struct ramfs_inode {
+	struct inode* ino;
 	char *name;
-	uint8_t isDir;
 	struct page** pages; // file content blocks
 	size_t page_capacity;
 
 	struct ramfs_inode *parent;
-	struct inode* ino;
 
 	spinlock_t spinlock;
 

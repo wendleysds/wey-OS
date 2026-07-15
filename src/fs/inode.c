@@ -1,5 +1,6 @@
 #include <kernel/panic.h>
 #include <fs/vfs.h>
+#include <fs/stat.h>
 
 struct inode* inode_alloc(struct super_block* sb){
 	struct inode* inode = NULL;
@@ -40,5 +41,25 @@ void inode_destroy(struct inode* inode){
 		ops->destroy_inode(inode);
 	}else{
 		panic("inode_destroy(): No destroy operation on %s!", inode->i_sb->fs_type->name);
+	}
+}
+
+void inode_init_special(struct inode* inode, umode_t mode, dev_t dev){
+	inode->mode = mode;
+	switch (inode->mode & S_IFMT) {
+		case S_IFCHR:
+			inode->i_fop = &def_chr_fops;
+			inode->dev = dev;
+			break;
+		case S_IFBLK:
+			inode->i_fop = &def_blk_fops;
+			inode->dev = dev;
+			break;
+		case S_IFIFO:
+			break;
+		case S_IFSOCK:
+			break;
+		default:
+			break;
 	}
 }
