@@ -1,7 +1,10 @@
 #include <kernel/device.h>
 #include <kernel/init.h>
+#include <mm/kheap.h>
 #include <lib/string.h>
 #include <def/errno.h>
+
+#define MAX_DEVICE_NAME 64
 
 static LIST_HEAD(devices);
 
@@ -16,6 +19,13 @@ static int duplicate_device(dev_t dev){
 	}
 
 	return 0;
+}
+
+void device_initialize(struct device *dev){
+	memset(dev, 0x0, sizeof(struct device));
+	dev->type = DEVICE_CLASS_NONE;
+	dev->id = 0;
+	INIT_LIST_HEAD(&dev->list);
 }
 
 int __must_check device_register(struct device *dev){
@@ -50,6 +60,51 @@ void device_unregister(struct device *dev){
 
 	dev->id = 0;
 	list_remove(&dev->list);
+}
+
+struct device* device_create(dev_t devt, void *drvdata, const char *name){
+	if(devt == 0 || !name){
+		return ERR_PTR(-EINVAL); 
+	}
+
+	struct device* dev = kmalloc(sizeof(struct device));
+	if(!dev){
+		return ERR_PTR(-ENOMEM);
+	}
+
+	size_t name_len = strnlen(name, MAX_DEVICE_NAME);
+	if(name_len >= MAX_DEVICE_NAME){
+		kfree(dev);
+		return ERR_PTR(-ENAMETOOLONG);
+	}
+
+	if(name[name_len] != '\0'){
+		kfree(dev);
+		return ERR_PTR(-EINVAL);
+	}
+
+	char* s = strdup(name);
+	if(!s){
+		kfree(dev);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	s[name_len] = '\0';
+
+	device_initialize(dev);
+
+	dev->name = s;
+	dev->devt = devt;
+	dev->driver_data = drvdata;
+
+	int res = device_register(dev);
+	if(res){
+		kfree(s);
+		kfree(dev);
+		return ERR_PTR(res);
+	}
+
+	return dev;
 }
 
 struct device* device_get_by_name(const char* name){

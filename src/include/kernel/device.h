@@ -32,9 +32,11 @@ struct device {
 	struct list_head list;
 };
 
+void device_initialize(struct device *dev);
 int __must_check device_register(struct device *dev);
 void device_unregister(struct device *dev);
 
+struct device* device_create(dev_t devt, void *drvdata, const char *name);
 struct device* device_get_by_name(const char* name);
 struct device* device_get_by_devt(dev_t devt);
 struct device* device_get_by_id(int id);
