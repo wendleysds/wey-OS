@@ -4,10 +4,11 @@
 #include <def/config.h>
 #include <def/errno.h>
 #include <fs/vfs.h>
+#include <fs/stat.h>
 
 #define CHRDEV_MAJOR_HASH_SIZE 31
 
-struct chrdev{
+static struct chrdev{
 	char name[32];
 	struct chrdev* next;
 	unsigned int major;
@@ -60,7 +61,7 @@ static struct chrdev* reserve_minors_region(unsigned int major, unsigned int bas
 		return ERR_PTR(-ENOMEM);
 	}
 
-	int i = major_to_index(major);
+	const unsigned int i = major_to_index(major);
 	struct chrdev *cur = chrdevs[i], *prev = NULL;
 	for (; cur; prev = cur, cur = cur->next) {
 		if (cur->major < major)
@@ -133,22 +134,64 @@ int chardev_register(unsigned int major, unsigned int base_minor,
 }
 
 void chardev_unregister(unsigned int major, unsigned int base_minor,
-	unsigned int minor_total, const char *name)
+	unsigned int minor_total)
 {
 	struct chrdev* cdev = unreserve_minors_region(major, base_minor, minor_total);
 	if(!cdev){
 		return;
 	}
 
-	if(strncmp(cdev->name, name, sizeof(cdev->name)) != 0){
-		return;
-	}
-
 	kfree(cdev);
 }
 
+static const struct chrdev* chrdev_lookup(unsigned int major, unsigned int minor){
+	const unsigned int index = major_to_index(major);
+
+	struct chrdev **current = &chrdevs[index];
+	while (*current) {
+		struct chrdev *entry = *current;
+
+		if(entry->major == major){
+			if(minor < entry->first_minor + entry->minors_total)
+				return entry;
+			else
+				return NULL;
+		}
+
+		current = &entry->next;
+	}
+
+	return NULL;
+}
+
 static int chrdev_open(struct inode *ino, struct file *file){
-	return -ENOSYS;
+	if(!S_ISCHR(ino->mode)){
+		return -EINVAL;
+	}
+
+	const unsigned int major = MAJOR(ino->dev);
+	const unsigned int minor = MINOR(ino->dev);
+
+	const struct chrdev* dev = chrdev_lookup(major, minor);
+
+	if(!dev){
+		return -ENOENT;
+	}
+
+	if(!dev->ops){
+		return -ENXIO;
+	}
+
+	file->f_op = dev->ops;
+
+	if(file->f_op->open){
+		int ret = file->f_op->open(ino, file);
+		if(ret){
+			return ret;
+		}
+	}
+
+	return SUCCESS;
 }
 
 const struct file_operations def_chr_fops = {

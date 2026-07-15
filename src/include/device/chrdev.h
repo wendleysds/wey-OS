@@ -7,6 +7,6 @@ int chardev_register(unsigned int major, unsigned int base_minor,
 	unsigned int minor_total, const char *name, const struct file_operations *fops);
 
 void chardev_unregister(unsigned int major, unsigned int base_minor,
-	unsigned int minor_total, const char *name);
+	unsigned int minor_total);
 
 #endif
