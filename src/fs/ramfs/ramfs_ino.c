@@ -156,14 +156,17 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 	return -ENOENT;
 }
 
+static int ramfs_mknod(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev){
+	return ramfs_create_common(dir, name, mode, S_ISDIR(mode), dev);
+}
 
 static int ramfs_create(struct inode *dir, struct qstr *name, umode_t mode){
 	if(S_ISDIR(mode)) return -EINVAL;
-	return ramfs_create_common(dir, name, mode, 0, 0);
+	return ramfs_create_common(dir, name, mode | S_IFREG, 0, 0);
 }
 
 static int ramfs_mkdir(struct inode *dir, struct qstr *name){
-	return ramfs_create_common(dir, name, S_IFDIR, 1, 0);
+	return ramfs_create_common(dir, name, S_IFDIR | 0777, 1, 0);
 }
 
 static int ramfs_unlink(struct inode *dir, struct qstr *name){
@@ -211,10 +214,6 @@ static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
 		ino->ctime_sec = st->ctime;
 
 	return OK;
-}
-
-static int ramfs_mknod(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev){
-	return ramfs_create_common(dir, name, mode, S_ISDIR(mode), dev);
 }
 
 const struct inode_operations ramfs_iops = {

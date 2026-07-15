@@ -178,7 +178,8 @@ struct inode* vfs_walk(const char *path);
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode);
 
-int vfs_create(const char *restrict path, uint16_t mode);
+int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev);
+int vfs_create(const char *restrict path, umode_t mode);
 int vfs_unlink(const char *restrict path);
 int vfs_mkdir(const char *restrict path);
 int vfs_rmdir(const char *restrict path);
