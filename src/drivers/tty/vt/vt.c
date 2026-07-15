@@ -1,5 +1,5 @@
-#include "asm/page.h"
 #include <device/terminal.h>
+#include <device/tty.h>
 #include <kernel/init.h>
 #include <kernel/printk.h>
 #include <mm/kheap.h>
@@ -8,6 +8,7 @@
 #include <def/config.h>
 #include <uapi/headers.h>
 #include <lib/string.h>
+#include <asm/page.h>
 
 #define FIRST_VT_INDEX 0
 
@@ -365,4 +366,67 @@ int __init terminal_init(){
 	return terminal_common_init(0);
 }
 
+static int vt_tty_install(struct tty_driver *self, struct tty_struct *new_tty){
+	if(!self || !new_tty){
+		return -EINVAL;
+	}
 
+	if(new_tty->index < 0 || new_tty->index >= TERMINALS_MAX){
+		return -EINVAL;
+	}
+
+	return vt_alloc(new_tty->index);
+}
+
+static int vt_tty_write(struct tty_struct *self, const char *buffer, size_t count){
+	if(!self || !buffer){
+		return -EINVAL;
+	}
+
+	if(count == 0){
+		return 0;
+	}
+
+	struct vt *terminal = terminal_get(self->index);
+	if(!terminal){
+		return -EINVAL;
+	}
+
+	if(!terminal->data){
+		int res = vt_alloc(self->index);
+		if(res < 0){
+			return res;
+		}
+	}
+
+	vt_write(terminal->data, buffer, count);
+
+	return count;
+}
+
+static const struct tty_ops vt_tty_ops = {
+	.install = vt_tty_install,
+	.write = vt_tty_write
+};
+
+static int __init vt_init(void){
+	struct tty_driver* driver = tty_alloc_drive();
+	if(!driver){
+		return -ENOMEM;
+	}
+
+	driver->name = "tty",
+	driver->ops = &vt_tty_ops;
+	driver->major = 4;
+	driver->minor_start = 0;
+	driver->num = TERMINALS_MAX;
+
+	int res = tty_register_driver(driver);
+	if(res){
+		kfree(driver);
+	}
+
+	return res;
+}
+
+device_initcall(vt_init);
