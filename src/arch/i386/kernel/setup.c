@@ -28,6 +28,9 @@ struct video_info video_info;
 unsigned long max_low_pfn_mapped;
 unsigned long max_pfn_mapped;
 
+unsigned long ramdisk_ptr;
+unsigned long ramdisk_size;
+
 unsigned long _brk_start = (unsigned long)__brk_base;
 unsigned long _brk_ptr = (unsigned long)__brk_base;
 unsigned long _brk_end = (unsigned long)__brk_limit;
@@ -152,7 +155,7 @@ static __init void setup_swapper(void){
 
 static __init void setup_video(void){
 	struct boot_tag_video* v = (struct boot_tag_video*)boot_find_tag(&boot_header, BOOT_TAG_VIDEO);
-	if(!v) panic("Setup: No video information provided!");
+	if(!v) panic("Setup: No boot_tag_video provided!");
 
 	struct video_info video = {
 		.type = v->type,
@@ -202,6 +205,20 @@ static __init void check_pse(void){
 	memcpy((void*)arch_paging_fmt.sizes, sizes, sizeof(struct paging_size) * idx);
 }
 
+static void __init setup_ramdisk(void) {
+	struct boot_tag_setup* setup = (void*)boot_find_tag(
+		&boot_header, 
+		BOOT_TAG_SETUP
+	);
+
+	if(!setup){
+		panic("Setup: No boot_tag_setup provided!");
+	}
+
+	ramdisk_ptr = __va(setup->ramdisk_ptr);
+	ramdisk_size = setup->ramdisk_size;
+}
+
 static __init void setup_memblock(void){
 	struct boot_tag_e820* e820 = (void*)boot_find_tag(
 		&boot_header, 
@@ -242,6 +259,12 @@ static __init void setup_memblock(void){
 	memblock_reserve(
 		__pa(boot_header.tags_ptr), 
 		boot_header.tags_size
+	);
+
+	// Reserve initrd
+	memblock_reserve(
+		__pa(ramdisk_ptr), 
+		ramdisk_size
 	);
 
 	// BRK
@@ -289,7 +312,7 @@ __init void setup_arch(void){
 		BOOT_TAG_E820
 	);
 
-	if(!e820) panic("Setup: No memory map provided!");
+	if(!e820) panic("Setup: No boot_tag_e820 provided!");
 
 	e820_init(
 		e820->map, 
@@ -302,6 +325,8 @@ __init void setup_arch(void){
 	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);
 
 	setup_video();
+
+	setup_ramdisk();
 
 	setup_memblock();
 
