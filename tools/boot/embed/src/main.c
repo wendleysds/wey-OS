@@ -429,7 +429,6 @@ process_line:
 
 	platform_clear_screen();
 	printf("Selected: %s\n", cur->label);
-	printf("Loading %s ...\n", cur->target);
 
 	struct load_info_struct load_info;
 
