@@ -17,6 +17,10 @@ hdr:
 	dd main                   ; code16_start
 	dd 0x0100000              ; code32_start
 
+	dd 0                      ; ramdisk_ptr
+	dd 0                      ; ramdisk_size
+	dd 0                      ; cmd_line_ptr
+
 	dd 0x0200000              ; kernel_alignment
 
 	db 0                      ; relocatable_kernel

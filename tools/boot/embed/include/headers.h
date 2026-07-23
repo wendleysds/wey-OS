@@ -89,6 +89,10 @@ struct boot_tag_setup{
 	uint32_t code16_start;
 	uint32_t code32_start;
 
+	uint32_t ramdisk_ptr;
+	uint32_t ramdisk_size;
+	uint32_t cmd_line_ptr;
+
 	uint32_t kernel_alignment;
 
 	uint8_t relocatable_kernel;
