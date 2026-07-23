@@ -21,6 +21,6 @@ struct cpio_file_iter {
 	uint32_t check;
 };
 
-int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer);
+int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer);
 
 #endif

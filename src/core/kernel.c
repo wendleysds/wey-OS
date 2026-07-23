@@ -13,7 +13,6 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 extern void setup_arch();
-extern int unpack_initrd();
 
 static inline void module_load(const char* module_name, int (*func)(void)){
 	int res = func();
@@ -58,9 +57,7 @@ static __init void do_initcalls(){
 static int init(void* args){
 	interrupts_disable();
 
-	printk("unpack status: %d\n", unpack_initrd());
-
-	kernel_exec("/bash", 0x0, 0x0);
+	kernel_exec("/init", 0x0, 0x0);
 
 	printk("OK\n");
 

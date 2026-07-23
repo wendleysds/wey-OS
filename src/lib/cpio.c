@@ -48,19 +48,19 @@ static uint32_t cpio_parse_field(const char field[8]) {
 	return value;
 }
 
-int cpio_initramfs_iterate(void* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer){
+int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8_t** cursor, struct cpio_file_iter* file_buffer){
 	if (!initrd_start || !cursor || !file_buffer)
 		return -EINVAL;
 
 	uintptr_t aligned;
 	const uint8_t* cur;
 
-	uint8_t* start = (uint8_t*)initrd_start;
+	const uint8_t* start = initrd_start;
 	if(size > UINTPTR_MAX - (uintptr_t)start){
 		return -ERANGE;
 	}
 
-	uint8_t* end = start + size;
+	const uint8_t* end = start + size;
 
 	if (*cursor == NULL)
 		cur = start;
