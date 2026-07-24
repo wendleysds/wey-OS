@@ -1,1 +1,1 @@
-obj-y += vt.o
+obj-y += vt.o keyboard.o

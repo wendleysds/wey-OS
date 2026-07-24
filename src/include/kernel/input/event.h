@@ -15,19 +15,9 @@ enum input_key_state {
 	INPUT_KEY_PRESSED,
 };
 
-enum input_modifier {
-	INPUT_MOD_SHIFT      = 1 << 0,
-	INPUT_MOD_CTRL       = 1 << 1,
-	INPUT_MOD_ALT        = 1 << 2,
-	INPUT_MOD_CAPSLOCK   = 1 << 3,
-	INPUT_MOD_NUMLOCK    = 1 << 4,
-	INPUT_MOD_SCROLLLOCK = 1 << 5,
-};
-
 struct input_key_event {
 	enum input_keycode keycode;
 	enum input_key_state state;
-	uint32_t modifiers;
 };
 
 struct input_mouse_event {
