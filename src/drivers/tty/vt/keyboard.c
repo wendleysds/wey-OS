@@ -2,6 +2,8 @@
 #include <kernel/printk.h>
 #include <kernel/input.h>
 #include <kernel/init.h>
+#include <device/terminal.h>
+#include <device/tty.h>
 #include <lib/string.h>
 #include <stdbool.h>
 
@@ -65,6 +67,12 @@ static const keymap_entry_t qwerty_us_map[NR_KEYS] = {
 	[KEY_KP_ENTER]    = {'\n', '\n'},
 };
 
+static bool is_combo(bool alt, bool crtl, bool shift){
+	return kb_state.alt == alt &&
+		   kb_state.ctrl == crtl &&
+		   kb_state.shift == shift;
+}
+
 static char keycode_to_ascii(enum input_keycode code) {
     if (code >= NR_KEYS) return '\0';
 
@@ -77,6 +85,11 @@ static char keycode_to_ascii(enum input_keycode code) {
     
     bool use_uppercase = false;
     if (is_alpha) {
+
+		if(is_combo(false, true, false)){
+			return entry.normal & 0x1F;
+		}
+
         use_uppercase = kb_state.shift ^ kb_state.capslock;
     } else {
         use_uppercase = kb_state.shift;
@@ -115,12 +128,6 @@ static bool update_kb_state(enum input_keycode keycode, bool release){
 	}
 }
 
-static bool is_combo(bool alt, bool crtl, bool shift){
-	return kb_state.alt == alt &&
-		   kb_state.ctrl == crtl &&
-		   kb_state.shift == shift;
-}
-
 static bool is_fkey(enum input_keycode keycode){
 	return keycode >= KEY_F1 && keycode <= KEY_F24;
 }
@@ -134,11 +141,17 @@ static void key_event(struct input_handler *self, const struct input_event *even
 	if(update_kb_state(keycode, release)) return;
 
 	if(is_combo(true, false, false) && is_fkey(keycode)){
-		printk("switching too %d ...\n", keycode - KEY_F1);
+		terminal_switch(keycode - KEY_F1);
 		return;
 	}
 
-	printk("%c", keycode_to_ascii(keycode));
+	char ch = keycode_to_ascii(keycode);
+	if (ch != '\0') {
+		struct tty_struct*tty = terminal_get_current()->tty;
+		if(!tty) return;
+
+		tty_receive_char(tty, ch);
+	}
 }
 
 static struct input_handler keyboard_event_listener =  {

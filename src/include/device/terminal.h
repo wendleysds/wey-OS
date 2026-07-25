@@ -67,4 +67,7 @@ static inline enum vt_intensity color_intensity(terminal_color_t c){
 int terminal_early_init();
 int terminal_init();
 
+struct vt* terminal_get_current();
+int terminal_switch(int index);
+
 #endif

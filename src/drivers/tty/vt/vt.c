@@ -394,6 +394,31 @@ int __init terminal_init(){
 	return terminal_common_init(0);
 }
 
+struct vt* terminal_get_current(){
+	return terminal_get(cur_vt);
+}
+
+int terminal_switch(int index){
+	struct vt* vt = terminal_get(index);
+	if(!vt) return -EINVAL;
+
+	if(!vt->data){
+		int res = vt_alloc(index);
+		if(res) return res;
+	}
+
+	if(!vt->tty){
+		void* res_ptr = tty_ensure_created(driver, index);
+		if(IS_ERR(res_ptr)){
+			kfree(driver);
+			return PTR_ERR(res_ptr);
+		}
+	}
+
+	vt_switch(index);
+	return SUCCESS;
+}
+
 static int vt_tty_install(struct tty_driver *self, struct tty_struct *new_tty){
 	if(!self || !new_tty){
 		return -EINVAL;

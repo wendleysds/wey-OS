@@ -12,9 +12,42 @@
 
 #define TTY_MAX_NAME 32
 
+extern const struct tty_ldisc_ops tty_ldisc_ops;
+
 static LIST_HEAD(drivers);
 
-static int tty_open(struct inode* ino, struct file* file){
+struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index){
+	struct tty_struct* tty = driver->ttys[index];
+	if(!tty){
+		tty = kmalloc(sizeof(struct tty_struct));
+		if(!tty){
+			return ERR_PTR(-ENOMEM);
+		}
+
+		tty->driver = driver;
+		tty->index = index;
+		spinlock_init(&tty->lock);
+
+		int res = driver->ops->install(driver, tty);
+		if(res < 0){
+			kfree(tty);
+			return ERR_PTR(res);
+		}
+
+		res = tty_ldisc_ops.open(tty);
+		if(res < 0){
+			kfree(tty);
+			return ERR_PTR(res);
+		}
+
+		driver->ttys[index] = tty;
+		tty->ops = tty->driver->ops;
+	}
+
+	return tty;
+}
+
+static int tty_file_open(struct inode* ino, struct file* file){
 	if(!S_ISCHR(ino->mode) || ino->dev == 0){
 		return -EINVAL;
 	}
@@ -27,24 +60,9 @@ static int tty_open(struct inode* ino, struct file* file){
 	struct tty_driver* driver = dev->driver_data;
 	const int index = MINOR(ino->dev) - driver->minor_start;
 
-	struct tty_struct* tty = driver->ttys[index];
-
-	if(!tty){
-		tty = kmalloc(sizeof(struct tty_struct));
-		if(!tty){
-			return -ENOMEM;
-		}
-
-		tty->driver = driver;
-		tty->index = index;
-
-		int res = driver->ops->install(driver, tty);
-		if(res < 0){
-			kfree(tty);
-			return res;
-		}
-
-		driver->ttys[index] = tty;
+	struct tty_struct* tty = tty_ensure_created(driver, index);
+	if(IS_ERR(tty)){
+		return PTR_ERR(tty);
 	}
 
 	file->private_data = tty;
@@ -58,7 +76,7 @@ static int tty_open(struct inode* ino, struct file* file){
 	return SUCCESS;
 }
 
-static int tty_write(struct file* file, const void* buffer, uint32_t count){
+static int tty_file_write(struct file* file, const void* buffer, uint32_t count){
 	if(!buffer){
 		return -EINVAL;
 	}
@@ -66,18 +84,22 @@ static int tty_write(struct file* file, const void* buffer, uint32_t count){
 	if(count == 0) return 0;
 
 	struct tty_struct* tty = file->private_data;
-	const struct tty_driver* driver = tty->driver;
+	spin_lock(&tty->lock);
 
-	if(!driver->ops->write){
+	if(!tty->ops->write){
+		spin_unlock(&tty->lock);
 		return -ENOSYS;
 	}
 
-	return driver->ops->write(tty, buffer, count);
+	int res = tty->ops->write(tty, buffer, count);
+
+	spin_unlock(&tty->lock);
+	return res;
 }
 
 static const struct file_operations tty_file_ops = {
-	.open = tty_open,
-	.write = tty_write
+	.open = tty_file_open,
+	.write = tty_file_write
 };
 
 struct tty_driver* tty_alloc_drive(){
@@ -119,7 +141,14 @@ int tty_register_driver(struct tty_driver* driver){
 		return -ENOMEM;
 	}
 
-	int res = chardev_register(driver->major, driver->minor_start, driver->num, driver->name, &tty_file_ops);
+	int res = chardev_register(
+		driver->major,
+		driver->minor_start,
+		driver->num,
+		driver->name,
+		&tty_file_ops
+	);
+
 	if(res < 0){
 		kfree(ttys);
 		kfree(devs);
@@ -186,4 +215,4 @@ static int __init tty_init(void){
 	return SUCCESS;
 }
 
-subsys_initcall(tty_init);
+fs_initcall(tty_init);
