@@ -1,6 +1,7 @@
 #ifndef _TERMINAL_STRUCT_H
 #define _TERMINAL_STRUCT_H
 
+#include <sync/spinlock.h>
 #include <lib/font.h>
 
 struct video_info {
@@ -74,11 +75,14 @@ struct vt_data{
 	unsigned char vt_default_color;
 	unsigned char vt_attr;
 
+	spinlock_t lock;
+
 	struct font_info font;
 };
 
 struct vt {
 	struct vt_data* data;
+	struct tty_struct* tty;
 };
 
 #endif

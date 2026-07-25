@@ -8,11 +8,14 @@
 #include <def/config.h>
 #include <uapi/headers.h>
 #include <lib/string.h>
+#include <lib/assert.h>
 #include <asm/page.h>
 
 #define FIRST_VT_INDEX 0
 
 static struct vt terminals[TERMINALS_MAX];
+static spinlock_t console_lock;
+static struct tty_driver* driver = NULL;
 
 extern struct video_info video_info;
 extern const struct consw vgadrv_consw;
@@ -63,6 +66,7 @@ static void vt_data_setup(struct vt_data *vt){
 	vt->state.color = TERMINAL_DEFAULT_COLOR;
 	vt->state.intensity = TERMINAL_INTENSITY_NORMAL;
 	update_attr(vt);
+	spinlock_init(&vt->lock);
 }
 
 static __init int vt_early_alloc(){
@@ -101,28 +105,31 @@ static int vt_alloc(int currcon){
 		return -EINVAL;
 	}
 
-	struct vt* terminal = terminal_get(currcon);
+	spin_lock(&console_lock);
 
+	struct vt* terminal = terminal_get(currcon);
 	if(terminal->data){
+		spin_unlock(&console_lock);
 		return SUCCESS;
 	}
 
 	struct vt_data *vt = (struct vt_data*)kzalloc(sizeof(struct vt_data));
-
 	if(!vt){
+		spin_unlock(&console_lock);
 		return -ENOMEM;
 	}
 
 	int res = vt_data_con_setup(vt);
 	if(IS_ERR_VALUE(res)){
 		kfree(vt);
+		spin_unlock(&console_lock);
 		return res;
 	}
 
 	vt->screenbuffer = (unsigned short*)kmalloc(vt->screenbuffer_size);
-	
 	if(!vt->screenbuffer){
 		kfree(vt);
+		spin_unlock(&console_lock);
 		return -ENOMEM;
 	}
 
@@ -131,6 +138,7 @@ static int vt_alloc(int currcon){
 	vt->id = currcon;
 	terminals[currcon].data = vt;
 
+	spin_unlock(&console_lock);
 	return SUCCESS;
 }
 
@@ -214,11 +222,16 @@ static void vt_putc(struct vt_data *vt, char ch){
 		break;
 
 		case '\r':
-			vt->state.x = 0;
+			vt->state.x = 0; 
+		break;
+
+		case '\b':
+			if(vt->state.x != 0)
+				vt->state.x--;
 		break;
 
 		case '\t':
-			vt->state.x = (vt->state.x + 8) & ~(8 - 1);
+			vt->state.x = (vt->state.x + 4) & ~(4 - 1);
 			if (vt->state.x >= vt->vt_cols) {
 				vt->state.x = 0;
 				vt->state.y++;
@@ -260,45 +273,57 @@ static void vt_putc(struct vt_data *vt, char ch){
 }
 
 static void vt_switch(int new_vt){
-    if (new_vt == cur_vt)
-        return;
+	if (new_vt == cur_vt)
+		return;
 
-    struct vt_data *old = terminal_get(cur_vt)->data;
-    struct vt_data *new = terminal_get(new_vt)->data;
+	spin_lock(&console_lock);
 
-    if (!new)
-        return;
+	struct vt_data *old = terminal_get(cur_vt)->data;
+	struct vt_data *new = terminal_get(new_vt)->data;
 
-    last_vt = cur_vt;
-    cur_vt = new_vt;
+	if (!new){
+		spin_unlock(&console_lock);
+		return;
+	}
 
-    old->vt_sw->cursor(old, 0);
+	last_vt = cur_vt;
+	cur_vt = new_vt;
 
-    vt_redraw(new);
+	old->vt_sw->cursor(old, 0);
 
-    new->vt_sw->cursor(new, 1);
+	vt_redraw(new);
+
+	new->vt_sw->cursor(new, 1);
+
+	spin_unlock(&console_lock);
 }
 
 void vt_puts(struct vt_data *vt, const char *s){
+	spin_lock(&vt->lock);
+
 	vt->vt_sw->cursor(vt, 0);
 	while (*s) {
 		vt_putc(vt, *s++);
 	}
 	vt->vt_sw->cursor(vt, 1);
+
+	spin_unlock(&vt->lock);
 }
 
 static void vt_write(struct vt_data *vt, const char *buf, int length){
-	if (!vt)
-		return;
+	spin_lock(&vt->lock);
 
 	vt->vt_sw->cursor(vt, 0);
 	for(int i = 0; i < length; i++){
 		vt_putc(vt, buf[i]);
 	}
 	vt->vt_sw->cursor(vt, 1);
+
+	spin_unlock(&vt->lock);
 }
 
 static void vt_clean(struct vt_data* vt){
+	spin_lock(&vt->lock);
 	if(vt_is_visible(vt) && vt->vt_sw->clean){
 		vt->vt_sw->clean(vt);
 	}
@@ -313,6 +338,8 @@ static void vt_clean(struct vt_data* vt){
 	if(!vt->vt_sw->clean && vt_is_visible(vt)){
 		vt_redraw(vt);
 	}
+
+	spin_unlock(&vt->lock);
 }
 
 static void vt_write_current_active(const char *buf, int length){
@@ -328,6 +355,7 @@ static int __init terminal_common_init(int early){
 	}
 
 	if (early) {
+		spinlock_init(&console_lock);
 		res = vt_early_alloc();
 	} else {
 		res = vt_alloc(FIRST_VT_INDEX);
@@ -375,7 +403,15 @@ static int vt_tty_install(struct tty_driver *self, struct tty_struct *new_tty){
 		return -EINVAL;
 	}
 
-	return vt_alloc(new_tty->index);
+	int res = vt_alloc(new_tty->index);
+	if(res) return res;
+
+	struct vt* vt = terminal_get(new_tty->index);
+	BUG_ON(vt->tty);
+
+	vt->tty = new_tty;
+
+	return OK;
 }
 
 static int vt_tty_write(struct tty_struct *self, const char *buffer, size_t count){
@@ -409,8 +445,8 @@ static const struct tty_ops vt_tty_ops = {
 	.write = vt_tty_write
 };
 
-static int __init vt_init(void){
-	struct tty_driver* driver = tty_alloc_drive();
+static int __init vt_tty_init(void){
+	driver = tty_alloc_drive();
 	if(!driver){
 		return -ENOMEM;
 	}
@@ -426,7 +462,18 @@ static int __init vt_init(void){
 		kfree(driver);
 	}
 
-	return res;
+	void* res_ptr = tty_ensure_created(driver, 0);
+	if(IS_ERR(res_ptr)){
+		kfree(driver);
+		return PTR_ERR(res_ptr);
+	}
+
+	return SUCCESS;
+}
+
+static int __init vt_init(void){
+	spinlock_init(&console_lock);
+	return vt_tty_init();
 }
 
 device_initcall(vt_init);
