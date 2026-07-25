@@ -1,6 +1,7 @@
 #ifndef _X86_CPU_H
 #define _X86_CPU_H
 
+#include <def/compile.h>
 #include <asm/tss.h>
 
 struct task;
