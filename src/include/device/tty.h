@@ -33,6 +33,23 @@ struct tty_ldisc {
 	void* data;
 };
 
+struct tty_buffer {
+	struct tty_buffer* next;
+
+	unsigned int read_pos;
+	unsigned int write_pos;
+
+	unsigned int size;
+	u8* data;
+};
+
+struct tty_bufhead {
+	struct tty_buffer *head;
+	struct tty_buffer *tail; // Active buffer
+
+	spinlock_t lock;
+};
+
 struct tty_line_discipline_state {
 	spinlock_t lock;
 	struct tty_ldisc ldisc;
@@ -61,8 +78,9 @@ struct tty_struct {
 
 	void* private;
 
-	struct wait_queue_head read_waiters;
+	struct tty_bufhead buffer;
 
+	struct wait_queue_head read_waiters;
 	spinlock_t lock;
 };
 
@@ -72,5 +90,7 @@ int tty_register_driver(struct tty_driver* driver);
 struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index);
 
 void tty_receive_char(struct tty_struct* tty, char ch);
+int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count);
+int tty_buffer_read(struct tty_struct *tty, u8 *buffer, size_t count);
 
 #endif

@@ -97,6 +97,7 @@
 
 /*Terminal/Console*/
 #define TERMINALS_MAX 6
+#define TTY_BUFFER_CHUNK_SIZE 1024
 
 /*CPU*/
 #define MAX_CPUS 4
