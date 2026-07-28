@@ -1,5 +1,6 @@
 #include <device/tty.h>
 #include <kernel/init.h>
+#include <kernel/sched.h>
 #include <kernel/printk.h>
 #include <kernel/device.h>
 #include <device/chrdev.h>
@@ -27,6 +28,7 @@ struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index
 		tty->driver = driver;
 		tty->index = index;
 		spinlock_init(&tty->lock);
+		wait_queue_head_init(&tty->read_waiters);
 
 		int res = driver->ops->install(driver, tty);
 		if(res < 0){
@@ -97,9 +99,26 @@ static int tty_file_write(struct file* file, const void* buffer, uint32_t count)
 	return res;
 }
 
+static int tty_file_read(struct file *file, void *buffer, uint32_t count){
+	if(!buffer){
+		return -EINVAL;
+	}
+
+	if(count == 0) return 0;
+
+	struct tty_struct* tty = file->private_data;
+
+	if(!tty->ldisc || !tty->ldisc->ops->read){
+		return -ENODEV;
+	}
+
+	return tty->ldisc->ops->read(tty, buffer, count);
+}
+
 static const struct file_operations tty_file_ops = {
 	.open = tty_file_open,
-	.write = tty_file_write
+	.write = tty_file_write,
+	.read = tty_file_read,
 };
 
 struct tty_driver* tty_alloc_drive(){

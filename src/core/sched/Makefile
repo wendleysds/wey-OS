@@ -1,1 +1,1 @@
-obj-y += task.o sched.o
+obj-y += task.o wait.o sched.o

@@ -1,4 +1,5 @@
 #include <kernel/sched.h>
+#include <kernel/printk.h>
 #include <lib/string.h>
 #include <asm/cpuflags.h>
 #include <mm/vma.h>
@@ -70,6 +71,9 @@ void context_switch(struct task* prev, struct task* to){
 	if(prev == to || to == cpu->current){
 		return;
 	}
+
+	printk("Switching to \"[%d:%s]\"\n", to->pid, to->name);
+
 
 	// TODO: do some checks here, like if the tasks are valid or permissions
 

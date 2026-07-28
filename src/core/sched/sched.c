@@ -1,6 +1,5 @@
 #include <kernel/clock.h>
 #include <kernel/sched.h>
-#include <kernel/printk.h>
 #include <sync/spinlock.h>
 #include <def/compile.h>
 #include <def/errno.h>
@@ -59,8 +58,6 @@ asmlinkage void schedule(){
 			next_task = prev_task;
 		}
 	}
-
-	printk("Switching to \"[%d:%s]\"\n", next_task->pid, next_task->name);
 
 	context_switch(prev_task, next_task);
 }

@@ -54,12 +54,23 @@ static __init void do_initcalls(){
 	}
 }
 
+#include <fs/stat.h>
+#include <kernel/device.h>
+
 static int init(void* args){
-	interrupts_disable();
+	//interrupts_disable();
 
-	kernel_exec("/init", 0x0, 0x0);
+	//kernel_exec("/init", 0x0, 0x0);
 
-	printk("OK\n");
+	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
+	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
+
+	while(1){
+		char buffer[64];
+		int readed = vfs_read(tty, buffer, sizeof(buffer));
+		buffer[readed] = '\0';
+		printk("readed %d: %s\n", readed, buffer);
+	}
 
 	while(1) cpu_relax();
 	unreachable();

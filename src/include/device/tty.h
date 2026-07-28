@@ -1,6 +1,7 @@
 #ifndef _TTY_H
 #define _TTY_H
 
+#include <kernel/wait.h>
 #include <sync/spinlock.h>
 #include <lib/list.h>
 #include <stddef.h>
@@ -20,6 +21,10 @@ struct tty_ops {
 struct tty_ldisc_ops {
 	int (*open)(struct tty_struct*);
 	int (*close)(struct tty_struct*);
+
+	int (*read)(struct tty_struct*, char *buffer, size_t len);
+	int (*write)(struct tty_struct*, const char *buffer, size_t len);
+
 	int (*receive_buf)(struct tty_struct*, const char *data, size_t len);
 };
 
@@ -29,6 +34,7 @@ struct tty_ldisc {
 };
 
 struct tty_line_discipline_state {
+	spinlock_t lock;
 	struct tty_ldisc ldisc;
 	char buffer[256];
 	size_t len;
@@ -54,6 +60,8 @@ struct tty_struct {
 	struct tty_ldisc *ldisc;
 
 	void* private;
+
+	struct wait_queue_head read_waiters;
 
 	spinlock_t lock;
 };
