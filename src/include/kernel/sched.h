@@ -9,6 +9,7 @@
 #include <lib/list.h>
 
 struct mm_struct;
+struct wait_queue_entry;
 
 typedef enum {
 	TASK_NEW,
@@ -52,6 +53,8 @@ void task_reparent_children(struct task* task, struct task* new_parent);
 
 asmlinkage void task_sleep(struct task* task);
 asmlinkage void task_wakeup(struct task* task);
+
+int task_default_wakeup(struct wait_queue_entry* entry);
 
 asmlinkage void schedule();
 

@@ -1,5 +1,6 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
+#include <kernel/wait.h>
 #include <lib/assert.h>
 #include <lib/string.h>
 #include <mm/vma.h>
@@ -49,6 +50,16 @@ asmlinkage void task_wakeup(struct task* task){
 		task->state = TASK_READY;
 		scheduler_add(task);
 	}
+}
+
+int task_default_wakeup(struct wait_queue_entry* entry){
+	struct task* task = entry->private;
+	if(task->state != TASK_BLOCKED){
+		return 0;
+	}
+
+	task_wakeup(task);
+	return 1;
 }
 
 void task_reparent_children(struct task* task, struct task* new_parent){
