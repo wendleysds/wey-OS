@@ -1,20 +1,13 @@
-#include "kernel/wait.h"
 #include <device/tty.h>
 #include <device/terminal.h>
 #include <kernel/printk.h>
 #include <kernel/sched.h>
+#include <kernel/wait.h>
 #include <mm/kheap.h>
 #include <def/errno.h>
 #include <lib/string.h>
 
 extern const struct tty_ldisc_ops tty_ldisc_ops;
-
-static int tty_task_awake(struct wait_queue_entry* entry){
-	struct task* task = entry->private;
-	task_wakeup(task);
-
-	return 1;
-}
 
 static int tty_ldisc_open(struct tty_struct* tty){
 	if(!tty){
@@ -60,7 +53,7 @@ static int tty_ldisc_read(struct tty_struct* tty, char *buffer, size_t len){
 
 	struct tty_line_discipline_state* state = tty->ldisc->data;
 	struct wait_queue_entry wait;
-	wait_queue_entry_init(&wait, current, tty_task_awake);
+	wait_queue_entry_init(&wait, current, task_default_wakeup);
 
 	size_t bytes_read = 0;
 	wait_queue_add(&tty->read_waiters, &wait);
