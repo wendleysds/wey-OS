@@ -14,7 +14,7 @@ struct file;
 struct tty_ops {
 	int (*install)(struct tty_driver*, struct tty_struct *new_tty);
 	int (*open)(struct tty_struct*, struct file *file);
-	int (*write)(struct tty_struct*, const char *buffer, size_t count);
+	int (*write)(struct tty_struct*, const u8 *buffer, size_t count);
 	int (*ioctl)(struct tty_struct*, unsigned int cmd, unsigned long arg);
 };
 
@@ -22,10 +22,10 @@ struct tty_ldisc_ops {
 	int (*open)(struct tty_struct*);
 	int (*close)(struct tty_struct*);
 
-	int (*read)(struct tty_struct*, char *buffer, size_t len);
-	int (*write)(struct tty_struct*, const char *buffer, size_t len);
+	int (*read)(struct tty_struct*, u8 *buffer, size_t len);
+	int (*write)(struct tty_struct*, const u8 *buffer, size_t len);
 
-	int (*receive_buf)(struct tty_struct*, const char *data, size_t len);
+	int (*receive_buf)(struct tty_struct*, const u8 *data, size_t len);
 };
 
 struct tty_ldisc {

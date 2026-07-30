@@ -439,7 +439,7 @@ static int vt_tty_install(struct tty_driver *self, struct tty_struct *new_tty){
 	return OK;
 }
 
-static int vt_tty_write(struct tty_struct *self, const char *buffer, size_t count){
+static int vt_tty_write(struct tty_struct *self, const u8 *buffer, size_t count){
 	if(!self || !buffer){
 		return -EINVAL;
 	}
@@ -460,7 +460,7 @@ static int vt_tty_write(struct tty_struct *self, const char *buffer, size_t coun
 		}
 	}
 
-	vt_write(terminal->data, buffer, count);
+	vt_write(terminal->data, (char*)buffer, count);
 
 	return count;
 }

@@ -9,8 +9,8 @@
 
 struct tty_ldisc_data {
 	spinlock_t lock;
-	char buffer[256];
 	size_t len;
+	u8 buffer[256];
 };
 
 extern const struct tty_ldisc_ops tty_ldisc_ops;
@@ -60,7 +60,7 @@ static int tty_ldisc_close(struct tty_struct* tty){
 	return 0;
 }
 
-static int tty_ldisc_read(struct tty_struct* tty, char *buffer, size_t len){
+static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 	if(!tty || !buffer || len == 0){
 		return 0;
 	}
@@ -100,7 +100,7 @@ static int tty_ldisc_read(struct tty_struct* tty, char *buffer, size_t len){
 	return bytes_read;
 }
 
-static int tty_ldisc_receive_buf(struct tty_struct* tty, const char* data, size_t len){
+static int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 	if(!tty || !data || len == 0){
 		return 0;
 	}
@@ -116,14 +116,14 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const char* data, size_
 
 	spin_lock_irqsave(&state->lock, &flags);
 	for(size_t i = 0; i < len; i++){
-		char ch = data[i];
+		u8 ch = data[i];
 
 		if(ch == '\b'){
 			if(state->len > 0){
 				state->len--;
 				state->buffer[state->len] = '\0';
 				if(tty->ops && tty->ops->write){
-					tty->ops->write(tty, "\b \b", 3);
+					tty->ops->write(tty, (u8*)"\b \b", 3);
 				}
 			}
 
@@ -136,7 +136,7 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const char* data, size_
 		}
 
 		if(ch >= 0x01 && ch <= 0x1A){
-			char tmp[3] = { '^', 'A' + ch - 1, '\n' };
+			u8 tmp[3] = { '^', 'A' + ch - 1, '\n' };
 			state->len = 0;
 			if(tty->ops && tty->ops->write){
 				tty->ops->write(tty, tmp, 3);
@@ -173,5 +173,5 @@ void tty_receive_char(struct tty_struct* tty, char ch){
 		return;
 	}
 
-	tty->ldisc->ops->receive_buf(tty, &ch, 1);
+	tty->ldisc->ops->receive_buf(tty, (u8*)&ch, 1);
 }
