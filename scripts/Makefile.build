@@ -1,18 +1,5 @@
 src := $(srctree)/$(obj)
 
-# src = abspath of target
-# obj = target/
-#
-# obj-y = file1.o file2.o file3.o
-# subdir-y = dir1/ dir2/ dir3/
-#
-# $(Q)$(MAKE) $(build)=core/
-#    obj = core/
-#    src = /home/.../kernel/src/core/
-#
-#    %.o -> $(OBJ_DIR)/$(obj)/
-#
-
 obj-y :=
 subdir-y :=
 target :=
@@ -38,11 +25,19 @@ KBUILD_CFLAGS += $(subdir-ccflags-y)
 subdir-y := $(sort $(subdir-y) $(patsubst %/,%/, $(filter %/, $(obj-y))))
 obj-y := $(filter-out %/, $(obj-y))
 
+# Map the short file names before prepending $(OBJ_DIR)
+DEPS := $(patsubst %.o,$(OBJ_DIR)/$(obj)%.d,$(filter %.o,$(obj-y)))
+
+# Prepend build folder to objects
+subdir-obj := $(foreach dir, $(subdir-y), $(obj)$(dir)built-in.o)
+obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
+subdir-files := $(addprefix $(OBJ_DIR)/, $(subdir-obj))
+
 # Compile rules
 $(OBJ_DIR)/$(obj)%.o: $(src)%.c
 	@echo "  CC         $<"
 	@mkdir -p $(dir $@)
-	$(Q)$(CC) $(KBUILD_CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(KBUILD_CFLAGS) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/$(obj)%.asm.o: $(src)%.asm
 	@echo "  AS         $<"
@@ -57,15 +52,9 @@ $(OBJ_DIR)/$(obj)%.lds: $(src)%.lds.S
 $(OBJ_DIR)/$(obj)%c_s.o: $(src)%.S
 	@echo "  CPP        $<"
 	@mkdir -p $(dir $@)
-	$(Q)$(CPP) $(KBUILD_CFLAGS) $(KINCLUDE) -D__ASSEMBLY__ -P -o $(OBJ_DIR)/$(obj)$*.S $<
-
+	$(Q)$(CPP) $(KBUILD_CFLAGS) $(KINCLUDE) -MMD -MP -D__ASSEMBLY__ -P -o $(OBJ_DIR)/$(obj)$*.S $<
 	@echo "  AS         $<"
 	$(Q)$(AS) $(KBUILD_ASFLAGS) -o $@ $(OBJ_DIR)/$(obj)$*.S
-
-subdir-obj := $(foreach dir, $(subdir-y), $(obj)$(dir)built-in.o)
-obj-y := $(addprefix $(OBJ_DIR)/$(obj), $(obj-y))
-
-subdir-files := $(addprefix $(OBJ_DIR)/, $(subdir-obj))
 
 all: $(target)
 
@@ -78,3 +67,5 @@ $(target): $(subdir-files) $(obj-y)
 .PHONY: $(subdir-obj)
 $(subdir-obj):
 	$(Q)$(MAKE) $(build)=$(dir $@)
+
+-include $(DEPS)
