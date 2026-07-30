@@ -30,7 +30,7 @@ struct tty_ldisc_ops {
 
 struct tty_ldisc {
 	const struct tty_ldisc_ops *ops;
-	void* data;
+	struct tty_struct* tty;
 };
 
 struct tty_buffer {
@@ -50,13 +50,6 @@ struct tty_bufhead {
 	spinlock_t lock;
 };
 
-struct tty_line_discipline_state {
-	spinlock_t lock;
-	struct tty_ldisc ldisc;
-	char buffer[256];
-	size_t len;
-};
-
 struct tty_driver {
 	const char *name;
 	unsigned int major;
@@ -74,7 +67,9 @@ struct tty_struct {
 	int index;
 	struct tty_driver *driver;
 	const struct tty_ops *ops;
+
 	struct tty_ldisc *ldisc;
+	void* ldisc_data;
 
 	void* private;
 

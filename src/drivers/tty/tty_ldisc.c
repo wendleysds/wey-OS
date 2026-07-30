@@ -7,6 +7,12 @@
 #include <def/errno.h>
 #include <lib/string.h>
 
+struct tty_ldisc_data {
+	spinlock_t lock;
+	char buffer[256];
+	size_t len;
+};
+
 extern const struct tty_ldisc_ops tty_ldisc_ops;
 
 static int tty_ldisc_open(struct tty_struct* tty){
@@ -18,27 +24,39 @@ static int tty_ldisc_open(struct tty_struct* tty){
 		return 0;
 	}
 
-	struct tty_line_discipline_state* state = kzalloc(sizeof(*state));
-	if(!state){
+	struct tty_ldisc* ldisc = kmalloc(sizeof(struct tty_ldisc));
+	if(!ldisc){
 		return -ENOMEM;
 	}
 
-	memset(state, 0, sizeof(*state));
-	state->ldisc.ops = &tty_ldisc_ops;
-	state->ldisc.data = state;
-	tty->ldisc = &state->ldisc;
-	tty->private = state;
+	struct tty_ldisc_data* data = kzalloc(sizeof(*data));
+	if(!data){
+		kfree(ldisc);
+		return -ENOMEM;
+	}
+
+	ldisc->ops = &tty_ldisc_ops;
+	ldisc->tty = tty;
+
+	tty->ldisc = ldisc;
+	tty->ldisc_data = data;
+
 	return 0;
 }
 
 static int tty_ldisc_close(struct tty_struct* tty){
-	if(!tty || !tty->private){
+	if(!tty || !tty->ldisc){
 		return 0;
 	}
 
-	kfree(tty->private);
-	tty->private = NULL;
+	kfree(tty->ldisc);
+
+	if(tty->ldisc_data)
+		kfree(tty->ldisc_data);
+
 	tty->ldisc = NULL;
+	tty->ldisc_data = NULL;
+	
 	return 0;
 }
 
@@ -47,11 +65,11 @@ static int tty_ldisc_read(struct tty_struct* tty, char *buffer, size_t len){
 		return 0;
 	}
 
-	if(!tty->ldisc || !tty->ldisc->data){
+	if(!tty->ldisc || !tty->ldisc_data){
 		return -ENODEV;
 	}
 
-	struct tty_line_discipline_state* state = tty->ldisc->data;
+	struct tty_ldisc_data* state = tty->ldisc_data;
 	struct wait_queue_entry wait;
 	wait_queue_entry_init(&wait, current, task_default_wakeup);
 
@@ -87,14 +105,14 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const char* data, size_
 		return 0;
 	}
 
-	if(!tty->ldisc || !tty->ldisc->data){
+	if(!tty->ldisc || !tty->ldisc_data){
 		return -ENODEV;
 	}
 
 	unsigned long flags;
 	int wake_all = 0;
 
-	struct tty_line_discipline_state* state = tty->ldisc->data;
+	struct tty_ldisc_data* state = tty->ldisc_data;
 
 	spin_lock_irqsave(&state->lock, &flags);
 	for(size_t i = 0; i < len; i++){
@@ -145,7 +163,6 @@ append:
 const struct tty_ldisc_ops tty_ldisc_ops = {
 	.open = tty_ldisc_open,
 	.close = tty_ldisc_close,
-
 	.read = tty_ldisc_read,
 
 	.receive_buf = tty_ldisc_receive_buf,
