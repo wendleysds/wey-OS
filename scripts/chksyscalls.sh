@@ -23,6 +23,9 @@ fi
 
 infile="$1"
 outfile="$2"
+tmpfile=(mktemp)
+
+trap 'rm -f "$tmpfile"' EXIT
 
 nxt=0
 
@@ -45,4 +48,10 @@ grep -E "^[0-9]+[[:space:]]" "$infile" | {
 
 		nxt=$((nr + 1))
 	done
-} > "$outfile"
+} > "$tmpfile"
+
+if [ -f "$outfile" ] && cmp -s "$tmpfile" "$outfile"; then
+	rm -f "$tmpfile"
+else
+	mv "$tmpfile" "$outfile"
+fi
