@@ -8,8 +8,8 @@
 #include <stdbool.h>
 
 typedef struct {
-	char normal;    // Ex: 'a', '1', '/'
-	char shifted;   // Ex: 'A', '!', '?'
+	u8 normal;    // Ex: 'a', '1', '/'
+	u8 shifted;   // Ex: 'A', '!', '?'
 } keymap_entry_t;
 
 static kb_state_t kb_state;
@@ -73,7 +73,7 @@ static bool is_combo(bool alt, bool crtl, bool shift){
 		   kb_state.shift == shift;
 }
 
-static char keycode_to_ascii(enum input_keycode code) {
+static u8 keycode_to_ascii(enum input_keycode code) {
     if (code >= NR_KEYS) return '\0';
 
     keymap_entry_t entry = qwerty_us_map[code];
@@ -145,12 +145,12 @@ static void key_event(struct input_handler *self, const struct input_event *even
 		return;
 	}
 
-	char ch = keycode_to_ascii(keycode);
+	u8 ch = keycode_to_ascii(keycode);
 	if (ch != '\0') {
 		struct tty_struct*tty = terminal_get_current()->tty;
 		if(!tty) return;
 
-		tty_receive_char(tty, ch);
+		tty_receive_buf(tty, &ch, 1);
 	}
 }
 

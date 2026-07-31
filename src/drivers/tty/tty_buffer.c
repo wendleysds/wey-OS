@@ -56,6 +56,57 @@ static void tty_buffer_free_chunk(struct tty_buffer *buffer) {
 	tty_free_buffer(buffer);
 }
 
+static void flush_to_ldisc(struct tty_struct* tty){
+	if(!tty->ldisc || !tty->ldisc->ops->receive_buf){
+		return;
+	}
+
+	spin_lock(&tty->buffer.lock);
+
+	struct tty_buffer *buf = tty->buffer.head;
+
+	size_t available = buf->write_pos - buf->read_pos;
+	if(!available){
+		spin_unlock(&tty->buffer.lock);
+		return;
+	}
+
+	while (1) {
+		struct tty_buffer *buf = tty->buffer.head;
+		if (!buf) break;
+
+		size_t available = buf->write_pos - buf->read_pos;
+		
+		if (available == 0) {
+			if (buf->next) {
+				struct tty_buffer *next = buf->next;
+				tty->buffer.head = next;
+
+				spin_unlock(&tty->buffer.lock);
+				tty_buffer_free_chunk(buf);
+				spin_lock(&tty->buffer.lock);
+				continue;
+			} else {
+				buf->read_pos = 0;
+				buf->write_pos = 0;
+				break;
+			}
+		}
+
+		// Dispatch 
+		tty->ldisc->ops->receive_buf(tty, &buf->data[buf->read_pos], available);
+		buf->read_pos += available;
+	}
+	
+	spin_unlock(&tty->buffer.lock);
+}
+
+int tty_bufhead_init(struct tty_bufhead* bufhead){
+	memset(bufhead, 0x0, sizeof(struct tty_bufhead));
+	spinlock_init(&bufhead->lock);
+	return SUCCESS;
+}
+
 int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count) {
 	if (!tty || !buffer || count == 0) {
 		return -EINVAL;
@@ -155,6 +206,21 @@ int tty_buffer_read(struct tty_struct *tty, u8 *buffer, size_t count) {
 
 	spin_unlock(&tty->buffer.lock);
 	return (int)read_bytes;
+}
+
+// IRQ -> tty_receive_buf -> tty_buffer_write
+// -> flush_to_ldisc -> tty_ldisc_receive_buf
+int tty_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
+	int res = tty_buffer_write(tty, data, len);
+	if(res < 0){
+		return res;
+	}
+
+	//TODO: Add tty_worker latter
+
+	flush_to_ldisc(tty);
+
+	return SUCCESS;
 }
 
 static int __init tty_buffer_init(void) {

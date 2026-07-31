@@ -42,6 +42,13 @@ struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index
 			return ERR_PTR(res);
 		}
 
+		res = tty_bufhead_init(&tty->buffer);
+		if(res < 0){
+			tty_ldisc_ops.close(tty);
+			kfree(tty);
+			return ERR_PTR(res);
+		}
+
 		driver->ttys[index] = tty;
 		tty->ops = tty->driver->ops;
 	}
