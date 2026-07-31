@@ -1,16 +1,16 @@
 #include <device/tty.h>
-#include <device/terminal.h>
-#include <kernel/printk.h>
-#include <kernel/sched.h>
-#include <kernel/wait.h>
-#include <mm/kheap.h>
 #include <def/errno.h>
-#include <lib/string.h>
+#include <def/config.h>
+#include <kernel/sched.h>
+#include <kernel/printk.h>
+#include <mm/kheap.h>
 
 struct tty_ldisc_data {
 	spinlock_t lock;
-	size_t len;
-	u8 buffer[256];
+	size_t head;
+	size_t tail;
+	size_t count;
+	u8 buffer[TTY_BUFFER_LDISC_SIZE];
 };
 
 extern const struct tty_ldisc_ops tty_ldisc_ops;
@@ -34,6 +34,11 @@ static int tty_ldisc_open(struct tty_struct* tty){
 		kfree(ldisc);
 		return -ENOMEM;
 	}
+
+	spinlock_init(&data->lock);
+	data->head = 0;
+	data->tail = 0;
+	data->count = 0;
 
 	ldisc->ops = &tty_ldisc_ops;
 	ldisc->tty = tty;
@@ -77,30 +82,45 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 	wait_queue_add(&tty->read_waiters, &wait);
 	
 	while(len > 0){
-		size_t available = state->len;
-		
-		/* Copy available data from buffer */
-		for(size_t idx = 0; idx < available && len > 0; idx++, bytes_read++, len--){
-			char ch = state->buffer[idx];
-			buffer[bytes_read] = ch;
+		unsigned long flags;
+		spin_lock_irqsave(&state->lock, &flags);
+
+		if(state->count == 0){
+			spin_unlock_irqrestore(&state->lock, &flags);
+			if(bytes_read > 0){
+				break;
+			}
+			sleep_current();
+			continue;
+		}
+
+		int line_done = 0;
+		while(state->count > 0 && len > 0){
+			u8 ch = state->buffer[state->tail];
+			state->tail = (state->tail + 1) % TTY_BUFFER_LDISC_SIZE;
+			state->count--;
+
+			buffer[bytes_read++] = ch;
+			len--;
 
 			if(ch == '\n' || ch == '\r'){
-				state->len = 0;
-				wait_queue_remove(&tty->read_waiters, &wait);
-				return bytes_read;
+				line_done = 1;
+				break;
 			}
 		}
 
-		state->len = 0;
-		task_sleep(current);
-		schedule();
+		spin_unlock_irqrestore(&state->lock, &flags);
+
+		if(line_done || bytes_read > 0){
+			break;
+		}
 	}
 
 	wait_queue_remove(&tty->read_waiters, &wait);
 	return bytes_read;
 }
 
-static int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
+int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 	if(!tty || !data || len == 0){
 		return 0;
 	}
@@ -119,9 +139,10 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t 
 		u8 ch = data[i];
 
 		if(ch == '\b'){
-			if(state->len > 0){
-				state->len--;
-				state->buffer[state->len] = '\0';
+			if(state->count > 0){
+				state->head = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
+				state->count--;
+				state->buffer[state->head] = '\0';
 				if(tty->ops && tty->ops->write){
 					tty->ops->write(tty, (u8*)"\b \b", 3);
 				}
@@ -137,7 +158,9 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t 
 
 		if(ch >= 0x01 && ch <= 0x1A){
 			u8 tmp[3] = { '^', 'A' + ch - 1, '\n' };
-			state->len = 0;
+			state->head = 0;
+			state->tail = 0;
+			state->count = 0;
 			if(tty->ops && tty->ops->write){
 				tty->ops->write(tty, tmp, 3);
 			}
@@ -145,8 +168,10 @@ static int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t 
 		}
 
 append:
-		if(state->len < sizeof(state->buffer) - 1){
-			state->buffer[state->len++] = ch;
+		if(state->count < TTY_BUFFER_LDISC_SIZE){
+			state->buffer[state->head] = ch;
+			state->head = (state->head + 1) % TTY_BUFFER_LDISC_SIZE;
+			state->count++;
 			if(tty->ops && tty->ops->write){
 				tty->ops->write(tty, &ch, 1);
 			}
