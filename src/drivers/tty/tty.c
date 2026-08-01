@@ -93,17 +93,12 @@ static int tty_file_write(struct file* file, const void* buffer, uint32_t count)
 	if(count == 0) return 0;
 
 	struct tty_struct* tty = file->private_data;
-	spin_lock(&tty->lock);
 
-	if(!tty->ops->write){
-		spin_unlock(&tty->lock);
-		return -ENOSYS;
+	if(!tty->ldisc || !tty->ldisc->ops || !tty->ldisc->ops->write){
+		return -ENODEV;
 	}
 
-	int res = tty->ops->write(tty, buffer, count);
-
-	spin_unlock(&tty->lock);
-	return res;
+	return tty->ldisc->ops->write(tty, buffer, count);
 }
 
 static int tty_file_read(struct file *file, void *buffer, uint32_t count){

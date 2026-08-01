@@ -120,6 +120,18 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 	return bytes_read;
 }
 
+static int tty_ldisc_write(struct tty_struct* tty, const u8 *buffer, size_t len){
+	if(!tty || !buffer || len == 0){
+		return 0;
+	}
+
+	if(!tty->ops || !tty->ops->write){
+		return -ENODEV;
+	}
+
+	return tty->ops->write(tty, buffer, len);
+}
+
 int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 	if(!tty || !data || len == 0){
 		return 0;
@@ -189,6 +201,7 @@ const struct tty_ldisc_ops tty_ldisc_ops = {
 	.open = tty_ldisc_open,
 	.close = tty_ldisc_close,
 	.read = tty_ldisc_read,
+	.write = tty_ldisc_write,
 
 	.receive_buf = tty_ldisc_receive_buf,
 };
