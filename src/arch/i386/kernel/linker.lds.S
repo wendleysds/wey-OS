@@ -20,11 +20,9 @@ SECTIONS
 		__kernel_text_end = .;
 	}
 
-	.rodata ALIGN(PAGE_SIZE) : AT(ADDR(.rodata) - LOAD_OFFSET) {
-		__kernel_rodata_start = .;
-		*(.rodata*)
-		__kernel_rodata_end = .;
-	}
+	RO_DATA(PAGE_SIZE)
+
+	EXCEPTION_TABLE(16)
 
 	.data ALIGN(PAGE_SIZE) : AT(ADDR(.data) - LOAD_OFFSET) {
 		__kernel_data_start = .;

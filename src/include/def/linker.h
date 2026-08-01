@@ -8,6 +8,8 @@ extern char __kernel_text_start[];
 extern char __kernel_text_end[];
 extern char __kernel_rodata_start[];
 extern char __kernel_rodata_end[];
+extern char __exception_table_start[];
+extern char __exception_table_end[];
 extern char __kernel_data_start[];
 extern char __kernel_data_end[];
 extern char __init_begin[];
@@ -29,6 +31,8 @@ extern __kernel_text_start
 extern __kernel_text_end
 extern __kernel_rodata_start
 extern __kernel_rodata_end
+extern __exception_table_start
+extern __exception_table_end
 extern __kernel_data_start
 extern __kernel_data_end
 extern __init_begin

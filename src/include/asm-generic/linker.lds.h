@@ -1,3 +1,19 @@
+#define RO_DATA(align)  \
+	. = ALIGN((align)); \
+	.rodata : AT(ADDR(.rodata) - LOAD_OFFSET) { \
+		__kernel_rodata_start = .; \
+		*(.rodata*)                \
+		__kernel_rodata_end = .;   \
+	}
+
+#define EXCEPTION_TABLE(align) \
+	. = ALIGN((align));        \
+	.exception_table : AT(ADDR(.exception_table) - LOAD_OFFSET) { \
+		__exception_table_start = .; \
+		KEEP(*(.exception_table*))   \
+		__exception_table_end = .;   \
+	}
+
 #define INIT_RAM_FS        \
 	. = ALIGN(4);          \
 	__initramfs_start = .; \
