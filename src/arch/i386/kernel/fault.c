@@ -4,8 +4,12 @@
 #include <mm/page.h>
 #include <mm/vma.h>
 #include <def/errno.h>
+#include <def/linker.h>
 #include <lib/string.h>
 #include <asm/idt.h>
+
+#include <asm-generic/extable.h>
+
 
 extern void page_fault_entry();
 
@@ -195,6 +199,14 @@ void page_fault_handler(struct registers* regs){
 	int handle_res = -1;
 
 	if(!current || !pf.user){
+
+		struct exception_entry* e = find_extable(regs->ip);
+		if (e){
+			printk("Exception handler found at %#010lx\n", e->fixup);
+			regs->ip = e->fixup;
+			return;
+		}
+
 		dump_regs(regs);
 		show_pf_info(&pf);
 		panic("Kernel page fault!");
