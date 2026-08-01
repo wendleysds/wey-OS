@@ -1,6 +1,6 @@
 #include <kernel/uaccess.h>	
 #include <asm-generic/extable.h>
-#include <asm/user/access.h>
+#include <asm/usr/access.h>
 #include <def/linker.h>
 #include <def/compile.h>
 #include <def/errno.h>

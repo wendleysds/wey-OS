@@ -1,12 +1,13 @@
-#include "kernel/printk.h"
 #include <kernel/syscall.h>
 #include <kernel/interrupt.h>
+#include <kernel/device.h>
 #include <kernel/sched.h>
 #include <kernel/fork.h>
 #include <device/terminal.h>
 #include <lib/assert.h>
 #include <def/errno.h>
 #include <fs/vfs.h>
+#include <fs/stat.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
 
@@ -54,29 +55,23 @@ static __init void do_initcalls(){
 	}
 }
 
-#include <fs/stat.h>
-#include <kernel/device.h>
-
-static int init(void* args){
-	//interrupts_disable();
-
-	//kernel_exec("/init", 0x0, 0x0);
+static int init(void* unused){
 
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
 	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
 
-	while(1){
-		char buffer[64];
-		int readed = vfs_read(tty, buffer, sizeof(buffer));
-		buffer[readed] = '\0';
-		printk("readed %d: %s\n", readed, buffer);
-	}
+	// stdin  - 0
+	// stdout - 1
+	// stderr - 2
 
-	while(1) cpu_relax();
+	current->file_table[1] = tty;
+
+	kernel_exec("/init", 0x0, 0x0);
+
 	unreachable();
 }
 
-__no_return void kmain(){
+__no_return __init void kmain(){
 	memblock_init();
 
 	setup_arch();
@@ -89,11 +84,11 @@ __no_return void kmain(){
 
 	module_load("Scheduler", scheduler_init);
 
+	kernel_thread(init, "init", (void*)0xCAFE);
+
 	do_initcalls();
 
 	interrupts_enable();
-
-	kernel_thread(init, "init", (void*)0xCAFE);
 
 	scheduler_start();
 
