@@ -64,6 +64,8 @@ static int init(void* unused){
 	// stdout - 1
 	// stderr - 2
 
+	current->file_table[0] = tty;
+	file_get(tty);
 	current->file_table[1] = tty;
 
 	kernel_exec("/init", 0x0, 0x0);
