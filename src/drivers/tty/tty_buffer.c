@@ -107,17 +107,19 @@ int tty_bufhead_init(struct tty_bufhead* bufhead){
 	return SUCCESS;
 }
 
-int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count) {
-	if (!tty || !buffer || count == 0) {
+// IRQ -> tty_receive_buf -> [tty_worker]
+// [tty_worker] -> flush_to_ldisc -> tty_ldisc_receive_buf
+int tty_receive_buf(struct tty_struct* tty, const u8* buffer, size_t len){
+	if (!tty || !buffer || len == 0) {
 		return -EINVAL;
 	}
 
-	size_t written = 0;
+	int written = 0;
 	struct tty_buffer *new_chunk = NULL;
 
 	spin_lock(&tty->buffer.lock);
 
-	while (written < count) {
+	while (written < len) {
 		struct tty_buffer *buf = tty->buffer.tail;
 
 		if (!buf || buf->write_pos == buf->size) {
@@ -145,7 +147,7 @@ int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count) {
 		}
 
 		size_t available = buf->size - buf->write_pos;
-		size_t to_write = count - written;
+		size_t to_write = len - written;
 		if (to_write > available) {
 			to_write = available;
 		}
@@ -161,66 +163,11 @@ int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count) {
 		tty_buffer_free_chunk(new_chunk);
 	}
 
-	return (int)written;
-}
-
-int tty_buffer_read(struct tty_struct *tty, u8 *buffer, size_t count) {
-	if (!tty || !buffer || count == 0) {
-		return -EINVAL;
-	}
-
-	size_t read_bytes = 0;
-	spin_lock(&tty->buffer.lock);
-
-	while (read_bytes < count) {
-		struct tty_buffer *buf = tty->buffer.head;
-		if (!buf) break;
-
-		size_t available = buf->write_pos - buf->read_pos;
-		
-		if (available == 0) {
-			if (buf->next) {
-				struct tty_buffer *next = buf->next;
-				tty->buffer.head = next;
-
-				spin_unlock(&tty->buffer.lock);
-				tty_buffer_free_chunk(buf);
-				spin_lock(&tty->buffer.lock);
-				continue;
-			} else {
-				buf->read_pos = 0;
-				buf->write_pos = 0;
-				break;
-			}
-		}
-
-		size_t to_read = count - read_bytes;
-		if (to_read > available) {
-			to_read = available;
-		}
-
-		memcpy(&buffer[read_bytes], &buf->data[buf->read_pos], to_read);
-		buf->read_pos += to_read;
-		read_bytes += to_read;
-	}
-
-	spin_unlock(&tty->buffer.lock);
-	return (int)read_bytes;
-}
-
-// IRQ -> tty_receive_buf -> tty_buffer_write
-// -> flush_to_ldisc -> tty_ldisc_receive_buf
-int tty_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
-	int res = tty_buffer_write(tty, data, len);
-	if(res < 0){
-		return res;
-	}
-
 	//TODO: Add tty_worker latter
 
 	flush_to_ldisc(tty);
 
-	return SUCCESS;
+	return written;
 }
 
 static int __init tty_buffer_init(void) {

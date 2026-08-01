@@ -84,12 +84,9 @@ int tty_register_driver(struct tty_driver* driver);
 
 struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index);
 
-int tty_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
+int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
 
 int tty_bufhead_init(struct tty_bufhead* bufhead);
-int tty_buffer_write(struct tty_struct *tty, const u8 *buffer, size_t count);
-int tty_buffer_read(struct tty_struct *tty, u8 *buffer, size_t count);
-
-int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
+int tty_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
 
 #endif
