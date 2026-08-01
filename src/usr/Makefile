@@ -1,1 +1,1 @@
-obj-y += initramfsc_s.o
+obj-y += initramfsc_s.o uaccess.o
