@@ -6,6 +6,8 @@
 #include <lib/list.h>
 #include <stddef.h>
 
+#include <uapi/kernel/termios.h>
+
 struct tty_struct;
 struct tty_driver;
 struct device;
@@ -70,6 +72,8 @@ struct tty_struct {
 
 	struct tty_ldisc *ldisc;
 	void* ldisc_data;
+
+	struct termios termios;
 
 	void* private;
 

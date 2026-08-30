@@ -17,6 +17,32 @@ extern const struct tty_ldisc_ops tty_ldisc_ops;
 
 static LIST_HEAD(drivers);
 
+static const struct termios termios_default = { 
+	.c_iflag = ICRNL,
+	.c_oflag = OPOST,
+	.c_cflag = CREAD | CS8,
+	.c_lflag = ECHO | ICANON | ECHOE | ECHOK,
+	.c_cc = {
+		[VINTR] = 0x03,
+		[VQUIT] = 0x1c,
+		[VERASE] = 0x8, //0x7F,
+		[VKILL] = 0x15,
+		[VEOF] = 0x04,
+		[VTIME] = 0x00,
+		[VMIN] = 0x01,
+		[VSWTC] = 0x00,
+		[VSTART] = 0x11,
+		[VSTOP] = 0x13,
+		[VSUSP] = 0x1a,
+		[VEOL] = 0x00,
+		[VREPRINT] = 0x12,
+		[VDISCARD] = 0x0f,
+		[VWERASE] = 0x17,
+		[VLNEXT] = 0x16,
+		[VEOL2] = 0x00,
+	} 
+};
+
 struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index){
 	struct tty_struct* tty = driver->ttys[index];
 	if(!tty){
@@ -29,6 +55,7 @@ struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index
 		tty->index = index;
 		spinlock_init(&tty->lock);
 		wait_queue_head_init(&tty->read_waiters);
+		tty->termios = termios_default;
 
 		int res = driver->ops->install(driver, tty);
 		if(res < 0){
