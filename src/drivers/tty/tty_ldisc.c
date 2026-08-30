@@ -11,6 +11,8 @@ struct tty_ldisc_data {
 	size_t head;
 	size_t tail;
 	size_t count;
+	size_t lines;
+	bool eof_pending;
 	u8 buffer[TTY_BUFFER_LDISC_SIZE];
 };
 
@@ -40,6 +42,8 @@ static int tty_ldisc_open(struct tty_struct* tty){
 	data->head = 0;
 	data->tail = 0;
 	data->count = 0;
+	data->lines = 0;
+	data->eof_pending = false;
 
 	ldisc->ops = &tty_ldisc_ops;
 	ldisc->tty = tty;
@@ -87,13 +91,32 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 		unsigned long flags;
 		spin_lock_irqsave(&state->lock, &flags);
 
-		if(state->count == 0){
+		bool data_ready = false;
+		if (t->c_lflag & ICANON) {
+			if (state->lines > 0 || state->eof_pending) {
+				data_ready = true;
+			}
+		} else {
+			if (state->count > 0) {
+				data_ready = true;
+			}
+		}
+
+		if (!data_ready) {
 			spin_unlock_irqrestore(&state->lock, &flags);
 			if(bytes_read > 0){
 				break;
 			}
 			sleep_current();
 			continue;
+		}
+
+		if ((t->c_lflag & ICANON) && state->count == 0 && state->eof_pending) {
+			state->eof_pending = false;
+			if (state->lines > 0)
+				state->lines--;
+			spin_unlock_irqrestore(&state->lock, &flags);
+			break;
 		}
 
 		int line_done = 0;
@@ -110,14 +133,24 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 			     (t->c_cc[VEOL] && ch == t->c_cc[VEOL]) ||
 			     (t->c_cc[VEOL2] && ch == t->c_cc[VEOL2]))) {
 				line_done = 1;
+				if (state->lines > 0)
+					state->lines--;
 				break;
 			}
 		}
 
+		if ((t->c_lflag & ICANON) && state->count == 0 && state->lines > 0 && !line_done) {
+            state->lines--;
+        }
+
 		spin_unlock_irqrestore(&state->lock, &flags);
 
-		if(line_done || bytes_read > 0){
-			break;
+		if (t->c_lflag & ICANON) {
+			if (line_done)
+				break;
+		} else {
+			if (bytes_read > 0)
+				break;
 		}
 	}
 
@@ -134,18 +167,44 @@ static int tty_ldisc_write(struct tty_struct* tty, const u8 *buffer, size_t len)
 		return -ENODEV;
 	}
 
+	const struct termios *t = &tty->termios;
+
+	/* Output processing (OPOST & ONLCR) */
+	if ((t->c_oflag & OPOST) && (t->c_oflag & ONLCR)) {
+		size_t written = 0;
+		for (size_t i = 0; i < len; i++) {
+			if (buffer[i] == '\n') {
+				u8 crlf[2] = {'\r', '\n'};
+				tty->ops->write(tty, crlf, 2);
+			} else {
+				tty->ops->write(tty, &buffer[i], 1);
+			}
+			written++;
+		}
+		return written;
+	}
+
 	return tty->ops->write(tty, buffer, len);
+}
+
+static bool tty_ldisc_pop_char(struct tty_ldisc_data *state, u8 *out_ch) {
+	if (state->count == 0)
+		return false;
+
+	state->head = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
+	state->count--;
+	if (out_ch)
+		*out_ch = state->buffer[state->head];
+	state->buffer[state->head] = '\0';
+	return true;
 }
 
 static void tty_ldisc_erase(struct tty_struct *tty, struct tty_ldisc_data *state){
 	const struct termios *t = &tty->termios;
 
-	if(state->count > 0){
-		state->head = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
-		state->count--;
-		state->buffer[state->head] = '\0';
-		if((t->c_lflag & (ECHO | ECHOE)) == (ECHO | ECHOE) && tty->ops && tty->ops->write){
-			tty->ops->write(tty, (u8*)"\b \b", 3);
+	if (tty_ldisc_pop_char(state, NULL)) {
+		if ((t->c_lflag & (ECHO | ECHOE)) == (ECHO | ECHOE) && tty->ops && tty->ops->write) {
+			tty->ops->write(tty, (const u8*)"\b \b", 3);
 		}
 	}
 }
@@ -153,52 +212,50 @@ static void tty_ldisc_erase(struct tty_struct *tty, struct tty_ldisc_data *state
 static void tty_ldisc_kill_line(struct tty_struct *tty, struct tty_ldisc_data *state){
 	const struct termios *t = &tty->termios;
 
-	if(state->count > 0){
-		state->count = 0;
-		state->head = 0;
-		state->tail = 0;
-		if((t->c_lflag & (ECHO | ECHOK)) == (ECHO | ECHOK) && tty->ops && tty->ops->write){
-			tty->ops->write(tty, (u8*)"\n", 1);
+	if (state->count > 0) {
+		while (tty_ldisc_pop_char(state, NULL));
+		if ((t->c_lflag & (ECHO | ECHOK)) == (ECHO | ECHOK) && tty->ops && tty->ops->write) {
+			tty->ops->write(tty, (const u8*)"\n", 1);
 		}
 	}
 }
 
 static void tty_ldisc_werase(struct tty_struct *tty, struct tty_ldisc_data *state){
 	const struct termios *t = &tty->termios;
+	u8 ch;
 
-	if(state->count > 0){
-		while(state->count > 0){
-			size_t prev = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
-			u8 ch = state->buffer[prev];
-			if(ch == ' '){
-				break;
-			}
+	/* Phase 1: Erase trailing spaces */
+	while (state->count > 0) {
+		size_t prev_idx = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
+		if (state->buffer[prev_idx] != ' ')
+			break;
 
-			state->head = prev;
-			state->count--;
-			if((t->c_lflag & (ECHO | ECHOE)) == (ECHO | ECHOE) && tty->ops && tty->ops->write){
-				tty->ops->write(tty, (u8*)"\b \b", 3);
-			}
+		tty_ldisc_pop_char(state, &ch);
+		if ((t->c_lflag & (ECHO | ECHOE)) == (ECHO | ECHOE) && tty->ops && tty->ops->write) {
+			tty->ops->write(tty, (const u8*)"\b \b", 3);
+		}
+	}
+
+	/* Phase 2: Erase word characters until next space */
+	while (state->count > 0) {
+		size_t prev_idx = (state->head + TTY_BUFFER_LDISC_SIZE - 1) % TTY_BUFFER_LDISC_SIZE;
+		if (state->buffer[prev_idx] == ' ')
+			break;
+
+		tty_ldisc_pop_char(state, &ch);
+		if ((t->c_lflag & (ECHO | ECHOE)) == (ECHO | ECHOE) && tty->ops && tty->ops->write) {
+			tty->ops->write(tty, (const u8*)"\b \b", 3);
 		}
 	}
 }
 
-static int tty_ldisc_should_wake_readers(struct tty_struct *tty, u8 ch){
+static int tty_ldisc_should_wake_readers(struct tty_struct *tty, struct tty_ldisc_data *state, u8 ch){
 	const struct termios *t = &tty->termios;
 
 	if (!(t->c_lflag & ICANON))
 		return 1;
 
-	if (ch == '\n' || ch == '\r')
-		return 1;
-
-	if (t->c_cc[VEOF] && ch == t->c_cc[VEOF])
-		return 1;
-
-	if (t->c_cc[VEOL] && ch == t->c_cc[VEOL])
-		return 1;
-
-	if (t->c_cc[VEOL2] && ch == t->c_cc[VEOL2])
+	if (state->lines > 0 || state->eof_pending)
 		return 1;
 
 	return 0;
@@ -248,12 +305,17 @@ static int tty_ldisc_canonical_process(
 	}
 
 	if (t->c_cc[VEOF] && ch == t->c_cc[VEOF]) {
+		if (state->count == 0) {
+			state->eof_pending = true;
+		} else {
+			state->lines++;
+		}
+
 		return 1;
 	}
 
 	return 0;
 }
-
 
 static void tty_ldisc_echo(struct tty_struct *tty,
                            struct tty_ldisc_data *state,
@@ -265,7 +327,12 @@ static void tty_ldisc_echo(struct tty_struct *tty,
 		return;
 
 	if ((t->c_lflag & ECHO) || ((t->c_lflag & ECHONL) && ch == '\n')) {
-		tty->ops->write(tty, &ch, 1);
+		if ((t->c_oflag & OPOST) && (t->c_oflag & ONLCR) && ch == '\n') {
+			u8 crlf[2] = {'\r', '\n'};
+			tty->ops->write(tty, crlf, 2);
+		} else {
+			tty->ops->write(tty, &ch, 1);
+		}
 	}
 }
 
@@ -303,13 +370,6 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 
 		/*
 		* 1. Input processing
-		*
-		* c_iflag:
-		*   ICRNL
-		*   INLCR
-		*   IGNCR
-		*   IXON
-		*   ...
 		*/
 		ret = tty_ldisc_input_process(tty, state, &ch);
 
@@ -318,43 +378,11 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 			return ret;
 		}
 
-		/*
-		* Character was consumed by input processing.
-		*/
 		if (ret > 0)
 			continue;
 
-
 		/*
-		* 2. Signal processing
-		*
-		* c_lflag:
-		*   ISIG
-		*
-		* c_cc:
-		*   VINTR
-		*   VQUIT
-		*   VSUSP
-		*/
-		/*ret = tty_ldisc_signal_process(tty, state, ch);
-
-		if (ret < 0)
-			return ret;
-
-		if (ret > 0)
-			continue;
-		*/
-
-
-		/*
-		* 3. Canonical editing
-		*
-		* ICANON
-		*
-		* VERASE
-		* VKILL
-		* VWERASE
-		* ...
+		* 2. Canonical editing
 		*/
 		ret = tty_ldisc_canonical_process(tty, state, ch);
 
@@ -363,12 +391,12 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 			return ret;
 		}
 
-		if (ret > 0)
-			continue;
-
+		if (ret > 0) {
+			goto check_wake_up;
+		}
 
 		/*
-		* 4. Store the character for userspace.
+		* 3. Store the character for userspace.
 		*/
 		ret = tty_ldisc_store_char(tty, state, ch);
 
@@ -377,24 +405,28 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 			return ret;
 		}
 
+		const struct termios *t = &tty->termios;
+		if ((t->c_lflag & ICANON) &&
+		    (ch == '\n' || ch == '\r' ||
+		     (t->c_cc[VEOL] && ch == t->c_cc[VEOL]) ||
+		     (t->c_cc[VEOL2] && ch == t->c_cc[VEOL2]))) {
+			state->lines++;
+		}
 
 		/*
-		* 5. Echo
-		*
-		* ECHO
-		* ECHOE
-		* ECHOK
-		* ECHOCTL
+		* 4. Echo
 		*/
 		tty_ldisc_echo(tty, state, ch);
 
-
 		/*
-		* 6. Wake readers if this character completes
+		* 5. Wake readers if this character completes
 		*    something they can consume.
 		*/
-		if (tty_ldisc_should_wake_readers(tty, ch))
-			wake_up(&tty->read_waiters);
+
+check_wake_up:
+		if (tty_ldisc_should_wake_readers(tty, state, ch)) {
+			wake_up = true;
+		}
 	}
 
 	spin_unlock_irqrestore(&state->lock, &flags);
@@ -403,7 +435,7 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 		wake_up(&tty->read_waiters);
 	}
 
-	return ret;
+	return 0;
 }
 
 const struct tty_ldisc_ops tty_ldisc_ops = {
