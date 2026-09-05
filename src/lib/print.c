@@ -1,40 +1,45 @@
 #include <lib/string.h>
 #include <lib/div64.h>
+#include <def/bits.h>
 #include <stdarg.h>
 
-#define ZERODAP_FLAG      0x01
-#define SHOW_SIGN_FLAG    0x02
-#define PLUS_PREFIX_FLAG  0x04
-#define SPACE_PREFIX_FLAG 0x08
-#define SPECIAL_FLAG      0x10
-#define LOWERCASE_FLAG    0x20
-#define LEFTPAD_FLAG      0x40
+#define ZERODAP_FLAG      BIT(0)
+#define SHOW_SIGN_FLAG    BIT(1)
+#define PLUS_PREFIX_FLAG  BIT(2)
+#define SPACE_PREFIX_FLAG BIT(3)
+#define SPECIAL_FLAG      BIT(4)
+#define LOWERCASE_FLAG    BIT(5)
+#define LEFTPAD_FLAG      BIT(6)
 
 #define __isdigit(c) ((c) >= '0' && (c) <= '9')
 #define __tolow(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 32 : (c))
 
-static int skip_stoi(const char **s){
+static int skip_stoi(const char **s) {
 	int i = 0;
-	while (__isdigit(**s)){
+	while (__isdigit(**s)) {
 		i = i * 10 + *((*s)++) - '0';
 	}
-		
 	return i;
 }
 
-static char* stoi(char* str, unsigned long long number, int base, int size, int precision, int flag){
-	static const char digits[] = "0123456789ABCDEF";
+#define EMIT(c) do { putc((c), ctx); count++; } while(0)
 
+static int print_num(void (*putc)(char c, void *ctx), void *ctx,
+					unsigned long long number, int base, int size,
+					int precision, int flag) {
+
+	static const char digits[] = "0123456789ABCDEF";
 	char tmp[128];
 	int i = 0;
+	int count = 0;
 
-	if(base < 2 || base > 16){
-		return NULL;
+	if (base < 2 || base > 16) {
+		return 0;
 	}
 
-	uint8_t lowercase = (flag & LOWERCASE_FLAG);
+	uint8_t lowercase = (flag & LOWERCASE_FLAG) ? 0x20 : 0;
 
-	if(flag & LEFTPAD_FLAG){
+	if (flag & LEFTPAD_FLAG) {
 		flag &= ~ZERODAP_FLAG;
 	}
 
@@ -57,12 +62,12 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 	}
 
 	// Handle special prefix (0x, 0, 0b)
-	if(flag & SPECIAL_FLAG){
+	if (flag & SPECIAL_FLAG) {
 		size -= (base == 16 || base == 2) ? 2 : (base == 8) ? 1 : 0;
 	}
 
-	// Convert number to string
-	if(number == 0){
+	// Convert number to string (preenche de trás pra frente no tmp)
+	if (number == 0) {
 		tmp[i++] = '0';
 	} else {
 		if (base == 16) {
@@ -75,13 +80,14 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 				tmp[i++] = digits[number & 0x7];
 				number >>= 3;
 			}
-		}  else if (base == 2) {
+		} else if (base == 2) {
 			while (number) {
 				tmp[i++] = digits[number & 0x1];
 				number >>= 1;
 			}
 		} else {
 			while (number) {
+				// assumindo que do_div é uma macro que faz divisão e retorna o resto
 				tmp[i++] = digits[do_div(number, base)] | lowercase;
 			}
 		}
@@ -91,55 +97,47 @@ static char* stoi(char* str, unsigned long long number, int base, int size, int 
 	size -= precision;
 
 	// Left padding with spaces
-	if(!(flag & (ZERODAP_FLAG | LEFTPAD_FLAG))){
-		while(size-- > 0) *str++ = ' ';
+	if (!(flag & (ZERODAP_FLAG | LEFTPAD_FLAG))) {
+		while (size-- > 0) EMIT(' ');
 	}
 
-	if(sign) *str++ = sign;
+	if (sign) EMIT(sign);
 
 	// Special prefix
-	if(flag & SPECIAL_FLAG){
-		if(base == 8) *str++ = '0';
-		else if(base == 16){
-			*str++ = '0';
-			*str++ = ('X' | lowercase);
-		}else if(base == 2){
-			*str++ = '0';
-			*str++ = 'b';
+	if (flag & SPECIAL_FLAG) {
+		if (base == 8) EMIT('0');
+		else if (base == 16) {
+			EMIT('0');
+			EMIT('X' | lowercase);
+		} else if (base == 2) {
+			EMIT('0');
+			EMIT('b');
 		}
 	}
 
 	// Zero padding
-	if(!(flag & LEFTPAD_FLAG)){
-		while (size-- > 0) *str++ = c;
+	if (!(flag & LEFTPAD_FLAG)) {
+		while (size-- > 0) EMIT(c);
 	}
 
 	// Precision padding
-	while(i < precision--) *str++ = '0';
+	while (i < precision--) EMIT('0');
 
 	// Copy digits in reverse
-	while(i--) *str++ = tmp[i];
+	while (i--) EMIT(tmp[i]);
 
 	// Right padding
-	while(size-- > 0) *str++ = ' ';
+	while (size-- > 0) EMIT(' ');
 
-	return str;
+	return count;
 }
 
-int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list args){
-	if (size == 0) {
-		return 0; // No space to write
-	}
+int vprintfmt(void (*putc)(char c, void *ctx), void *ctx, const char *fmt, va_list args) {
+	int count = 0;
 
-	char *str = buf;
-	
-	for (unsigned int __i = 0; __i < size ; ++fmt, __i++) {
-		if(!*fmt){
-			break;
-		}
-
+	for (; *fmt; ++fmt) {
 		if (*fmt != '%') {
-			*str++ = *fmt;
+			EMIT(*fmt);
 			continue;
 		}
 
@@ -158,7 +156,7 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 		int field_width = -1;
 		if (__isdigit(*fmt))
 			field_width = skip_stoi(&fmt);
-		else if (*fmt == '*'){
+		else if (*fmt == '*') {
 			fmt++;
 			field_width = va_arg(args, int);
 			if (field_width < 0) {
@@ -172,7 +170,7 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 		if (*fmt == '.') {
 			fmt++;
 			precision = (__isdigit(*fmt)) ? skip_stoi(&fmt) : 0;
-			if (*fmt == '*'){
+			if (*fmt == '*') {
 				fmt++;
 				precision = va_arg(args, int);
 			}
@@ -185,8 +183,7 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 		if (*fmt == 'l' && *(fmt + 1) == 'l') {
 			qualifier = 'q';
 			fmt += 2;
-		} else if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L'
-			|| *fmt == 'Z') {
+		} else if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'Z') {
 			qualifier = *fmt;
 			++fmt;
 		}
@@ -195,17 +192,18 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 		switch (*fmt) {
 			case 'c':
 				if (!(flags & LEFTPAD_FLAG))
-					while (--field_width > 0) *str++ = ' ';
-				*str++ = (unsigned char)va_arg(args, int);
-				while (--field_width > 0) *str++ = ' ';
+					while (--field_width > 0) EMIT(' ');
+				EMIT((unsigned char)va_arg(args, int));
+				while (--field_width > 0) EMIT(' ');
 				continue;
 			case 's': {
-					const char *s = va_arg(args, char *);
-					int len = (precision < 0) ? strlen(s) : strnlen(s, precision);
+				const char *s = va_arg(args, char *);
+				if (!s) s = "(null)";
+				int len = (precision < 0) ? strlen(s) : strnlen(s, precision);
 				if (!(flags & LEFTPAD_FLAG))
-					while (len < field_width--) *str++ = ' ';
-				for (int i = 0; i < len; ++i) *str++ = *s++;
-				while (len < field_width--) *str++ = ' ';
+					while (len < field_width--) EMIT(' ');
+				for (int j = 0; j < len; ++j) EMIT(s[j]);
+				while (len < field_width--) EMIT(' ');
 				continue;
 			}
 			case 'p':
@@ -213,20 +211,20 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 					field_width = 2 * sizeof(void *);
 					flags |= ZERODAP_FLAG;
 				}
-				str = stoi(str, (unsigned long)va_arg(args, void *), 16,
-						field_width, precision, flags);
+				count += print_num(putc, ctx, (unsigned long)va_arg(args, void *), 16,
+								field_width, precision, flags);
 				continue;
 			case 'n':
 				if (qualifier == 'l') {
 					long *ip = va_arg(args, long *);
-					*ip = (str - buf);
+					*ip = count;
 				} else {
 					int *ip = va_arg(args, int *);
-					*ip = (str - buf);
+					*ip = count;
 				}
 				continue;
 			case '%':
-				*str++ = '%';
+				EMIT('%');
 				continue;
 			case 'b': base = 2; break;
 			case 'o': base = 8; break;
@@ -236,8 +234,8 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 			case 'i': flags |= SHOW_SIGN_FLAG; break;
 			case 'u': break;
 			default:
-				*str++ = '%';
-				if (*fmt) *str++ = *fmt;
+				EMIT('%');
+				if (*fmt) EMIT(*fmt);
 				else --fmt;
 				continue;
 		}
@@ -266,11 +264,49 @@ int vsnprintf(char* restrict buf, unsigned int size, const char* fmt, va_list ar
 				num = va_arg(args, unsigned int);
 		}
 		
-		str = stoi(str, num, base, field_width, precision, flags);
+		count += print_num(putc, ctx, num, base, field_width, precision, flags);
 	}
 
-	*str = '\0';
-	return str - buf;
+	return count;
+}
+#undef EMIT
+
+struct buffer_ctx {
+	char *buf;
+	size_t pos;
+	size_t size;
+};
+
+static void buffer_putc(char c, void *ctx) {
+	struct buffer_ctx *b = ctx;
+
+	if (b->pos < b->size - 1) {
+		b->buf[b->pos] = c;
+	}
+
+	b->pos++;
+}
+
+int vsnprintf(char *restrict buf, unsigned int size, const char *fmt, va_list args) {
+	if (size == 0) {
+		return 0;
+	}
+
+	struct buffer_ctx ctx = {
+		.buf = buf,
+		.pos = 0,
+		.size = size
+	};
+
+	vprintfmt(buffer_putc, &ctx, fmt, args);
+
+	if (ctx.pos < size) {
+		buf[ctx.pos] = '\0';
+	} else {
+		buf[size - 1] = '\0';
+	}
+
+	return ctx.pos;
 }
 
 int snprintf(char* restrict buf, unsigned int size, const char* restrict fmt, ...){

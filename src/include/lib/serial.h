@@ -2,8 +2,6 @@
 #define _SERIAL_H
 
 #include <io/ports.h>
-#include <lib/stdio.h>
-#include <stdarg.h>
 
 #define COM1 0x3F8
 
@@ -24,14 +22,6 @@ int serial_is_transmit_empty() {
 void serial_putchar(char a) {
 	while (serial_is_transmit_empty() == 0);
 	outb(COM1, a);
-}
-
-void serial_printf(const char* restrict fmt, ...){
-	char buffer[1024];
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(buffer, sizeof(buffer), fmt, args);
-	va_end(args);
 }
 
 #endif

@@ -1,7 +1,9 @@
 #include <kernel/printk.h>
 #include <def/config.h>
 #include <lib/serial.h>
+#include <lib/stdio.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 static printk_echo_function _printk_ech = NULL;
 static char printk_circular_buffer[PRINTK_BUFFER_SIZE];
@@ -9,9 +11,10 @@ static char printk_circular_buffer[PRINTK_BUFFER_SIZE];
 static uint64_t printk_cursor = 0;
 
 // Not SMP-safe, but we don't have SMP yet.
-static inline void printk_write_char(char c){
+static inline void printk_write_char(char c, void* ctx){
 	printk_circular_buffer[printk_cursor % PRINTK_BUFFER_SIZE] = c;
 	printk_cursor++;
+	serial_putchar(c);
 }
 
 void printk_show_buffer(){
@@ -41,20 +44,25 @@ void printk_set_echo(printk_echo_function f){
 }
 
 int printk(const char* restrict fmt, ...){
-	char buffer[1024];
-
 	va_list args;
 	va_start(args, fmt);
-	int c = vsnprintf(buffer, sizeof(buffer), fmt, args);
-	va_end(args);
 
-	if (_printk_ech)
-		_printk_ech(buffer, c);
+	int cursor_start = printk_cursor;
 
-	for(int i = 0; buffer[i] != '\0' || i > 1024; i++){
-		printk_write_char(buffer[i]);
-		serial_putchar(buffer[i]);
+	int ret = vprintfmt(printk_write_char, NULL, fmt, args);
+
+	int cursor_end = printk_cursor;
+	
+	if(_printk_ech){
+		if(cursor_start < cursor_end){
+			_printk_ech(&printk_circular_buffer[cursor_start], cursor_end - cursor_start);
+		}else{
+			_printk_ech(&printk_circular_buffer[cursor_start], PRINTK_BUFFER_SIZE - cursor_start);
+			_printk_ech(&printk_circular_buffer[0], cursor_end);
+		}
 	}
 
-	return c;
+	va_end(args);
+
+	return ret;
 }
