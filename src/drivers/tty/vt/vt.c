@@ -471,7 +471,7 @@ static const struct tty_ops vt_tty_ops = {
 };
 
 static int __init vt_tty_init(void){
-	driver = tty_alloc_drive();
+	driver = tty_alloc_driver();
 	if(!driver){
 		return -ENOMEM;
 	}

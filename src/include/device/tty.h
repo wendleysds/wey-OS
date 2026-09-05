@@ -83,7 +83,7 @@ struct tty_struct {
 	spinlock_t lock;
 };
 
-struct tty_driver* tty_alloc_drive();
+struct tty_driver* tty_alloc_driver();
 int tty_register_driver(struct tty_driver* driver);
 
 struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index);
