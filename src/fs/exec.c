@@ -139,13 +139,6 @@ static int exec_binprm(struct binprm* bprm){
 	
 	cur->mm = bprm->mm;
 
-	for(int i = 0; i < PROC_FD_MAX; i++){
-		if(cur->file_table[i]){
-			vfs_close(cur->file_table[i]);
-			cur->file_table[i] = NULL;
-		}
-	}
-
 	start_thread_user(
 		&cur->regs, 
 		bprm->entryPoint, 
