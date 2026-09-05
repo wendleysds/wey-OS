@@ -21,6 +21,7 @@ enum boot_tags {
 	BOOT_TAG_SETUP = 1,
 	BOOT_TAG_E820,
 	BOOT_TAG_VIDEO,
+	BOOT_TAG_ACPI,
 };
 
 struct boot_tag {
@@ -77,6 +78,11 @@ struct boot_tag_video {
 	uint16_t attributes;
 	uint32_t capabilities;
 	uint32_t vesapm_addr;
+} __packed;
+
+struct boot_tag_acpi {
+	struct boot_tag tag;
+	uint64_t rsdp;
 } __packed;
 
 struct boot_tag_setup{

@@ -75,6 +75,42 @@ static inline uint16_t gs(void){
 	return seg;
 }
 
+// helper to access the whole memory
+
+static inline void set_fs(uint16_t seg) {
+	asm volatile("movw %0, %%fs" : : "rm" (seg));
+}
+
+static inline uint8_t rdfs8(uint32_t addr_fs) {
+	uint8_t val;
+	asm volatile("movb %%fs:(%1), %0" : "=q" (val) : "r" (addr_fs));
+	return val;
+}
+static inline uint16_t rdfs16(uint32_t addr_fs) {
+	uint16_t val;
+	asm volatile("movw %%fs:(%1), %0" : "=r" (val) : "r" (addr_fs));
+	return val;
+}
+static inline uint32_t rdfs32(uint32_t addr_fs) {
+	uint32_t val;
+	asm volatile("movl %%fs:(%1), %0" : "=r" (val) : "r" (addr_fs));
+	return val;
+}
+static inline void wrfs8(uint8_t val, uint32_t addr_fs) {
+	asm volatile("movb %0, %%fs:(%1)" : : "q" (val), "r" (addr_fs) : "memory");
+}
+static inline void wrfs16(uint16_t val, uint32_t addr_fs) {
+	asm volatile("movw %0, %%fs:(%1)" : : "r" (val), "r" (addr_fs) : "memory");
+}
+static inline void wrfs32(uint32_t val, uint32_t addr_fs) {
+	asm volatile("movl %0, %%fs:(%1)" : : "r" (val), "r" (addr_fs) : "memory");
+}
+
+void *memcpy_fromfs(void *dst_ds, uint32_t src_fs, size_t count);
+void memcpy_tofs(uint32_t dst_fs, const void *src_ds, size_t count);
+void *memset_fs(uint32_t dst_fs, int c, size_t count);
+int memcmp_fs(uint32_t s1_fs, const void *s2_ds, size_t count);
+
 extern struct boot_tag_setup hdr;
 
 // BIOS
@@ -92,6 +128,9 @@ int kdb_read(char* restrict buffer, int length);
 
 // A20
 int enable_a20();
+
+// ACPI
+int acpi_find_rsdp(struct boot_tag_acpi* acpi);
 
 // stdio
 void putchar(int c);

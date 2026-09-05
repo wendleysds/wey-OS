@@ -67,30 +67,44 @@ static void build_boot_header(
 
 // TODO: Implement missing
 void main(){
+	const struct boot_tag* tags[] = { 0,0,0,0 };
+	int tag_pos = 0;
+
 	printf("Starting Real Mode kernel\n");
 
 	struct boot_tag_video video;
 	memset(&video, 0x0, sizeof(struct boot_tag_video));
 
+	struct boot_tag_acpi acpi;
+	memset(&acpi, 0x0, sizeof(struct boot_tag_acpi));
+
 	struct boot_tag_setup setup;
 	memcpy(&setup, &hdr, sizeof(struct boot_tag_setup));
+
+	setup.tag.type = BOOT_TAG_SETUP;
+	setup.tag.size = sizeof(struct boot_tag_setup);
+	tags[tag_pos++] = &setup.tag;
 	
 	// Check CPU
 
 	setup_video(&video);
 
+	video.tag.type = BOOT_TAG_VIDEO;
+	video.tag.size = sizeof(struct boot_tag_video);	
+	tags[tag_pos++] = &video.tag;
+
+	if(acpi_find_rsdp(&acpi)){
+		acpi.tag.type = BOOT_TAG_ACPI;
+		acpi.tag.size = sizeof(struct boot_tag_acpi);
+		tags[tag_pos++] = &acpi.tag;
+	}
+
 	// Build boot header
 	struct boot_header boot_header;
 	memset(&boot_header, 0x0, sizeof(struct boot_header));
 
-	setup.tag.type = BOOT_TAG_SETUP;
-	setup.tag.size = sizeof(struct boot_tag_setup);
-
-	video.tag.type = BOOT_TAG_VIDEO;
-	video.tag.size = sizeof(struct boot_tag_video);
-
 	const struct boot_tag end = {.type = BOOT_TAG_END, .size = sizeof(struct boot_tag)};
-	const struct boot_tag* tags[] = { &setup.tag, &video.tag, &end };
+	tags[tag_pos++] = &end;
 
 	build_boot_header(&boot_header, tags, ARRAY_SIZE(tags));
 

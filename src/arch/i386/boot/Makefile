@@ -1,5 +1,6 @@
 obj-y += main.o printf.o regs.o video.o memory.o 
-obj-y += a20.o
+obj-y += a20.o acpi.o
+obj-y += copy.o
 obj-y += bioscall.asm.o pmc_s.o
 obj-y += headerc_s.o
 

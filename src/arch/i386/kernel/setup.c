@@ -31,6 +31,8 @@ unsigned long max_pfn_mapped;
 unsigned long ramdisk_ptr;
 unsigned long ramdisk_size;
 
+unsigned long acpi_rsdp;
+
 unsigned long _brk_start = (unsigned long)__brk_base;
 unsigned long _brk_ptr = (unsigned long)__brk_base;
 unsigned long _brk_end = (unsigned long)__brk_limit;
@@ -179,6 +181,17 @@ static __init void setup_video(void){
 	memcpy(&video_info, &video, sizeof(struct video_info));
 }
 
+static __init void setup_acpi(void){
+	struct boot_tag_acpi* acpi = (struct boot_tag_acpi*)boot_find_tag(&boot_header, BOOT_TAG_ACPI);
+	if(!acpi){
+		acpi_rsdp = 0;
+		printk("Setup: No boot_tag_acpi provided!\n");
+		return;
+	}
+
+	acpi_rsdp = (uintptr_t)__va(acpi->rsdp);
+}
+
 static __init void check_pse(void){
 	struct paging_size* sizes = (struct paging_size*)arch_paging_fmt.sizes;
 	uint8_t idx = 0;
@@ -325,6 +338,8 @@ __init void setup_arch(void){
 	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);
 
 	setup_video();
+
+	setup_acpi();
 
 	setup_ramdisk();
 
