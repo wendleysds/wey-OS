@@ -9,7 +9,7 @@ tmp
 
 # Files/Configs
 compile_commands.json
-.clangd
+.clang*
 
 syscalltbl.h
 kernelsecs.h
