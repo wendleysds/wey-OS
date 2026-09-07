@@ -157,8 +157,13 @@ static __init int acpi_init(void) {
 
 	rsdt = acpi_parse_rsdt(rsdp);
 	if(!rsdt) return -ENOENT;
+
+	struct acpi_madt *madt = acpi_find_table(ACPI_MADT_SIGNATURE);
+	if(madt){
+		acpi_parse_madt(madt);
+	}
 	
-	struct acpi_fadt *fadt = acpi_find_table("FACP");
+	struct acpi_fadt *fadt = acpi_find_table(ACPI_FADT_SIGNATURE);
 	if(fadt){
 		acpi_parse_fadt(fadt);
 		return acpi_enable();

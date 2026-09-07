@@ -1,6 +1,8 @@
 #ifndef _ACPI_TABLE_FADT
 #define _ACPI_TABLE_FADT
 
+/* Fixed ACPI Description Table */
+
 #include <def/compile.h>
 #include <def/bits.h>
 #include <stdint.h>
@@ -9,7 +11,7 @@
 
 #define ACPI_FADT_SIGNATURE "FACP"
 
-// Fixed Feature Flags para FADT
+// Fixed Feature Flags FADT
 #define FADT_FLAG_HW_REDUCED_ACPI  BIT(0)
 #define FADT_FLAG_WBINVD_NO_FLUSH  BIT(1)
 #define FADT_FLAG_PCI_IRQ_ROUTING  BIT(2)

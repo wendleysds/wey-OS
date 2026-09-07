@@ -8,3 +8,4 @@ int acpi_gas_to_io_region(const struct acpi_generic_address *gas, io_region_t *r
 
 void *acpi_find_table(const char *signature);
 void acpi_parse_fadt(struct acpi_fadt *ptr);
+void acpi_parse_madt(struct acpi_madt *madt);

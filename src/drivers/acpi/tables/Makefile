@@ -1,1 +1,1 @@
-obj-y += fadt.o
+obj-y += fadt.o madt.o
