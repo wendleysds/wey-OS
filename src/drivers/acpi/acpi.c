@@ -13,7 +13,7 @@ extern unsigned long acpi_rsdp;
 
 static struct acpi_rsdt *rsdt;
 
-void *acpi_find_table(const char *signature) {
+void *acpi_find_table(const char *signature){
 	const size_t entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
 	for (size_t i = 0; i < entries; i++){
 		struct acpi_sdt_header *sdt = (struct acpi_sdt_header *)__va(rsdt->entries[i]);
@@ -105,6 +105,8 @@ static __init int acpi_init(void) {
 	
 	struct acpi_fadt *fadt = acpi_find_table("FACP");
 	if(!fadt) return -ENODEV;
+	
+	acpi_parse_fadt(fadt);
 	
 	return 0;
 }
