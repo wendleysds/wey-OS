@@ -46,6 +46,7 @@ static inline uint32_t io_read32(const io_region_t *io, uintptr_t offset){
 static inline void io_write8(const io_region_t *io, uintptr_t offset, uint8_t val){
 	if(io->type == IO_TYPE_PIO){
 		port_write8(io->pio_base + offset, val);
+		return;
 	}
 
 	mmio_write8(io->mmio_base + offset, val);
@@ -54,6 +55,7 @@ static inline void io_write8(const io_region_t *io, uintptr_t offset, uint8_t va
 static inline void io_write16(const io_region_t *io, uintptr_t offset, uint16_t val){
 	if(io->type == IO_TYPE_PIO){
 		port_write16(io->pio_base + offset, val);
+		return;
 	}
 
 	mmio_write16(io->mmio_base + offset, val);
@@ -62,6 +64,7 @@ static inline void io_write16(const io_region_t *io, uintptr_t offset, uint16_t 
 static inline void io_write32(const io_region_t *io, uintptr_t offset, uint32_t val){
 	if(io->type == IO_TYPE_PIO){
 		port_write32(io->pio_base + offset, val);
+		return;
 	}
 
 	mmio_write32(io->mmio_base + offset, val);

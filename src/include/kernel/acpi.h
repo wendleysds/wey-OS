@@ -2,6 +2,8 @@
 #define _ACPI_H
 
 #include <def/compile.h>
+#include <io/region.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 struct rsdp_descriptor_v1 {
@@ -49,11 +51,11 @@ enum acpi_access_size {
 };
 
 struct acpi_generic_address {
-	enum acpi_address_space_id address_space_id;
-	uint8_t                    bit_width;
-	uint8_t                    bit_offset;
-	enum acpi_access_size      access_size;
-	uint64_t                   address;
+	uint8_t address_space_id;
+	uint8_t bit_width;
+	uint8_t bit_offset;
+	uint8_t access_size;
+	uint64_t address;
 } __packed;
 
 struct acpi_sdt_header {
@@ -67,5 +69,37 @@ struct acpi_sdt_header {
 	uint32_t creator_id;
 	uint32_t creator_revision;
 } __packed;
+
+struct acpi_pm_info {
+	struct acpi_fadt *fadt;
+
+	io_region_t smi_cmd;
+    io_region_t pm1a_cnt;
+    io_region_t pm1b_cnt;
+    io_region_t pm2_cnt;
+    io_region_t pm_timer;
+    io_region_t gpe0;
+    io_region_t gpe1;
+    io_region_t reset;
+
+    uint8_t pm1_cnt_len;
+    uint8_t pm2_cnt_len;
+    uint8_t pm_timer_len;
+    uint8_t gpe0_len;
+    uint8_t gpe1_len;
+    uint8_t reset_value;
+
+    uint16_t sci_int;
+
+    uint8_t acpi_enable;
+    uint8_t acpi_disable;
+
+    bool has_pm1b;
+    bool has_pm2;
+    bool has_pm_timer;
+    bool has_gpe0;
+    bool has_gpe1;
+    bool has_reset;
+};
 
 #endif

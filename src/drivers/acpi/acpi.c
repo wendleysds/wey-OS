@@ -2,6 +2,8 @@
 #include <kernel/init.h>
 
 #include <kernel/printk.h>
+#include <kernel/clock.h>
+#include <asm/cpu.h>
 
 #include <lib/string.h>
 #include <def/errno.h>
@@ -12,6 +14,8 @@
 extern unsigned long acpi_rsdp;
 
 static struct acpi_rsdt *rsdt;
+
+struct acpi_pm_info acpi_pm;
 
 void *acpi_find_table(const char *signature){
 	const size_t entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
@@ -94,8 +98,59 @@ static struct acpi_rsdt *acpi_parse_rsdt(rsdp_descriptor_t *rsdp) {
 	return rsdt;
 }
 
+static inline void ndelay(uint64_t ns){
+	const uint64_t start = clock_get_realtime_ns();
+	const uint64_t end = start + ns;
+
+	while(clock_get_realtime_ns() < end) cpu_relax();
+}
+
+static int acpi_enable(void){
+	if(!acpi_pm.acpi_enable || !acpi_pm.acpi_disable) return -ENODEV;
+	
+	uint16_t value;
+
+	if (acpi_pm.smi_cmd.pio_base == 0) {
+		return -ENODEV;
+	}
+
+	if (acpi_pm.pm1a_cnt.pio_base == 0) {
+		return -ENODEV;
+	}
+
+	value = io_read16(&acpi_pm.pm1a_cnt, 0);
+
+	if (value & (1 << 0)) {
+		printk("ACPI: SCI already enabled\n");
+		return 0;
+	}
+
+	if (acpi_pm.acpi_enable == 0) {
+		printk("ACPI: ACPI_ENABLE command unavailable\n");
+		return -ENODEV;
+	}
+
+	io_write8(&acpi_pm.smi_cmd, 0, acpi_pm.acpi_enable);
+
+	for (unsigned int i = 0; i < 300; i++) {
+		value = io_read16(&acpi_pm.pm1a_cnt, 0);
+
+		if (value & (1 << 0)) {
+			printk("ACPI: ACPI mode enabled\n");
+			return 0;
+		}
+
+		ndelay(1000000);
+	}
+
+	printk("ACPI: timeout waiting for SCI_EN\n");
+
+	return -ETIMEDOUT;
+}
+
 static __init int acpi_init(void) {
 	if(!acpi_rsdp) return 0;
+	memset(&acpi_pm, 0, sizeof(acpi_pm));
 
 	rsdp_descriptor_t *rsdp = acpi_parse_rsdp();
 	if(!rsdp) return -ENOENT;
@@ -104,9 +159,10 @@ static __init int acpi_init(void) {
 	if(!rsdt) return -ENOENT;
 	
 	struct acpi_fadt *fadt = acpi_find_table("FACP");
-	if(!fadt) return -ENODEV;
-	
-	acpi_parse_fadt(fadt);
+	if(fadt){
+		acpi_parse_fadt(fadt);
+		return acpi_enable();
+	}
 	
 	return 0;
 }
