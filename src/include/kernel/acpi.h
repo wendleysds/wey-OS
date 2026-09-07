@@ -94,12 +94,16 @@ struct acpi_pm_info {
     uint8_t acpi_enable;
     uint8_t acpi_disable;
 
+	uint16_t SLP_TYPa;
+	uint16_t SLP_TYPb;
+
     bool has_pm1b;
     bool has_pm2;
     bool has_pm_timer;
     bool has_gpe0;
     bool has_gpe1;
     bool has_reset;
+	bool has_s5;
 };
 
 #endif

@@ -1,6 +1,11 @@
 #include <kernel/printk.h>
 #include <kernel/acpi.h>
+
+#include <lib/assert.h>
+#include <lib/string.h>
 #include <def/errno.h>
+
+#include <asm/page.h>
 
 #include "../internal.h"
 
@@ -108,6 +113,102 @@ static void acpi_parse_reset(struct acpi_fadt *fadt)
 	acpi_pm.reset_value = fadt->reset_value;
 }
 
+static inline u8 acpi_parse_aml_field(u8 **ptr) {
+	if (**ptr == 0x0A) (*ptr)++;
+	return *((*ptr)++);
+}
+
+static uint8_t *acpi_find_s5(uint8_t *aml, size_t length) {
+	static const uint8_t root_s5[] = {0x08, '\\', '_', 'S', '5', '_'};
+	static const uint8_t local_s5[] = {0x08, '_', 'S', '5', '_'};
+
+	for (size_t i = 0; i < length; i++) {
+
+		if (i + sizeof(root_s5) <= length &&
+			memcmp(&aml[i], root_s5, sizeof(root_s5)) == 0) {
+
+			return &aml[i];
+		}
+
+		if (i + sizeof(local_s5) <= length &&
+			memcmp(&aml[i], local_s5, sizeof(local_s5)) == 0) {
+
+			return &aml[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void acpi_parse_s5(struct acpi_fadt *fadt) {
+	uintptr_t dsdt_addr = fadt->dsdt ? fadt->dsdt : (uintptr_t)fadt->x_dsdt;
+	if (!dsdt_addr) return;
+
+    struct acpi_sdt_header *dsdt = (struct acpi_sdt_header *) __va(dsdt_addr);
+
+	if (memcmp(dsdt->signature, "DSDT", 4) != 0) {
+		return;
+	}
+
+	if (!acpi_checksum_ok(dsdt, dsdt->length)) {
+		return;
+	}
+
+    u8 *curr = (u8 *) dsdt + sizeof(struct acpi_sdt_header);
+    size_t remaining = dsdt->length - sizeof(struct acpi_sdt_header);
+
+    u8 *s5_addr = NULL;
+    while (remaining > 3) {
+        if (memcmp(curr, "_S5_", 4) == 0) {
+            s5_addr = curr;
+            break;
+        }
+        curr++;
+        remaining--;
+    }
+
+    if (!s5_addr) {
+        return;
+    }
+
+    int has_prefix = (s5_addr >= (u8 *)dsdt + 2 && *(s5_addr - 1) == '\\' && *(s5_addr - 2) == 0x08);
+    int has_name_op = (s5_addr >= (u8 *)dsdt + 1 && *(s5_addr - 1) == 0x08);
+
+    if (!(has_prefix || has_name_op) || s5_addr[4] != 0x12) {
+        return;
+    }
+
+    s5_addr += 5;
+    
+    int pkg_len_bytes = ((*s5_addr & 0xC0) >> 6) + 2;
+    s5_addr += pkg_len_bytes;
+
+    acpi_pm.SLP_TYPa = (u16)acpi_parse_aml_field(&s5_addr) << 10;
+    acpi_pm.SLP_TYPb = (u16)acpi_parse_aml_field(&s5_addr) << 10;
+
+	acpi_pm.has_s5 = true;
+}
+
+int acpi_reboot(void) {
+	if (!acpi_pm.has_reset || acpi_pm.reset_value == 0) {
+		return -ENODEV;
+	}
+
+	io_write8(&acpi_pm.reset, 0, acpi_pm.reset_value);
+	unreachable();
+}
+
+int acpi_shutdown(void) {
+	if (!acpi_pm.has_s5) return -ENODEV;
+
+	io_write16(&acpi_pm.pm1a_cnt, 0, acpi_pm.SLP_TYPa | PM1_CNT_SLP_EN);
+	if (acpi_pm.has_pm1b) {
+		io_write16(&acpi_pm.pm1b_cnt, 0, acpi_pm.SLP_TYPb | PM1_CNT_SLP_EN);
+	}
+
+	return -EIO;
+}
+
 void acpi_parse_fadt(struct acpi_fadt *fadt)
 {
 	if (!fadt)
@@ -125,6 +226,7 @@ void acpi_parse_fadt(struct acpi_fadt *fadt)
 	acpi_parse_gpe1_blk(fadt);
 
 	acpi_parse_reset(fadt);
+	acpi_parse_s5(fadt);
 
 	acpi_pm.fadt = fadt;
 }

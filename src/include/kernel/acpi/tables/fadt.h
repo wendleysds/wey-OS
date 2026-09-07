@@ -24,8 +24,9 @@
 
 // PM1a_CNT Masks
 #define PM1_CNT_BUSY    (1 << 15)
-#define PM1_CNT_SLP_TYP 0x1FF0
+#define PM1_CNT_SLP_TYP (0x1FF0)
 #define PM1_CNT_SLP_EN  (1 << 13)
+#define PM1_CNT_SCI_EN  (1 << 0)
 #define PM1_CNT_GBL_EVT_EN (1 << 8)
 
 // PM1 Event Masks
