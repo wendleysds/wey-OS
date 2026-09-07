@@ -1,0 +1,1 @@
+obj-y += acpi.o acpi_helpers.o

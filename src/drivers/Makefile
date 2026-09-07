@@ -1,1 +1,1 @@
-subdir-y += video/ tty/ base/ ata/ input/ pci/
+subdir-y += video/ tty/ base/ ata/ input/ pci/ acpi/
