@@ -26,7 +26,7 @@
 #  └─> LD build/bin/kernel.elf
 
 ARCH ?= i386
-CROSS_COMPILE ?= i686-elf-
+CROSS_COMPILE ?=
 
 # Tools
 CPP     = $(CC) -E
@@ -100,28 +100,72 @@ KINCLUDE := \
 	-I$(srctree)/arch/$(ARCH)/include \
 	-I$(srctree)/include $(UINCLUDE)
 
-KBUILD_CFLAGS = -Wall -Werror -std=gnu11 $(KINCLUDE)
+# Base flags
+KBUILD_CFLAGS := \
+	$(KINCLUDE) \
+	-ffreestanding \
+	-nostdlib \
+	-nostdinc \
+	-nostartfiles \
+	-nodefaultlibs
 
+# Language / warnings
+KBUILD_CFLAGS += \
+	-std=gnu11 \
+	-Wall \
+	-Werror \
+	-Wno-int-to-pointer-cast \
+	-Wno-attribute-alias \
+	-Wno-cpp \
+	-Wno-unused-function \
+	-Wno-unused-parameter \
+	-Wno-address-of-packed-member
+
+# Optimization
+KBUILD_CFLAGS += \
+	-fstrength-reduce \
+	-ffunction-sections \
+	-fdata-sections
+
+# Code generation / binary layout
+KBUILD_CFLAGS += \
+	-fno-strict-aliasing \
+	-falign-jumps \
+	-falign-functions \
+	-falign-loops \
+	-falign-labels \
+	-fno-asynchronous-unwind-tables \
+	-fno-unwind-tables \
+	-fno-ident \
+	-fno-pic \
+	-fno-stack-protector \
+	-fno-omit-frame-pointer
+
+# Floating-point / SIMD
+KBUILD_CFLAGS += \
+	-mno-sse \
+	-mno-mmx \
+	-mno-sse2 \
+	-mno-3dnow \
+	-mno-avx \
+	-mno-sse4a
+
+# 32 BIT
 KBUILD_CFLAGS += -m32
 
+KBUILD_ASFLAGS = -f elf32
+
+KBUILD_LDFLAGS += -nostdlib -m elf_i386 --no-warn-rwx-segments -z noexecstack 
+
 ifdef DEBUG_KERNEL
-KBUILD_CFLAGS += -g
+    KBUILD_CFLAGS  += -g
+    KBUILD_ASFLAGS += -g
+    KBUILD_LDFLAGS += -g
 endif
 
 ifneq ($(INITRAM),)
     KBUILD_CFLAGS += -DCONFIG_INITRAM=\"$(INITRAM)\"
 endif
-
-KBUILD_CFLAGS += -ffreestanding -nostdlib -nostdinc -nostartfiles -nodefaultlibs
-KBUILD_CFLAGS += -Wno-unused-function -Wno-unused-parameter \
-	-Wno-int-to-pointer-cast -Wno-attribute-alias -Wno-cpp
-KBUILD_CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
-KBUILD_CFLAGS += -fno-omit-frame-pointer
-KBUILD_CFLAGS += -fstrength-reduce -finline-functions
-
-KBUILD_ASFLAGS = -f elf32
-
-KBUILD_LDFLAGS += -m elf_i386 --no-warn-rwx-segments
 
 export KBUILD_CFLAGS KBUILD_ASFLAGS KBUILD_LDFLAGS KINCLUDE
 

@@ -22,7 +22,7 @@ struct tss{
 	uint16_t ssp;
 } __attribute__((packed));
 
-static inline void tss_load(unsigned long tss_segment){
+static inline void tss_load(uint16_t tss_segment){
 	__asm__ volatile ("ltr %0" :: "r"(tss_segment) : "memory");
 }
 
