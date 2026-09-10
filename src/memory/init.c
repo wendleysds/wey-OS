@@ -8,6 +8,7 @@
 #include <def/errno.h>
 #include <def/config.h>
 #include <lib/string.h>
+#include <lib/assert.h>
 
 #include <asm-generic/paging_ctx.h>
 #include <asm/page.h>
@@ -26,7 +27,7 @@ extern unsigned long max_pfn_mapped;
 static struct page** sections __initdata;
 static size_t max_sections __initdata;
 
-static void __init paging_map_ram(void){
+static void __init paging_map_direct_ram(void){
 	uintptr_t max_phys =
 		MIN(
 			(uintptr_t)max_pfn << PAGE_SHIFT,
@@ -35,43 +36,28 @@ static void __init paging_map_ram(void){
 
 	uintptr_t last_phys_mapped = max_pfn_mapped << PAGE_SHIFT;
 
-	for(size_t i = 0; i < memblock.memory.count; i++){
-		struct memblock_region *r = &memblock.memory.regions[i];
+	uintptr_t start = ALIGN_DOWN(0, PAGE_SIZE);
+	uintptr_t end   = ALIGN_UP(0 + KERNEL_DIRECTMAP_SIZE, PAGE_SIZE);
 
-		uintptr_t start = ALIGN_DOWN(r->base, PAGE_SIZE);
-		uintptr_t end   = ALIGN_UP(r->base + r->size, PAGE_SIZE);
+	if(last_phys_mapped){
+		BUG_ON(end <= last_phys_mapped);
+		start = MAX(start, last_phys_mapped);
+	}
 
-		if(start >= max_phys)
-			continue;
-
-		end = MIN(end, max_phys);
-
-		if(last_phys_mapped != 0){
-			if(end <= last_phys_mapped){
-				continue;
-			}
-
-			// continue from where we left off
-			start = MAX(start, last_phys_mapped);
-		}
-
-		if(mmu_early_mmap(
-			&kernel_ctx,
-			__va(start),
-			start,
-			end - start,
-			(MEM_READ | MEM_WRITE)
-		)) {
-			printk("Failed to map RAM at %#lx\n", start);
-			continue;
-		}
-
-		last_phys_mapped = end - 1;
+	if(mmu_early_mmap(
+		&kernel_ctx,
+		__va(start),
+		start,
+		end - start,
+		(MEM_READ | MEM_WRITE)
+	)) {
+		printk("Failed to map RAM at %#lx\n", start);
+		return;
 	}
 
 	arch_paging_ops.flush_all();
 
-	max_pfn_mapped = (last_phys_mapped + 1) >> PAGE_SHIFT;
+	max_pfn_mapped = (end) >> PAGE_SHIFT;
 
 	printk("Memory: Max PFN mapped = %#lx/%#lx (max_phys=0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
 }
@@ -195,7 +181,7 @@ static __init int vmemmap_populate(void) {
 int __init memory_init(void) {
 	int res = 0;
 
-	paging_map_ram();
+	paging_map_direct_ram();
 
 	if(IS_ERR_VALUE(res = mmu_init())){
 		return res;
