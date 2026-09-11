@@ -23,7 +23,13 @@ void* kmalloc(size_t size) {
 			return NULL;
 		}
 
-		return (void*)page_to_virt(page);
+		uintptr_t vaddr = page_to_virt(page);
+		if(!vaddr){
+			page_free(page);
+			return NULL;
+		}
+
+		return (void*)vaddr;
 	}
 
 	return slab_alloc(size);

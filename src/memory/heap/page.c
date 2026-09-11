@@ -44,12 +44,38 @@ uintptr_t page_to_phys(struct page* page) {
 	return page_to_pfn(page) << PAGE_SHIFT;
 }
 
+/**
+ * @brief Convert a page to a virtual address.
+ *
+ * @param page The page to convert.
+ *
+ * @return The virtual address of the page.
+ *
+ * @note This function will return 0 if the page is not in the kernel directmap.
+ */
 uintptr_t page_to_virt(struct page* page) {
+	if(page->flags & PG_HIGHMEM){
+		return 0;
+	}
+
 	uintptr_t phys = page_to_phys(page);
 	return phys + KERNEL_DIRECTMAP_START;
 }
 
+/**
+ * @brief Convert a virtual address to a page.
+ *
+ * @param virt_addr The virtual address to convert.
+ *
+ * @return The page corresponding to the virtual address.
+ *
+ * @note This function will return NULL if the virtual address is not in the kernel directmap.
+ */
 struct page* virt_to_page(uintptr_t virt_addr) {
+	if(virt_addr < KERNEL_DIRECTMAP_START || virt_addr > KERNEL_DIRECTMAP_END){
+		return NULL;
+	}
+
 	uintptr_t phys = virt_addr - KERNEL_DIRECTMAP_START;
 	return phys_to_page(phys);
 }
@@ -192,8 +218,14 @@ struct page* page_alloc(uint8_t order, uint16_t flags) {
 			global_zone.free_area[cur].nr_free++;
 		}
 
+		uintptr_t phys = page_to_phys(page);
+		if (phys >= KERNEL_DIRECTMAP_SIZE) {
+			flags |= PG_HIGHMEM;
+		}
+
 		page->flags = flags;
 		page->order = order;
+		page->private = 0;
 
 		atomic_set(&page->refcount, 1);
 		global_zone.free_pages -= (1UL << order);

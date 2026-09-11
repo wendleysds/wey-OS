@@ -30,6 +30,10 @@ static struct slab* slab_create(struct slab_cache* cache){
 		return NULL;
 
 	uintptr_t virt = page_to_virt(page);
+	if(!virt){
+		page_free(page);
+		return NULL;
+	}
 
 	struct slab* slab = (struct slab*)virt;
 	memset(slab, 0x0, sizeof(*slab));
