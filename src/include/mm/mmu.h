@@ -45,6 +45,7 @@ int mmu_context_switch(struct paging_ctx *ctx);
 void mmu_destroy_context(struct paging_ctx *ctx);
 
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr);
+int mmu_present(struct paging_ctx *ctx, uintptr_t vaddr);
 void mmu_invlpg(struct paging_ctx *ctx, uintptr_t vaddr);
 void mmu_flush_all(struct paging_ctx *ctx);
 

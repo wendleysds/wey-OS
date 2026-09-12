@@ -2,14 +2,17 @@
 #include <kernel/panic.h>
 #include <kernel/printk.h>
 #include <mm/page.h>
+#include <mm/kmap.h>
 #include <mm/vma.h>
 #include <def/errno.h>
 #include <def/linker.h>
 #include <lib/string.h>
+#include <lib/assert.h>
 #include <asm/idt.h>
 
 #include <asm-generic/extable.h>
 
+#define PAGE_ALIGN_DOWN(addr) ((addr) & ~(PAGE_SIZE - 1))
 
 extern void page_fault_entry();
 
@@ -73,63 +76,62 @@ static inline void show_pf_info(pf_info_t* pf){
 	);
 }
 
-static int vm_handle_file(struct vm_region* region, uintptr_t addr){
-	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
-
-	size_t region_offset = page_addr - region->start;
-	off_t file_offset = region->file_offset + region_offset;
+static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+	off_t file_offset = region->file_offset + (page_addr - region->start);
 
 	struct page* page = page_alloc(0, 0x0);
 	if (!page) return -ENOMEM;
 
-	void* kernel_virt = (void*)page_to_virt(page);
-	memset(kernel_virt, 0x0, PAGE_SIZE);
-
 	if (region->file) {
-		vfs_lseek(region->file, file_offset, SEEK_SET);
+		void* kernel_virt = kmap(page);
+		if (!kernel_virt) {
+			page_free(page);
+			return -ENOMEM;
+		}
 
+		BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)kernel_virt));
+
+		memset(kernel_virt, 0x0, PAGE_SIZE);
+		vfs_lseek(region->file, file_offset, SEEK_SET);
 		int n = vfs_read(region->file, kernel_virt, PAGE_SIZE);
-		if (n < 0){
+		kunmap(kernel_virt);
+
+		if (n < 0) {
 			page_free(page);
 			return n;
 		}
 	}
 
-	int res = mmu_mmap(
-		current->mm->ctx,
-		page_to_phys(page),
-		page_addr,
-		PAGE_SIZE,
-		region->mem_flags
-	);
-
-	if(IS_ERR_VALUE(res)){
+	int res = mmu_mmap(current->mm->ctx, page_to_phys(page), page_addr, PAGE_SIZE, region->mem_flags);
+	if (IS_ERR_VALUE(res)) {
 		page_free(page);
 		return res;
 	}
 
 	mmu_invlpg(current->mm->ctx, page_addr);
-
 	return SUCCESS;
 }
 
-static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
-	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
+static int vm_handle_stack(struct vm_region* region, uintptr_t addr) {
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+	
 	struct page* page = page_alloc(1, 0x0);
 	if (!page) return -ENOMEM;
 
-	void* kernel_virt = (void*)page_to_virt(page);
+	void* kernel_virt = kmap(page);
+	if (!kernel_virt) {
+		page_free(page);
+		return -ENOMEM;
+	}
+
+	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)kernel_virt));
+	
 	memset(kernel_virt, 0x0, PAGE_SIZE);
+	kunmap(kernel_virt);
 
-	int res = mmu_mmap(
-		current->mm->ctx,
-		page_to_phys(page),
-		page_addr,
-		PAGE_SIZE,
-		region->mem_flags
-	);
-
-	if(IS_ERR_VALUE(res)){
+	int res = mmu_mmap(current->mm->ctx, page_to_phys(page), page_addr, PAGE_SIZE, region->mem_flags);
+	if (IS_ERR_VALUE(res)) {
 		page_free(page);
 		return res;
 	}
@@ -138,28 +140,20 @@ static int vm_handle_stack(struct vm_region* region, uintptr_t addr){
 	return SUCCESS;
 }
 
-static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
-	uintptr_t page_addr = addr & ~(PAGE_SIZE - 1);
+static int vm_handle_cow(struct vm_region* region, uintptr_t addr) {
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+	int res = SUCCESS;
 
-	if (page_addr < region->start || page_addr >= region->end){
+	if (page_addr < region->start || page_addr >= region->end) {
 		return -EFAULT;
 	}
 
-	uintptr_t phys = mmu_translate(
-		current->mm->ctx,
-		page_addr
-	);
-
+	uintptr_t phys = mmu_translate(current->mm->ctx, page_addr);
 	struct page* page = phys_to_page(phys);
 	if (!page) return -ENOENT;
 
-	if(atomic_read(&page->refcount) == 1){
-		mmu_set_flags(
-			current->mm->ctx,
-			page_addr,
-			region->mem_flags
-		);
-
+	if (atomic_read(&page->refcount) == 1) {
+		mmu_set_flags(current->mm->ctx, page_addr, region->mem_flags);
 		mmu_invlpg(current->mm->ctx, page_addr);
 		return SUCCESS;
 	}
@@ -167,36 +161,47 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr){
 	struct page* new_page = page_alloc(1, 0x0);
 	if (!new_page) return -ENOMEM;
 
-	memcpy(
-		(void*)page_to_virt(new_page),
-		(void*)page_to_virt(page),
-		PAGE_SIZE
-	);
+	void* new_virt = kmap(new_page);
+	if (!new_virt) {
+		res = -ENOMEM;
+		goto err_free_new;
+	}
 
-	int res = mmu_mmap(
-		current->mm->ctx,
-		page_to_phys(new_page),
-		page_addr,
-		PAGE_SIZE,
-		region->mem_flags
-	);
+	void* old_virt = kmap(page);
+	if (!old_virt) {
+		res = -ENOMEM;
+		goto err_unmap_new;
+	}
 
-	if(IS_ERR_VALUE(res)){
-		page_free(new_page);
-		return res;
+	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)new_virt));
+	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)old_virt));
+
+	memcpy(new_virt, old_virt, PAGE_SIZE);
+
+	kunmap(old_virt);
+	kunmap(new_virt);
+
+	res = mmu_mmap(current->mm->ctx, page_to_phys(new_page), page_addr, PAGE_SIZE, region->mem_flags);
+	if (IS_ERR_VALUE(res)) {
+		goto err_free_new;
 	}
 
 	mmu_invlpg(current->mm->ctx, page_addr);
-
 	page_put(page);
 
 	return SUCCESS;
+
+err_unmap_new:
+	kunmap(new_virt);
+err_free_new:
+	page_free(new_page);
+	return res;
 }
 
 void page_fault_handler(struct registers* regs){
 	pf_info_t pf = pf_decode(regs->err_code, cr2());
 	
-	int handle_res = -1;
+	int handle_res = -EFAULT;
 
 	if(!current || !pf.user){
 
@@ -253,7 +258,7 @@ void page_fault_handler(struct registers* regs){
 
 check_res:
 	if(handle_res != 0){
-		printk("page_fault_handler: handler: failed with status \"%d\"!\n", handle_res);
+		printk("page_fault_handler: failed with status \"%d\"!\n", handle_res);
 		goto kill;
 	}
 
@@ -261,10 +266,13 @@ check_res:
 
 segfault:
 	printk("Segmentation fault at address %#010lx\n", pf.addr);
+	
 kill:
 	dump_regs(regs);
-	panic("Killed thread\n");
-	while(1) cpu_relax();
+	task_exit(current, handle_res);
+
+	schedule();
+	unreachable();
 }
 
 void __init fault_init(){

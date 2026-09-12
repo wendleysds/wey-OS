@@ -630,6 +630,15 @@ void mmu_destroy_context(struct paging_ctx *ctx){
 	free_context(ctx);
 }
 
+int mmu_present(struct paging_ctx *ctx, uintptr_t vaddr){
+	pte_t* pte = walk(ctx, vaddr, ctx->fmt->levels);
+	if(pte){
+		return ctx->ops->pte_present(*pte);
+	}
+
+	return 0;
+}
+
 void mmu_invlpg(struct paging_ctx *ctx, uintptr_t vaddr){
 	ctx->ops->flush_tlb_one(vaddr);
 }
