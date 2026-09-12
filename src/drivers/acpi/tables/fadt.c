@@ -140,22 +140,36 @@ static uint8_t *acpi_find_s5(uint8_t *aml, size_t length) {
 	return NULL;
 }
 
+struct acpi_dsdt {
+	struct acpi_sdt_header header;
+	uint8_t definition_block[];
+};
+
 static void acpi_parse_s5(struct acpi_fadt *fadt) {
-	uintptr_t dsdt_addr = fadt->dsdt ? fadt->dsdt : (uintptr_t)fadt->x_dsdt;
+	paddr_t dsdt_addr = fadt->dsdt ? fadt->dsdt : (paddr_t)fadt->x_dsdt;
 	if (!dsdt_addr) return;
 
-    struct acpi_sdt_header *dsdt = (struct acpi_sdt_header *) __va(dsdt_addr);
+    struct acpi_sdt_header *sdt = acpi_map(dsdt_addr, sizeof(struct acpi_sdt_header));
+	if(!sdt) return;
 
-	if (memcmp(dsdt->signature, "DSDT", 4) != 0) {
+	if (memcmp(sdt->signature, "DSDT", 4) != 0) {
+		acpi_unmap(sdt);
 		return;
 	}
 
-	if (!acpi_checksum_ok(dsdt, dsdt->length)) {
+	struct acpi_dsdt *dsdt = acpi_map(dsdt_addr, sdt->length);
+	acpi_unmap(sdt);
+
+	if(!dsdt){
 		return;
 	}
 
-    u8 *curr = (u8 *) dsdt + sizeof(struct acpi_sdt_header);
-    size_t remaining = dsdt->length - sizeof(struct acpi_sdt_header);
+	if (!acpi_checksum_ok(dsdt, dsdt->header.length)) {
+		goto out_unmap;
+	}
+
+    u8 *curr = (u8 *)dsdt->definition_block;
+    size_t remaining = dsdt->header.length - sizeof(struct acpi_sdt_header);
 
     u8 *s5_addr = NULL;
     while (remaining > 3) {
@@ -168,14 +182,14 @@ static void acpi_parse_s5(struct acpi_fadt *fadt) {
     }
 
     if (!s5_addr) {
-        return;
+        goto out_unmap;
     }
 
-    int has_prefix = (s5_addr >= (u8 *)dsdt + 2 && *(s5_addr - 1) == '\\' && *(s5_addr - 2) == 0x08);
-    int has_name_op = (s5_addr >= (u8 *)dsdt + 1 && *(s5_addr - 1) == 0x08);
+    int has_prefix = (s5_addr >= (u8 *)dsdt->definition_block + 2 && *(s5_addr - 1) == '\\' && *(s5_addr - 2) == 0x08);
+    int has_name_op = (s5_addr >= (u8 *)dsdt->definition_block + 1 && *(s5_addr - 1) == 0x08);
 
     if (!(has_prefix || has_name_op) || s5_addr[4] != 0x12) {
-        return;
+        goto out_unmap;
     }
 
     s5_addr += 5;
@@ -187,6 +201,9 @@ static void acpi_parse_s5(struct acpi_fadt *fadt) {
     acpi_pm.SLP_TYPb = (u16)acpi_parse_aml_field(&s5_addr) << 10;
 
 	acpi_pm.has_s5 = true;
+
+out_unmap:
+	acpi_unmap(sdt);
 }
 
 int acpi_reboot(void) {
@@ -227,6 +244,4 @@ void acpi_parse_fadt(struct acpi_fadt *fadt)
 
 	acpi_parse_reset(fadt);
 	acpi_parse_s5(fadt);
-
-	acpi_pm.fadt = fadt;
 }

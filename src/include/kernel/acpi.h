@@ -71,8 +71,6 @@ struct acpi_sdt_header {
 } __packed;
 
 struct acpi_pm_info {
-	struct acpi_fadt *fadt;
-
 	io_region_t smi_cmd;
     io_region_t pm1a_cnt;
     io_region_t pm1b_cnt;

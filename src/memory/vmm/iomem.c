@@ -87,8 +87,9 @@ static vaddr_t block_alloc(size_t count) {
 	size_t start = 0;
 
 	for (size_t n = 0; n < IO_BLOCK_COUNT; n++) {
-
 		size_t idx = (block_slot_hint + n) % IO_BLOCK_COUNT;
+
+		if (n > 0 && idx == 0) found = 0;
 
 		if (block_is_free(idx)) {
 
@@ -158,9 +159,11 @@ void __iomem *ioremap(paddr_t phys, size_t size) {
 	if (!align_up_size(offset + size, PAGE_SIZE, &map_size))
 		return NULL;
 
-	size_t block_count;
-	if (!align_up_size(map_size, IO_BLOCK_SIZE, &block_count))
+	size_t aligned_size;
+	if (!align_up_size(map_size, IO_BLOCK_SIZE, &aligned_size))
 		return NULL;
+
+	size_t block_count = aligned_size / IO_BLOCK_SIZE;
 
 	unsigned long irqflags;
 
@@ -175,8 +178,7 @@ void __iomem *ioremap(paddr_t phys, size_t size) {
 
 			atomic_inc(&mapping->refcount);
 
-			vaddr_t virt =
-				mapping->virt + (phys - mapping->phys);
+			vaddr_t virt = mapping->virt + (phys - mapping->phys);
 
 			spin_unlock_irqrestore(
 				&io_mapping_lock,

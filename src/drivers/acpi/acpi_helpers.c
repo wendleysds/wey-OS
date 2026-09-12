@@ -1,6 +1,10 @@
 #include <kernel/acpi.h>
 #include <kernel/printk.h>
+#include <def/config.h>
 #include <def/errno.h>
+#include <mm/iomem.h>
+#include <asm/page.h>
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -30,4 +34,26 @@ int acpi_gas_to_io_region(const struct acpi_generic_address *gas, io_region_t *r
             printk("ACPI: Unsupported address space id %d\n", gas->address_space_id);
 			return -EOPNOTSUPP;
 	}
+}
+
+void* acpi_map(paddr_t phys, size_t size){
+	if(phys + size > UINTPTR_MAX){
+		return 0;
+	}
+
+	paddr_t end = phys + size;
+	if(end < KERNEL_DIRECTMAP_SIZE){
+		return (void*)__va(phys);
+	}
+
+	return ioremap(phys, size);
+}
+
+void acpi_unmap(void __iomem *virt){
+	vaddr_t vaddr = (vaddr_t)virt;
+	if (vaddr >= KERNEL_DIRECTMAP_START && vaddr < KERNEL_DIRECTMAP_END) {
+		return;
+	}
+
+	iounmap(virt);
 }

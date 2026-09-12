@@ -189,7 +189,7 @@ static __init void setup_acpi(void){
 		return;
 	}
 
-	acpi_rsdp = (uintptr_t)__va(acpi->rsdp);
+	acpi_rsdp = (unsigned long)acpi->rsdp;
 }
 
 static __init void check_pse(void){
