@@ -10,6 +10,8 @@ KBUILD_LDFLAGS += -T $(srctree)/$(boot-y)setup.ld
 relocable := n
 target := $(BIN_DIR)/setup.elf
 
+all: $(BIN_DIR)/setup.bin
+
 $(BIN_DIR)/setup.bin: $(BIN_DIR)/setup.elf
 	@echo "  OBJCOPY    $@"
 	$(Q)$(OBJCOPY) -O binary $< $@

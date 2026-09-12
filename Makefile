@@ -177,21 +177,20 @@ arch-y := arch/$(ARCH)/
 
 all-y := $(core-y) $(lib-y) $(arch-y)
 
-dirs := $(foreach dir, $(all-y), $(srcroot)/$(dir))
 core-builtins := $(foreach dir, $(all-y), $(OBJ_DIR)/$(dir)built-in.o)
-
 export core-builtins
 
-all: $(dirs) bzImage
+include $(srctree)/arch/$(ARCH)/Makefile
+
+all: bzImage
 
 $(BUILD_DIRS):
 	$(Q)mkdir -p $@
 
-.PHONY: $(dirs) chksyscalls
-$(dirs): chksyscalls $(BUILD_DIRS)
-	$(Q)$(MAKE) $(build)=$@
+.PHONY: $(core-builtins) chksyscalls isoimage cdrom clean
 
-bzImage: $(dirs)
+$(core-builtins): chksyscalls $(BUILD_DIRS)
+	$(Q)$(MAKE) $(build)=$(patsubst $(OBJ_DIR)/%built-in.o,%,$@)
 
 isoimage:
 	@echo "not supported yet"

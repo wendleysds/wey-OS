@@ -33,7 +33,9 @@ $(kernelsecs): $(BIN_DIR)/kernel.elf
 	@echo "  NM         $@"
 	$(Q)$(NM) $^ | sed -n 's/^\([0-9a-fA-F]*\) [A-Za-z] \(__kernel.*\)$$/#define \2 0x\1/p' > $@
 
-$(BIN_DIR)/kernel.elf: all | $(BIN_DIR)
+$(KBUILD_LDS): $(OBJ_DIR)/arch/i386/built-in.o ;
+
+$(BIN_DIR)/kernel.elf: $(KBUILD_LDS) $(core-builtins) | $(BIN_DIR)
 	@echo "  LD         $@"
 	@mkdir -p $(dir $@)
 	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $@ $(core-builtins)
