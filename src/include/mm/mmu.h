@@ -6,16 +6,16 @@
 
 typedef enum {
 	// Runtime flags
-	MEM_READ   = 1 << 0,
-	MEM_WRITE  = 1 << 1,
-	MEM_USER   = 1 << 2,
+	MEM_READ = 1 << 0,
+	MEM_WRITE = 1 << 1,
+	MEM_USER = 1 << 2,
 	MEM_GLOBAL = 1 << 3,
 	MEM_DEVICE = 1 << 4,
-	MEM_CACHE  = 1 << 5,
+	MEM_NO_CACHE = 1 << 5,
 	MEM_HUGE_PAGE = 1 << 6,
 
 	// VMA flags
-	MEM_EXEC   = 1 << 12,
+	MEM_EXEC = 1 << 12,
 	MEM_SHARED = 1 << 13,
 	MEM_LOCKED = 1 << 14,
 	MEM_GROWSDOWN = 1 << 15,

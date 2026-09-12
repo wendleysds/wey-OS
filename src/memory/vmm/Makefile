@@ -1,1 +1,1 @@
-obj-y += mmu.o vma.o kmap.o
+obj-y += mmu.o vma.o kmap.o iomem.o

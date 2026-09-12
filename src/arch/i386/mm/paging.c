@@ -92,6 +92,9 @@ int mmu_flags_arch(mem_flags_t flags){
 	if(flags & MEM_HUGE_PAGE)
 		f |= _PAGE_PSIZE;
 
+	if(flags & MEM_NO_CACHE)
+		f |= _PAGE_PCD;
+
 	if(flags & MEM_DEVICE)
 		f |= _PAGE_PCD | _PAGE_PWT;
 

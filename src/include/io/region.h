@@ -14,8 +14,8 @@ typedef enum {
 typedef struct {
 	io_type_t type;
 	union {
-		uintptr_t mmio_base;
-		uint16_t  pio_base;
+		vaddr_t  mmio_base;
+		uint16_t pio_base;
 	};
 } io_region_t;
 
