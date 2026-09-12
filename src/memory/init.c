@@ -37,7 +37,7 @@ static void __init paging_map_direct_ram(void){
 	uintptr_t last_phys_mapped = max_pfn_mapped << PAGE_SHIFT;
 
 	uintptr_t start = ALIGN_DOWN(0, PAGE_SIZE);
-	uintptr_t end   = ALIGN_UP(0 + KERNEL_DIRECTMAP_SIZE, PAGE_SIZE);
+	uintptr_t end   = ALIGN_UP(0 + max_phys, PAGE_SIZE);
 
 	if(last_phys_mapped){
 		BUG_ON(end <= last_phys_mapped);

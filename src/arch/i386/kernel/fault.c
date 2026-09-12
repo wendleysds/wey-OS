@@ -90,8 +90,6 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 			return -ENOMEM;
 		}
 
-		BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)kernel_virt));
-
 		memset(kernel_virt, 0x0, PAGE_SIZE);
 		vfs_lseek(region->file, file_offset, SEEK_SET);
 		int n = vfs_read(region->file, kernel_virt, PAGE_SIZE);
@@ -125,8 +123,6 @@ static int vm_handle_stack(struct vm_region* region, uintptr_t addr) {
 		return -ENOMEM;
 	}
 
-	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)kernel_virt));
-	
 	memset(kernel_virt, 0x0, PAGE_SIZE);
 	kunmap(kernel_virt);
 
@@ -172,9 +168,6 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr) {
 		res = -ENOMEM;
 		goto err_unmap_new;
 	}
-
-	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)new_virt));
-	BUG_ON(!mmu_present(current->mm->ctx, (uintptr_t)old_virt));
 
 	memcpy(new_virt, old_virt, PAGE_SIZE);
 

@@ -199,7 +199,7 @@ static __init void check_pse(void){
 #if X86_32 == 1
 	if(supports_pse){
 		sizes[idx++] = (struct paging_size){
-			.level = 1,
+			.level = 0,
 			.buddy_order = 10,
 			.size = MiB(4),
 			.flag = _PAGE_PSIZE,
@@ -208,7 +208,7 @@ static __init void check_pse(void){
 #endif
 
 	sizes[idx++] = (struct paging_size){
-		.level = 2,
+		.level = 1,
 		.buddy_order = 0,
 		.size = KiB(4),
 	};

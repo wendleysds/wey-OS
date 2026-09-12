@@ -65,7 +65,7 @@ static __init pte_t* walk_early(struct paging_ctx *ctx, uintptr_t vaddr, uint8_t
 		size_t idx = (vaddr >> ctx->fmt->lvl[i].shift) & ctx->fmt->lvl[i].mask;
 		pte_t *entry = &((pte_t*)table)[idx];
 
-		if (ctx->ops->pte_leaf(*entry, i)) {
+		if (i == stop_level || ctx->ops->pte_leaf(*entry, i)) {
 			return entry;
 		}
 
@@ -109,8 +109,8 @@ int __init mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t pad
 		ctx->ops->set_pte(pte, val);
 		ctx->ops->flush_tlb_one(vaddr);
 
-		vaddr += PAGE_SIZE;
-		paddr += PAGE_SIZE;
+		vaddr += pg->size;
+		paddr += pg->size;
 		size -= pg->size;
 	}
 
@@ -206,26 +206,24 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 
 		const pte_t pte_val = *entry;
 
-		if (likely(pte_present(pte_val))) {
-			if (pte_leaf(pte_val, i)) {
-				return entry;
-			}
+		if (i == stop_level || (pte_present(pte_val) && pte_leaf(pte_val, i))) {
+			return entry;
+		}
 
+		if (likely(pte_present(pte_val))) {
 			table = ops->pte_to_virt(pte_val);
 		} 
 		else if (create) {
-			const int is_leaf = pte_leaf(pte_val, i);
-			table = ensure_table(ctx, entry, user_table, is_leaf ? leaf_order : 0);
+			table = ensure_table(ctx, entry, user_table, 0);
 
 			if (unlikely(!table)) return NULL;
-			if (is_leaf) return entry;
 		}
 		else {
 			return NULL;
 		}
 	}
 
-	return NULL;
+	unreachable();
 }
 #endif
 
@@ -489,12 +487,12 @@ int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t si
 			return -ENOMEM;
 		}
 
-		pte_t val = ctx->ops->mk_pte(paddr, arch_flags);
+		pte_t val = ctx->ops->mk_pte(paddr, arch_flags | pg->flag);
 		ctx->ops->set_pte(pte, val);
 		ctx->ops->flush_tlb_one(vaddr);
 
-		vaddr += PAGE_SIZE;
-		paddr += PAGE_SIZE;
+		vaddr += pg->size;
+		paddr += pg->size;
 		size -= pg->size;
 	}
 
