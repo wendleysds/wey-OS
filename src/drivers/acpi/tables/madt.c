@@ -9,6 +9,48 @@
 
 #include "../internal.h"
 
+struct acpi_cpu {
+	uint32_t acpi_id;
+	uint32_t apid_id;
+	uint32_t flags;
+};
+
+struct acpi_ioapic {
+	uint8_t id;
+	vaddr_t address;
+	uint32_t gsi_base;
+};
+
+struct acpi_irq_override {
+	uint8_t bus;
+	uint8_t source_irq;
+	uint16_t flags;
+	uint32_t gsi;
+};
+
+struct acpi_nmi_source {
+	uint8_t acpi_id;
+	uint8_t lint;
+	uint16_t flags;
+};
+
+struct acpi_madt_info {
+	vaddr_t local_apic_address;
+	uint32_t flags;
+
+	struct acpi_cpu *cpus;
+	size_t cpu_count;
+
+	struct acpi_ioapic *ioapics;
+	size_t ioapic_count;
+	
+	struct acpi_irq_override *overrides;
+	size_t override_count;
+
+	struct acpi_nmi_sources *nmis;
+	size_t nmi_count;
+};
+
 static inline void acpi_parse_madt_lapic(struct acpi_madt_lapic *entry) {
 	if (!(entry->flags & MADT_LAPIC_FLAG_ENABLED)) return;
 
