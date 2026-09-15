@@ -1,6 +1,7 @@
 #include <kernel/sched.h>
 #include <kernel/panic.h>
 #include <kernel/printk.h>
+#include <kernel/stacktrace.h>
 #include <mm/page.h>
 #include <mm/kmap.h>
 #include <mm/vma.h>
@@ -205,10 +206,12 @@ void page_fault_handler(struct registers* regs){
 			return;
 		}
 
-		dump_regs(regs);
 		show_pf_info(&pf);
+		dump_regs(regs);
+		dump_stack(regs);
 		panic("Kernel page fault!");
 	}
+
 
 	struct vm_region* region = vma_lookup(current->mm, pf.addr);
 	if(!region){

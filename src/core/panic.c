@@ -1,7 +1,9 @@
 #include <kernel/interrupt.h>
 #include <kernel/printk.h>
+#include <kernel/stacktrace.h>
 #include <lib/stdio.h>
 #include <def/compile.h>
+#include <stddef.h>
 
 asmlinkage __no_return void panic(const char* fmt, ...){
 	interrupts_disable();
@@ -13,7 +15,8 @@ asmlinkage __no_return void panic(const char* fmt, ...){
 	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
 
-	printk("\nPanic!\n    %s", buffer);
+	printk("\nPanic!\n    %s\n", buffer);
+	dump_stack(NULL);
 
 	while(1){
 		__asm__ volatile ("hlt");
@@ -21,3 +24,4 @@ asmlinkage __no_return void panic(const char* fmt, ...){
 
 	__builtin_unreachable();
 }
+

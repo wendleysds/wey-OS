@@ -2,6 +2,7 @@
 #include <kernel/clock.h>
 #include <kernel/interrupt.h>
 #include <kernel/printk.h>
+#include <kernel/stacktrace.h>
 #include <mm/kheap.h>
 #include <asm/idt.h>
 #include <def/errno.h>
@@ -187,6 +188,8 @@ static void _print_frame(struct registers* regs){
 		"int 0x%x err 0x%x\n",
 		regs->int_no, regs->err_code
 	);
+
+	dump_stack(regs);
 }
 
 static void _build_irq_info(struct irq_info* info, struct registers* regs){
