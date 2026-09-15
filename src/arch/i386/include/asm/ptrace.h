@@ -21,8 +21,6 @@ struct registers {
 	unsigned long ss;
 } __packed;
 
-struct task;
-
 static inline unsigned long regs_get_return_value(struct registers *regs){
 	return regs->ax;
 }
@@ -31,7 +29,7 @@ static inline void regs_set_return_value(struct registers *regs, unsigned long v
 	regs->ax = value;
 }
 
-static __always_inline int regs_is_user_mode(struct registers *regs){
+static inline int regs_is_user_mode(struct registers *regs){
 	return !!(regs->cs & 3);
 }
 
