@@ -33,10 +33,12 @@
     #define __used   __attribute__((used))
     #define __unused __attribute__((unused))
     #define __cold   __attribute__((cold))
+    #define __weak   __attribute__((weak))
 #else
     #define __used
     #define __unused
     #define __cold
+    #define __weak
 #endif
 
 #if HAS_BUILTINS
