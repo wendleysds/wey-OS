@@ -23,21 +23,22 @@ extern struct paging_ctx kernel_ctx;
 struct paging_ctx* ctx = &kernel_ctx;
 
 extern unsigned long max_pfn_mapped;
+extern unsigned long directmap_limit_pfn;
 
 static struct page** sections __initdata;
 static size_t max_sections __initdata;
 
-static void __init paging_map_direct_ram(void){
+static void __init map_direct_ram(void){
 	uintptr_t max_phys =
 		MIN(
-			(uintptr_t)max_pfn << PAGE_SHIFT,
-			KERNEL_DIRECTMAP_SIZE
+			(uintptr_t)(directmap_limit_pfn << PAGE_SHIFT),
+			(uintptr_t)(__pa(KERNEL_DIRECTMAP_END))
 		);
 
 	uintptr_t last_phys_mapped = max_pfn_mapped << PAGE_SHIFT;
 
 	uintptr_t start = ALIGN_DOWN(0, PAGE_SIZE);
-	uintptr_t end   = ALIGN_UP(0 + max_phys, PAGE_SIZE);
+	uintptr_t end   = ALIGN_UP(max_phys, PAGE_SIZE);
 
 	if(last_phys_mapped){
 		BUG_ON(end <= last_phys_mapped);
@@ -59,7 +60,7 @@ static void __init paging_map_direct_ram(void){
 
 	max_pfn_mapped = (end) >> PAGE_SHIFT;
 
-	printk("Memory: Max PFN mapped = %#lx/%#lx (max_phys=0x%p)\n", max_pfn_mapped, max_pfn, max_phys);
+	printk("DMEMMAP: Max PFN mapped = %#lx/%#lx (max=0x%p)\n", max_pfn_mapped, directmap_limit_pfn, max_phys);
 }
 
 static __init int vmemmap_sections_init(void){
@@ -92,8 +93,9 @@ static __init int vmemmap_populate(void) {
 
 	size_t total_pages = 0;
 
-	for (size_t i = 0; i < memblock.memory.count; i++) {
-		struct memblock_region *r = &memblock.memory.regions[i];
+	struct memblock_type* mem = &memblock.memory;
+	for (size_t i = 0; i < mem->count; i++) {
+		struct memblock_region *r = &mem->regions[i];
 
 		size_t start_pfn = r->base >> PAGE_SHIFT;
 		size_t end_pfn   = (r->base + r->size) >> PAGE_SHIFT;
@@ -181,7 +183,7 @@ static __init int vmemmap_populate(void) {
 int __init memory_init(void) {
 	int res = 0;
 
-	paging_map_direct_ram();
+	map_direct_ram();
 
 	if(IS_ERR_VALUE(res = mmu_init())){
 		return res;

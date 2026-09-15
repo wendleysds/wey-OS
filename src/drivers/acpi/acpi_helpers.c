@@ -37,9 +37,7 @@ int acpi_gas_to_io_region(const struct acpi_generic_address *gas, io_region_t *r
 }
 
 void* acpi_map(paddr_t phys, size_t size){
-	if(phys + size > UINTPTR_MAX){
-		return 0;
-	}
+	if(size > UINTPTR_MAX - phys) return NULL;
 
 	paddr_t end = phys + size;
 	if(end < KERNEL_DIRECTMAP_SIZE){

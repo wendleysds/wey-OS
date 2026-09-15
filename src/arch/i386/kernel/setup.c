@@ -27,6 +27,7 @@ struct video_info video_info;
 
 unsigned long max_low_pfn_mapped;
 unsigned long max_pfn_mapped;
+unsigned long directmap_limit_pfn;
 
 unsigned long ramdisk_ptr;
 unsigned long ramdisk_size;
@@ -336,6 +337,7 @@ __init void setup_arch(void){
 	e820_print();
 
 	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);
+	directmap_limit_pfn = e820_end_directmap_pfn();
 
 	setup_video();
 

@@ -1,8 +1,15 @@
 #include <kernel/printk.h>
 #include <kernel/init.h>
 #include <def/config.h>
+#include <stdbool.h>
 
+#include <def/config.h>
 #include <uapi/headers.h>
+
+#include <asm/page.h>
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static struct e820_table {
 	struct e820_entry* entries;
@@ -183,31 +190,45 @@ __init void e820_print(){
 	}
 }
 
-__init size_t e820_end_ram_pfn(size_t limit_pfn) {
+static size_t __init e820_get_max_pfn(size_t limit_pfn, bool filter_memory) {
 	size_t last_pfn = 0;
-	size_t max_arch_pfn = MAX_ARCH_PFN;
 
 	for (size_t i = 0; i < e820_table.length; i++) {
 		struct e820_entry *entry = &e820_table.entries[i];
-		size_t start_pfn;
-		size_t end_pfn;
 
-		if (entry->type != E820_TYPE_RAM &&
-			entry->type != E820_TYPE_ACPI)
+		if (filter_memory && 
+			entry->type != E820_TYPE_RAM && 
+			entry->type != E820_TYPE_ACPI) {
 			continue;
+		}
 
-		start_pfn = entry->base_addr >> PAGE_SHIFT;
-		end_pfn = (entry->base_addr + entry->length) >> PAGE_SHIFT;
+		size_t start_pfn = entry->base_addr >> PAGE_SHIFT;
+		size_t end_pfn = (entry->base_addr + entry->length) >> PAGE_SHIFT;
 
 		if (start_pfn >= limit_pfn)
 			continue;
-		if (end_pfn > limit_pfn) {
-			last_pfn = limit_pfn;
-			break;
-		}
-		if (end_pfn > last_pfn)
-			last_pfn = end_pfn;
+
+		size_t current_end = MIN(end_pfn, limit_pfn);
+
+		if (current_end > last_pfn)
+			last_pfn = current_end;
 	}
+
+	return last_pfn;
+}
+
+__init size_t e820_end_directmap_pfn(void) {
+	size_t limit_pfn = __pa(KERNEL_DIRECTMAP_END) >> PAGE_SHIFT;
+
+	size_t last_pfn = e820_get_max_pfn(limit_pfn, false);
+
+	printk("E820: last_direct_map_pfn = %#lx\n", last_pfn);
+	return last_pfn;
+}
+
+__init size_t e820_end_ram_pfn(size_t limit_pfn) {
+	size_t last_pfn = e820_get_max_pfn(limit_pfn, true);
+	size_t max_arch_pfn = MAX_ARCH_PFN;
 
 	if (last_pfn > max_arch_pfn)
 		last_pfn = max_arch_pfn;
