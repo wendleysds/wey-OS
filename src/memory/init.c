@@ -4,6 +4,8 @@
 #include <mm/slab.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
+#include <mm/kmap.h>
+#include <mm/iomem.h>
 #include <kernel/init.h>
 #include <def/errno.h>
 #include <def/config.h>
@@ -200,6 +202,9 @@ int __init memory_init(void) {
 	if(IS_ERR_VALUE(res = buddy_init())){
 		return res;
 	}
+
+	kmap_init();
+	iomem_init();
 
 	slab_init();
 

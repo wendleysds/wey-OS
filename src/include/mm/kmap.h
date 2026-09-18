@@ -3,6 +3,7 @@
 
 struct page;
 
+void kmap_init(void);
 void *kmap(struct page *page);
 void kunmap(struct page *page);
 

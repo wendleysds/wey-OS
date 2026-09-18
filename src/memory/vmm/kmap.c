@@ -122,9 +122,7 @@ void kunmap(struct page *page) {
     spin_unlock(&kmap_lock);
 }
 
-static __init int kmap_init(void) {
+void __init kmap_init(void) {
     spinlock_init(&kmap_lock);
-    return SUCCESS;
 }
 
-core_initcall(kmap_init);

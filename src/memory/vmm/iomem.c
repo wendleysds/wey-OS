@@ -307,9 +307,6 @@ void iounmap(void __iomem *addr) {
 	);
 }
 
-static __init int iomem_init(void) {
+void __init iomem_init(void) {
 	spinlock_init(&io_mapping_lock);
-	return SUCCESS;
 }
-
-core_initcall(iomem_init);
