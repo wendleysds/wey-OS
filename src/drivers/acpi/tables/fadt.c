@@ -1,5 +1,6 @@
 #include <kernel/printk.h>
 #include <kernel/acpi.h>
+#include <kernel/init.h>
 
 #include <lib/assert.h>
 #include <lib/string.h>
@@ -9,116 +10,116 @@
 
 #include "../internal.h"
 
-extern struct acpi_pm_info acpi_pm;
+extern struct acpi_pm_info* acpi_pm;
 
-static void acpi_parse_smi_cmd(struct acpi_fadt *fadt) {
-	acpi_pm.smi_cmd.type = IO_TYPE_PIO;
-	acpi_pm.smi_cmd.pio_base = fadt->smi_command_port;
+static __init void acpi_parse_smi_cmd(struct acpi_fadt *fadt) {
+	acpi_pm->smi_cmd.type = IO_TYPE_PIO;
+	acpi_pm->smi_cmd.pio_base = fadt->smi_command_port;
 
-	acpi_pm.acpi_enable = fadt->acpi_enable;
-	acpi_pm.acpi_disable = fadt->acpi_disable;
+	acpi_pm->acpi_enable = fadt->acpi_enable;
+	acpi_pm->acpi_disable = fadt->acpi_disable;
 }
 
-static void acpi_parse_pm1a_cnt_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_pm1a_cnt_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.pm1a_cnt.type = IO_TYPE_PIO;
-	acpi_pm.pm1a_cnt.pio_base = fadt->pm1a_control_block;
+	acpi_pm->pm1a_cnt.type = IO_TYPE_PIO;
+	acpi_pm->pm1a_cnt.pio_base = fadt->pm1a_control_block;
 
-	if (acpi_pm.pm1a_cnt.pio_base == 0) {
+	if (acpi_pm->pm1a_cnt.pio_base == 0) {
 		return;
 	}
 }
 
-static void acpi_parse_pm1b_cnt_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_pm1b_cnt_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.pm1b_cnt.type = IO_TYPE_PIO;
-	acpi_pm.pm1b_cnt.pio_base = fadt->pm1b_control_block;
+	acpi_pm->pm1b_cnt.type = IO_TYPE_PIO;
+	acpi_pm->pm1b_cnt.pio_base = fadt->pm1b_control_block;
 
-	if (acpi_pm.pm1b_cnt.pio_base == 0) {
+	if (acpi_pm->pm1b_cnt.pio_base == 0) {
 		return;
 	}
 
-	acpi_pm.has_pm1b = 1;
+	acpi_pm->has_pm1b = 1;
 }
 
-static void acpi_parse_pm2_cnt_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_pm2_cnt_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.pm2_cnt.type = IO_TYPE_PIO;
-	acpi_pm.pm2_cnt.pio_base = fadt->pm2_control_block;
-	acpi_pm.pm2_cnt_len = fadt->pm2_control_length;
+	acpi_pm->pm2_cnt.type = IO_TYPE_PIO;
+	acpi_pm->pm2_cnt.pio_base = fadt->pm2_control_block;
+	acpi_pm->pm2_cnt_len = fadt->pm2_control_length;
 
-	if (acpi_pm.pm2_cnt.pio_base == 0) {
+	if (acpi_pm->pm2_cnt.pio_base == 0) {
 		return;
 	}
 
-	if (acpi_pm.pm2_cnt_len == 0) {
-		acpi_pm.pm2_cnt.pio_base = 0;
+	if (acpi_pm->pm2_cnt_len == 0) {
+		acpi_pm->pm2_cnt.pio_base = 0;
 		return;
 	}
 
-	acpi_pm.has_pm2 = 1;
+	acpi_pm->has_pm2 = 1;
 }
 
-static void acpi_parse_pm_timer_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_pm_timer_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.pm_timer.type = IO_TYPE_PIO;
-	acpi_pm.pm_timer.pio_base = fadt->pm_timer_block;
-	acpi_pm.pm_timer_len = fadt->pm_timer_length;
+	acpi_pm->pm_timer.type = IO_TYPE_PIO;
+	acpi_pm->pm_timer.pio_base = fadt->pm_timer_block;
+	acpi_pm->pm_timer_len = fadt->pm_timer_length;
 
-	if (acpi_pm.pm_timer.pio_base == 0) {
+	if (acpi_pm->pm_timer.pio_base == 0) {
 		return;
 	}
 
-	if (acpi_pm.pm_timer_len != 4) {
-		acpi_pm.pm_timer.pio_base = 0;
+	if (acpi_pm->pm_timer_len != 4) {
+		acpi_pm->pm_timer.pio_base = 0;
 		return;
 	}
 
-	acpi_pm.has_pm_timer = 1;
+	acpi_pm->has_pm_timer = 1;
 }
 
-static void acpi_parse_gpe0_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_gpe0_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.gpe0.type = IO_TYPE_PIO;
-	acpi_pm.gpe0.pio_base = fadt->gpe0_block;
-	acpi_pm.gpe0_len = fadt->gpe0_length;
+	acpi_pm->gpe0.type = IO_TYPE_PIO;
+	acpi_pm->gpe0.pio_base = fadt->gpe0_block;
+	acpi_pm->gpe0_len = fadt->gpe0_length;
 
-	if (acpi_pm.gpe0.pio_base == 0 || acpi_pm.gpe0_len == 0) {
+	if (acpi_pm->gpe0.pio_base == 0 || acpi_pm->gpe0_len == 0) {
 		return;
 	}
 
-	acpi_pm.has_gpe0 = 1;
+	acpi_pm->has_gpe0 = 1;
 }
 
-static void acpi_parse_gpe1_blk(struct acpi_fadt *fadt)
+static __init void acpi_parse_gpe1_blk(struct acpi_fadt *fadt)
 {
-	acpi_pm.gpe1.type = IO_TYPE_PIO;
-	acpi_pm.gpe1.pio_base = fadt->gpe1_block;
-	acpi_pm.gpe1_len = fadt->gpe1_length;
+	acpi_pm->gpe1.type = IO_TYPE_PIO;
+	acpi_pm->gpe1.pio_base = fadt->gpe1_block;
+	acpi_pm->gpe1_len = fadt->gpe1_length;
 
-	if (acpi_pm.gpe1.pio_base == 0 || acpi_pm.gpe1_len == 0) {
+	if (acpi_pm->gpe1.pio_base == 0 || acpi_pm->gpe1_len == 0) {
 		return;
 	}
 
-	acpi_pm.has_gpe1 = 1;
+	acpi_pm->has_gpe1 = 1;
 }
 
-static void acpi_parse_reset(struct acpi_fadt *fadt)
+static __init void acpi_parse_reset(struct acpi_fadt *fadt)
 {
-	if (acpi_gas_to_io_region(&fadt->reset_register, &acpi_pm.reset) != 0) {
+	if (acpi_gas_to_io_region(&fadt->reset_register, &acpi_pm->reset) != 0) {
 		return;
 	}
 
-	acpi_pm.has_reset = 1;	
-	acpi_pm.reset_value = fadt->reset_value;
+	acpi_pm->has_reset = 1;	
+	acpi_pm->reset_value = fadt->reset_value;
 }
 
-static inline u8 acpi_parse_aml_field(u8 **ptr) {
+static __init inline u8 acpi_parse_aml_field(u8 **ptr) {
 	if (**ptr == 0x0A) (*ptr)++;
 	return *((*ptr)++);
 }
 
-static uint8_t *acpi_find_s5(uint8_t *aml, size_t length) {
+static __init uint8_t *acpi_find_s5(uint8_t *aml, size_t length) {
 	static const uint8_t root_s5[] = {0x08, '\\', '_', 'S', '5', '_'};
 	static const uint8_t local_s5[] = {0x08, '_', 'S', '5', '_'};
 
@@ -145,11 +146,11 @@ struct acpi_dsdt {
 	uint8_t definition_block[];
 };
 
-static void acpi_parse_s5(struct acpi_fadt *fadt) {
+static __init void acpi_parse_s5(struct acpi_fadt *fadt) {
 	paddr_t dsdt_addr = fadt->dsdt ? fadt->dsdt : (paddr_t)fadt->x_dsdt;
 	if (!dsdt_addr) return;
 
-    struct acpi_sdt_header *sdt = acpi_map(dsdt_addr, sizeof(struct acpi_sdt_header));
+	struct acpi_sdt_header *sdt = acpi_map(dsdt_addr, sizeof(struct acpi_sdt_header));
 	if(!sdt) return;
 
 	if (memcmp(sdt->signature, "DSDT", 4) != 0) {
@@ -193,44 +194,45 @@ static void acpi_parse_s5(struct acpi_fadt *fadt) {
     }
 
     s5_addr += 5;
-    
+
     int pkg_len_bytes = ((*s5_addr & 0xC0) >> 6) + 2;
     s5_addr += pkg_len_bytes;
 
-    acpi_pm.SLP_TYPa = (u16)acpi_parse_aml_field(&s5_addr) << 10;
-    acpi_pm.SLP_TYPb = (u16)acpi_parse_aml_field(&s5_addr) << 10;
+    acpi_pm->SLP_TYPa = (u16)acpi_parse_aml_field(&s5_addr) << 10;
+    acpi_pm->SLP_TYPb = (u16)acpi_parse_aml_field(&s5_addr) << 10;
 
-	acpi_pm.has_s5 = true;
+	acpi_pm->has_s5 = true;
 
 out_unmap:
 	acpi_unmap(sdt);
 }
 
 int acpi_reboot(void) {
-	if (!acpi_pm.has_reset || acpi_pm.reset_value == 0) {
+	if(!acpi_pm) return -ENODEV;
+
+	if (!acpi_pm->has_reset || acpi_pm->reset_value == 0) {
 		return -ENODEV;
 	}
 
-	io_write8(&acpi_pm.reset, 0, acpi_pm.reset_value);
+	io_write8(&acpi_pm->reset, 0, acpi_pm->reset_value);
 	unreachable();
 }
 
 int acpi_shutdown(void) {
-	if (!acpi_pm.has_s5) return -ENODEV;
+	if(!acpi_pm) return -ENODEV;
 
-	io_write16(&acpi_pm.pm1a_cnt, 0, acpi_pm.SLP_TYPa | PM1_CNT_SLP_EN);
-	if (acpi_pm.has_pm1b) {
-		io_write16(&acpi_pm.pm1b_cnt, 0, acpi_pm.SLP_TYPb | PM1_CNT_SLP_EN);
+	if (!acpi_pm->has_s5) return -ENODEV;
+
+	io_write16(&acpi_pm->pm1a_cnt, 0, acpi_pm->SLP_TYPa | PM1_CNT_SLP_EN);
+	if (acpi_pm->has_pm1b) {
+		io_write16(&acpi_pm->pm1b_cnt, 0, acpi_pm->SLP_TYPb | PM1_CNT_SLP_EN);
 	}
 
 	return -EIO;
 }
 
-void acpi_parse_fadt(struct acpi_fadt *fadt)
+void __init acpi_parse_fadt(struct acpi_fadt *fadt)
 {
-	if (!fadt)
-		return;
-
 	acpi_parse_smi_cmd(fadt);
 
 	acpi_parse_pm1a_cnt_blk(fadt);

@@ -104,4 +104,8 @@ struct acpi_pm_info {
 	bool has_s5;
 };
 
+int acpi_reboot(void);
+int acpi_shutdown(void);
+
 #endif
+

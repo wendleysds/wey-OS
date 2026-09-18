@@ -17,7 +17,7 @@ extern unsigned long acpi_rsdp;
 
 static struct acpi_rsdt *rsdt;
 
-struct acpi_pm_info acpi_pm;
+struct acpi_pm_info* acpi_pm;
 
 struct acpi_table{
 	struct acpi_sdt_header *sdt;
@@ -26,7 +26,7 @@ struct acpi_table{
 
 static LIST_HEAD(acpi_tables);
 
-void acpi_parse_tables(void){
+static void __init acpi_parse_tables(void){
 	const size_t entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
 	for (size_t i = 0; i < entries; i++){
 		struct acpi_sdt_header *tmp = acpi_map(rsdt->entries[i], sizeof(struct acpi_sdt_header));
@@ -67,7 +67,7 @@ void *acpi_find_table(const char *signature){
 	return NULL;
 }
 
-static void acpi_print_sdt(const struct acpi_sdt_header *sdt){
+static __init void acpi_print_sdt(const struct acpi_sdt_header *sdt){
 	printk("ACPI: Table '%.4s' at 0x%lx\n", sdt->signature, (uintptr_t)sdt);
 	printk("    length: 0x%x, revision: 0x%x\n", sdt->length, sdt->revision);
 	printk("    OEM ID: %c%c%c%c%c%c\n", sdt->oemid[0], sdt->oemid[1], sdt->oemid[2], sdt->oemid[3], sdt->oemid[4], sdt->oemid[5]);
@@ -77,7 +77,7 @@ static void acpi_print_sdt(const struct acpi_sdt_header *sdt){
 	printk("    Creator revision: 0x%x\n", sdt->creator_revision);
 }
 
-static rsdp_descriptor_t *acpi_parse_rsdp(paddr_t paddr) {
+static __init rsdp_descriptor_t *acpi_parse_rsdp(paddr_t paddr) {
 	rsdp_descriptor_t *rsdp = acpi_map(paddr, sizeof(rsdp_descriptor_t));
 	if(!rsdp) return NULL;
 
@@ -112,7 +112,7 @@ out_invalid:
 	return NULL;
 }
 
-static struct acpi_rsdt *acpi_parse_rsdt(rsdp_descriptor_t *rsdp) {
+static __init struct acpi_rsdt *acpi_parse_rsdt(rsdp_descriptor_t *rsdp) {
 	if (rsdp->v1.rsdt_address == 0) return NULL;
 
 	struct acpi_sdt_header *sdt = acpi_map(rsdp->v1.rsdt_address, sizeof(struct acpi_sdt_header));
@@ -145,42 +145,44 @@ out_invalid:
 	return NULL;
 }
 
-static inline void ndelay(uint64_t ns){
+static __init inline void ndelay(uint64_t ns){
 	const uint64_t start = clock_get_realtime_ns();
 	const uint64_t end = start + ns;
 
 	while(clock_get_realtime_ns() < end) cpu_relax();
 }
 
-static int acpi_enable(void){
-	if(!acpi_pm.acpi_enable || !acpi_pm.acpi_disable) return -ENODEV;
+static __init int acpi_enable(void){
+	if(!acpi_pm) return -ENODEV;
+
+	if(!acpi_pm->acpi_enable || !acpi_pm->acpi_disable) return -ENODEV;
 	
 	uint16_t value;
 
-	if (acpi_pm.smi_cmd.pio_base == 0) {
+	if (acpi_pm->smi_cmd.pio_base == 0) {
 		return -ENODEV;
 	}
 
-	if (acpi_pm.pm1a_cnt.pio_base == 0) {
+	if (acpi_pm->pm1a_cnt.pio_base == 0) {
 		return -ENODEV;
 	}
 
-	value = io_read16(&acpi_pm.pm1a_cnt, 0);
+	value = io_read16(&acpi_pm->pm1a_cnt, 0);
 
 	if (value & (1 << 0)) {
 		printk("ACPI: SCI already enabled\n");
 		return 0;
 	}
 
-	if (acpi_pm.acpi_enable == 0) {
+	if (acpi_pm->acpi_enable == 0) {
 		printk("ACPI: ACPI_ENABLE command unavailable\n");
 		return -ENODEV;
 	}
 
-	io_write8(&acpi_pm.smi_cmd, 0, acpi_pm.acpi_enable);
+	io_write8(&acpi_pm->smi_cmd, 0, acpi_pm->acpi_enable);
 
 	for (unsigned int i = 0; i < 300; i++) {
-		value = io_read16(&acpi_pm.pm1a_cnt, 0);
+		value = io_read16(&acpi_pm->pm1a_cnt, 0);
 
 		if (value & (1 << 0)) {
 			printk("ACPI: ACPI mode enabled\n");
@@ -197,7 +199,7 @@ static int acpi_enable(void){
 
 static __init int acpi_init(void) {
 	if(!acpi_rsdp) return 0;
-	memset(&acpi_pm, 0, sizeof(acpi_pm));
+	acpi_pm = NULL;
 
 	rsdp_descriptor_t *rsdp = acpi_parse_rsdp(acpi_rsdp);
 	if(!rsdp) return -ENOENT;
@@ -217,6 +219,11 @@ static __init int acpi_init(void) {
 	
 	struct acpi_fadt *fadt = acpi_find_table(ACPI_FADT_SIGNATURE);
 	if(fadt){
+		acpi_pm = kzalloc(sizeof(struct acpi_pm_info));
+		if(!acpi_pm) {
+			return -ENOMEM;
+		}
+
 		acpi_parse_fadt(fadt);
 		acpi_unmap(fadt);
 		return acpi_enable();
