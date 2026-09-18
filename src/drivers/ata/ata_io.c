@@ -5,7 +5,10 @@
 
 int ata_flush(struct ATADevice* atadev) {
 	struct ATAChannel* ch = atadev->channel;
-	atadev->irqTriggered = 0;
+
+	spin_lock(&ch->spinlock);
+	ch->active = atadev;
+	spin_unlock(&ch->spinlock);
 
 	outb_p(ATA_IO(ch, ATA_REG_HDDEVSEL), 0xE0 | (atadev->drive << 4));
 	outb_p(ATA_IO(ch, ATA_REG_COMMAND), atadev->info.supports_lba48 ? 
@@ -31,7 +34,10 @@ static int _pio_28_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint32_t lba, u
 	}
 
 	struct ATAChannel* ch = atadev->channel;
-	ch->irqRegistered = 0;
+
+	spin_lock(&ch->spinlock);
+	ch->active = atadev;
+	spin_unlock(&ch->spinlock);
 
 	inb(ATA_IO(ch, ATA_REG_STATUS));
 	while (ata_status(atadev) & ATA_SR_BSY);
@@ -54,7 +60,10 @@ static int _pio_48_io_cmd(struct ATADevice* atadev, uint8_t cmd, uint64_t lba, u
 	}
 
 	struct ATAChannel* ch = atadev->channel;
-	ch->irqRegistered = 0;
+
+	spin_lock(&ch->spinlock);
+	ch->active = atadev;
+	spin_unlock(&ch->spinlock);
 
 	inb(ATA_IO(ch, ATA_REG_STATUS));
 	while (ata_status(atadev) & ATA_SR_BSY);

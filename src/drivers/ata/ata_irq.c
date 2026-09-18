@@ -21,12 +21,12 @@ static void ata_irq_handler(struct irq_info* info){
 
 	dev->irqTriggered = 1;
 
-	struct task* task;
-    list_for_each_entry(task, &dev->sleepQueue, queue) {
-        task->state = TASK_READY;
-        list_remove(&task->queue);
-        scheduler_add(task);
-    }
+	struct task *task, *tmp;
+	list_for_each_entry_safe(task, tmp, &dev->sleepQueue, queue) {
+		task->state = TASK_READY;
+		list_remove(&task->queue);
+		scheduler_add(task);
+	}
 
 	channel->active = NULL;
 
@@ -34,13 +34,14 @@ out:
 	spin_unlock(&channel->spinlock);
 }
 
-static int8_t ata_polling(struct ATADevice* atadev){
+int8_t ata_polling(struct ATADevice* atadev){
 	struct ATAChannel* ch = atadev->channel;
 	
 	int i;
 	for (i = 0; i < TRIES; i++)
 	{
 		uint8_t status = ata_status(atadev);
+		if (status == 0x00 || status == 0xFF) return -ENODEV;
 		if (status & ATA_SR_ERR) return -inb_p(ATA_IO(ch, ATA_REG_ERROR));
 		if (status & ATA_SR_DRQ) return OK;
 	}
@@ -74,8 +75,17 @@ int ata_wait_irq(struct ATADevice* atadev){
 
 	spin_lock(&channel->spinlock);
 
+	if (atadev->irqTriggered) {
+		atadev->irqTriggered = 0;
+		channel->active = NULL;
+		spin_unlock(&channel->spinlock);
+		return SUCCESS;
+	}
+
 	uint8_t status = ata_status(atadev);
 	if (status & ATA_SR_DRQ) {
+		atadev->irqTriggered = 0;
+		channel->active = NULL;
 		spin_unlock(&channel->spinlock);
 		return SUCCESS;
 	}
@@ -89,15 +99,16 @@ int ata_wait_irq(struct ATADevice* atadev){
 	spin_unlock(&channel->spinlock);
 
 	while (1) {
-		schedule();
-
 		spin_lock(&channel->spinlock);
 		if (atadev->irqTriggered) {
 			atadev->irqTriggered = 0;
+			channel->active = NULL;
 			spin_unlock(&channel->spinlock);
 			break;
 		}
 		spin_unlock(&channel->spinlock);
+
+		schedule();
 	}
 
 	return OK;

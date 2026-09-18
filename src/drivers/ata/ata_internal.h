@@ -85,5 +85,6 @@ int ata_pio(struct ATADevice* atadev, uint8_t cmd_pio, sector_t sector, unsigned
 
 void ata_register_irq(char channel);
 int ata_wait_irq(struct ATADevice* atadev);
+int8_t ata_polling(struct ATADevice* atadev);
 
 #endif
