@@ -106,9 +106,10 @@ fi
 [[ -d "$NOVALOADER_DIR" ]] ||
     die "NovaLoader directory '$NOVALOADER_DIR' does not exist."
 
-echo "Building NovaLoader..."
-
-make -C "$NOVALOADER_DIR"
+if [[ ! -d "$NOVALOADER_DIR/build" ]]; then
+	echo "Building NovaLoader..."
+	make -C "$NOVALOADER_DIR"
+fi
 
 echo "Installing bootloader..."
 
