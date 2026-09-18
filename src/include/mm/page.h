@@ -37,7 +37,8 @@ struct page {
 	struct list_head list;
 } __aligned(32);
 
-int page_init(void);
+int buddy_init(void);
+void buddy_add_memory(uintptr_t vaddr, size_t size);
 
 struct page* page_alloc(uint8_t order, uint16_t flags);
 int page_free(struct page* page);

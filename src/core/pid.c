@@ -34,7 +34,7 @@ void pid_free(pid_t pid){
 	next_free_pid = pid;
 }
 
-static int __init pid_init(){
+void __init pid_init(void){
 	for(pid_t i = 0; i < PROC_MAX; i++){
 		pids[i] = PID_FREE;
 	}
@@ -42,10 +42,7 @@ static int __init pid_init(){
 	next_free_pid = pids[0] = PID_ALLOC; // reserved init
 
 	spinlock_init(&pid_spinlock);
-	return OK;
 }
-
-core_initcall(pid_init);
 
 SYSCALL_DEFINE0(getpid){
 	return current->pid;

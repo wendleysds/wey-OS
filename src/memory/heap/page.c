@@ -104,7 +104,7 @@ static __init int pfn_range_reserved(uintptr_t start, uintptr_t pages){
 	return 0;
 }
 
-int __init page_init(void){
+int __init buddy_init(void){
 	global_zone.reserved_pages = 0;
 	global_zone.free_pages = 0;
 	spinlock_init(&global_zone.lock);
@@ -307,7 +307,7 @@ out:
 	return res;
 }
 
-void __page_add_memory(uintptr_t vaddr, size_t size){
+void buddy_add_memory(uintptr_t vaddr, size_t size){
 	uintptr_t start = ALIGN_UP((uintptr_t)vaddr, PAGE_SIZE);
     uintptr_t end = ALIGN_DOWN(start + size, PAGE_SIZE);
     size_t pages_freed = 0;

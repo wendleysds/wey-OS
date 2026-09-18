@@ -6,10 +6,12 @@
 #include <device/terminal.h>
 #include <lib/assert.h>
 #include <def/errno.h>
+#include <def/linker.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
+#include <mm/page.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
@@ -55,8 +57,20 @@ static __init void do_initcalls(){
 	}
 }
 
-static int init(void* unused){
+static __no_return void init(void){
+	buddy_add_memory(
+		(uintptr_t)(__init_begin),
+		(size_t)(__init_end - __init_begin)
+	);
+	
+	kernel_exec("/init", 0x0, 0x0);
 
+	unreachable();
+}
+
+static __init int rest_init(void* unused){
+	do_initcalls();
+	
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
 	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
 
@@ -68,7 +82,7 @@ static int init(void* unused){
 	file_get(tty);
 	current->file_table[1] = tty;
 
-	kernel_exec("/init", 0x0, 0x0);
+	init();
 
 	unreachable();
 }
@@ -86,17 +100,15 @@ __no_return __init void kmain(){
 
 	module_load("Scheduler", scheduler_init);
 
-	kernel_thread(init, "init", (void*)0xCAFE);
+	pid_init();
 
-	do_initcalls();
+	kernel_thread(rest_init, "init", NULL);
 
 	interrupts_enable();
 
 	scheduler_start();
 
 	while(1) cpu_relax();
-
-	unreachable();
 }
 
 SYSCALL_DEFINE2(tmp_vt_write, const char*, str, int, len){

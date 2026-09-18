@@ -197,7 +197,7 @@ int __init memory_init(void) {
 		return res;
 	}
 
-	if(IS_ERR_VALUE(res = page_init())){
+	if(IS_ERR_VALUE(res = buddy_init())){
 		return res;
 	}
 
