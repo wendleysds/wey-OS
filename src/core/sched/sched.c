@@ -52,7 +52,7 @@ asmlinkage void schedule(){
 	struct task* prev_task = current;
 
 	if(unlikely(next_task == NULL)){
-		if(prev_task->state == TASK_BLOCKED){
+		if(prev_task->state >= TASK_ZOMBIE){
 			next_task = &idle_task;
 		} else{
 			next_task = prev_task;

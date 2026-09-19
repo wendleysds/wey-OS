@@ -7,8 +7,7 @@ global kernel_thread_trampoline
 extern interrupt_handler
 extern interrupt_eoi
 extern schedule
-extern task_exit
-extern panic
+extern sys_exit
 
 ; vars
 extern need_resched
@@ -97,12 +96,9 @@ kernel_thread_trampoline:
 	call eax
 
 	push eax
-	call task_exit
+	call sys_exit
 
-	push _trampoline_return_msg
-	call panic
-
-; asmlinkage __no_return void ret_from_fork();
+; __no_return void ret_from_fork(void);
 ret_from_fork:
 	mov ebp, esp
 
@@ -122,8 +118,6 @@ ret_from_fork:
 
 	add esp, 8
 
-; ss and sp is removed and kernel_thread_trampoline
-; access args correctly.
 .not_same_priv:
 	popad
 	add esp,8 ; clear err_code and int_no
@@ -198,6 +192,3 @@ interrupt_pointer_table:
 	create_int i
 %assign i i+1
 %endrep
-
-section .data
-_trampoline_return_msg: db "kernel_thread_trampoline: returned from exit call!", 0xA, 0

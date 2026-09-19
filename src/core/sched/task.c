@@ -84,7 +84,9 @@ void task_exit(struct task* task, int status){
 
 	task_reparent_children(task, init_task);
 
-	task_wakeup(task->parent);
+	if(task->parent){
+		task_wakeup(task->parent);
+	}
 }
 
 void task_destroy(struct task* task){
