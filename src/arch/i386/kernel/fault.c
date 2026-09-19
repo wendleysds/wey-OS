@@ -43,7 +43,7 @@ static inline unsigned long cr2(){
 	return cr2;
 }
 
-static inline void dump_regs(struct registers* regs){
+void dump_regs(struct registers* regs){
 	printk(
 		"eax %#010lX ebx %#010lX ecx %#010lX edx %#010lX\n",
 		regs->ax, regs->bx, regs->cx, regs->dx

@@ -1,10 +1,12 @@
+#include <def/config.h>
+
 global interrupt_pointer_table
 global ret_from_fork
 global ret_from_registers
 global kernel_thread_trampoline
 
 ; methods
-extern interrupt_handler
+extern arch_handle_irq
 extern interrupt_eoi
 extern schedule
 extern sys_exit
@@ -123,10 +125,21 @@ ret_from_fork:
 	add esp,8 ; clear err_code and int_no
 	iret
 
+_set_segments:
+	mov ds, ax
+	mov es, ax
+	mov gs, ax
+	mov fs, ax
+	ret
+
 _isr_common:
 	pushad
 	push esp
-	call interrupt_handler
+
+	mov ax, GDT_KERNEL_DATA
+	call _set_segments
+
+	call arch_handle_irq
 	add esp, 4
 
 	jmp _ret_from_intr

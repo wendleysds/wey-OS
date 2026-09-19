@@ -1,24 +1,26 @@
-#include <device/terminal_struct.h>
 #include <kernel/printk.h>
 #include <kernel/syscall.h>
 #include <kernel/clock.h>
 #include <kernel/panic.h>
-#include <mm/memblock.h>
+#include <kernel/interrupt.h>
 #include <kernel/init.h>
-#include <def/errno.h>
+#include <mm/memblock.h>
 #include <def/linker.h>
-#include <arch/i386/rtc.h>
+
 #include <asm/cpu.h>
 #include <asm/gdt.h>
 #include <asm/idt.h>
 #include <asm/page.h>
 #include <asm/paging.h>
-#include <arch/i386/pic.h>
+
 #include <lib/string.h>
-#include <asm-generic/paging_ctx.h>
 
 #include "e820.h"
+#include <arch/i386/rtc.h>
 #include <uapi/headers.h>
+#include <device/terminal_struct.h>	
+
+#include <asm-generic/paging_ctx.h>
 
 #define ALIGN(value, alignment) (((value) + (alignment) - 1) & ~((alignment) - 1))
 
@@ -45,13 +47,15 @@ static struct gdt_descriptor gdt_descriptor;
 extern void fault_init();
 extern uint8_t supports_pse;
 
+extern const struct irq_chip i8259A_chip;
+
 static int pit_clockevent_start(void* data, uint32_t hz){
-	pic_init(hz);
+	i8259A_chip.init(hz);
 	return 0;
 }
 
 static void pit_clockevent_stop(void* data){
-	pic_disable();
+	i8259A_chip.disable(0);
 }
 
 static const struct clockevent pit_clockevent = {
@@ -348,6 +352,4 @@ __init void setup_arch(void){
 	setup_memblock();
 
 	memblock_dump_all();
-
-	syscalls_init();
 }

@@ -55,6 +55,4 @@
 
 typedef asmlinkage long (*sys_fn_t)(long, long, long, long, long, long);
 
-void syscalls_init();
-
 #endif

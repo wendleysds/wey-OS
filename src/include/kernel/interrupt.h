@@ -2,27 +2,44 @@
 #define _INTERRUPTS_H
 
 #include <def/config.h>
+#include <lib/list.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 struct registers;
 
-typedef enum {
+enum irq_id {
 	IRQ_WR_TIMER,
 	IRQ_ATA_PRIMARY,
 	IRQ_ATA_SECONDARY,
 	IRQ_KEYBOARD,
 	IRQ_NOT_MAPPED,
 	IRQ_MAX = TOTAL_INTERRUPTS
-} irq_id_t;
+};
+
+struct irq_chip {
+	const char *name;
+	void (*init)(int freq);
+	void (*eoi)(int irq);
+	void (*disable)(int irq);
+	void (*enable)(int irq);
+	void (*mask)(int irq);
+	void (*unmask)(int irq);
+
+	struct list_head node;
+};
 
 struct irq_cpu_context {
-	struct registers* regs;
 	int cpu_id;
-	char from_user;
+	struct registers* regs;
+	bool from_user;
+
+	bool exception;
+	const char* exception_name;
 };
 
 struct irq_routing_info {
-	irq_id_t irq_id;
+	enum irq_id irq_id;
 	unsigned long hw_line;
 };
 
@@ -30,7 +47,7 @@ struct irq_info {
 	struct irq_cpu_context cpu;
 	struct irq_routing_info route;
 
-	char needs_eoi;
+	bool needs_eoi;
 	void* device;
 };
 
@@ -44,26 +61,31 @@ struct irq_handler_node {
 
 struct irq_desc {
 	struct irq_handler_node* handlers;
-	char masked;
 	uint32_t hw_line;
+	bool masked;
 };
 
 int interrupt_init();
+int generic_handle_irq(struct irq_info* info);
 
 // For raw interrupts
 int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev);
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev);
 
-int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev);
-int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev);
-void irq_mask(irq_id_t irq);
-void irq_unmask(irq_id_t irq);
+int irq_register(enum irq_id irq, interrupt_handler_t handler, void *dev);
+int irq_unregister(enum irq_id irq, interrupt_handler_t handler, void *dev);
+void irq_mask(enum irq_id irq);
+void irq_unmask(enum irq_id irq);
 
 void interrupts_enable();
 void interrupts_disable();
 
-void interrupt_mask(uint8_t interrupt);
-void interrupt_unmask(uint8_t interrupt);
-void interrupt_eoi(uint8_t interrupt);
+void interrupt_mask(int interrupt);
+void interrupt_unmask(int interrupt);
+void interrupt_eoi(int interrupt);
+
+// chips
+void irqchip_register(struct irq_chip* chip);
+void irqchip_unregister(struct irq_chip* chip);
 
 #endif

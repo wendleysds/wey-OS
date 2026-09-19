@@ -1,1 +1,1 @@
-obj-y += entry_32.asm.o syscall.o
+obj-y += entry_32c_s.o syscall.o

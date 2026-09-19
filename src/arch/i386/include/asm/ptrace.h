@@ -21,6 +21,8 @@ struct registers {
 	unsigned long ss;
 } __packed;
 
+void dump_regs(struct registers* regs);
+
 static inline unsigned long regs_get_return_value(struct registers *regs){
 	return regs->ax;
 }

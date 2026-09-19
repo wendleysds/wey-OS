@@ -7,7 +7,6 @@
 #include <asm/idt.h>
 #include <def/errno.h>
 #include <lib/string.h>
-#include <arch/i386/pic.h>
 
 static const char* exception_messages[] = {
 	"Division By Zero", "Debug", "Non Maskable Interrupt", "Breakpoint",
@@ -70,53 +69,7 @@ void interrupts_disable(){
 	__asm__ volatile ("cli");
 }
 
-int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev){
-	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
-		return -EINVAL;
-	}
-	
-	struct irq_handler_node* node = kmalloc(sizeof(struct irq_handler_node));
-	if(!node){
-		return -ENOMEM;
-	}
-
-    node->handler = handler;
-    node->device = dev;
-
-    node->next = irq_table[interrupt].handlers;
-    irq_table[interrupt].handlers = node;
-
-	return OK;
-}
-
-int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
-	if(interrupt < 0 || interrupt >= TOTAL_INTERRUPTS){
-		return -EINVAL;
-	}
-
-	struct irq_handler_node *cur, *prev = NULL;
-	cur = irq_table[interrupt].handlers;
-
-	while(cur){
-		if(cur->device == dev && cur->handler == handler){
-			if(prev){
-				prev->next = cur->next;
-			}else{
-				irq_table[interrupt].handlers = cur->next;
-			}
-
-			kfree(cur);
-			return OK;
-		}
-
-		prev = cur;
-		cur = cur->next;
-	}
-
-	return -ENOENT;
-}
-
-static int irq_id_to_int_no(irq_id_t irq){
+int arch_irq_id_to_int_no(enum irq_id irq){
 	int irq_start = 0x20;
 	switch (irq) {
 		case IRQ_WR_TIMER: return      irq_start + 0;
@@ -127,77 +80,17 @@ static int irq_id_to_int_no(irq_id_t irq){
 	}
 }
 
-int irq_register(irq_id_t irq, interrupt_handler_t handler, void *dev){
-	int int_no = irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return -EINVAL;
-	}
-
-	return interrupt_register(int_no, handler, dev);
-}
-
-int irq_unregister(irq_id_t irq, interrupt_handler_t handler, void *dev){
-	int int_no = irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return -EINVAL;
-	}
-
-	return interrupt_unregister(int_no, handler, dev);
-}
-
-void irq_mask(irq_id_t irq){
-	int int_no = irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return;
-	}
-
-	interrupt_mask(int_no);
-}
-
-void irq_unmask(irq_id_t irq){
-	int int_no = irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return;
-	}
-
-	interrupt_unmask(int_no);
-}
-
-static void _print_frame(struct registers* regs){
-	printk(
-		"eax 0x%x ebx 0x%x ecx 0x%x edx 0x%x\n",
-		regs->ax, regs->bx, regs->cx, regs->dx
-	);
-
-	printk( 
-		"esi 0x%x edi 0x%x esp 0x%x ebp 0x%x\n",
-		regs->si, regs->di, regs->sp, regs->bp
-	);
-
-	printk(
-		"ip 0x%x cs 0x%x ss 0x%x\n",
-		regs->ip, regs->cs, regs->ss
-	);
-
-	printk(
-		"eflags 0x%x kesp 0x%x\n",
-		regs->flags, regs->ksp
-	);
-
-	printk(
-		"int 0x%x err 0x%x\n",
-		regs->int_no, regs->err_code
-	);
-
-	dump_stack(regs);
-}
-
 static void _build_irq_info(struct irq_info* info, struct registers* regs){
 	info->cpu.cpu_id = 0;
 	info->cpu.regs = regs;
 	info->cpu.from_user = regs_is_user_mode(regs);
 
-	irq_id_t irq_id = IRQ_NOT_MAPPED;
+	if(regs->int_no < 0x20){
+		info->cpu.exception = true;
+		info->cpu.exception_name = exception_messages[regs->int_no];
+	}
+
+	enum irq_id irq_id = IRQ_NOT_MAPPED;
 	switch (regs->int_no) {
 		case 0x20: irq_id = IRQ_WR_TIMER; break;
 		case 0x20 + 1: irq_id = IRQ_KEYBOARD; break;
@@ -211,63 +104,18 @@ static void _build_irq_info(struct irq_info* info, struct registers* regs){
 	info->needs_eoi = (regs->int_no > 0x20 && !info->cpu.from_user);
 }
 
-void __cdecl interrupt_handler(struct registers* regs){
-	kernel_registers();
-
-	int interrupt = regs->int_no;
-
+asmlinkage void arch_handle_irq(struct registers* regs){
 	if(likely(current))
 		current->regs = *regs;
 
-	struct irq_handler_node* h = irq_table[interrupt].handlers;
-
 	struct irq_info info;
+	memset(&info, 0x0, sizeof(info));
+
 	_build_irq_info(&info, regs);
 
-	char handled = !!(h);
+	generic_handle_irq(&info);
 
-	while(h) {
-		info.device = h->device;
-		h->handler(&info);
-		h = h->next;
-	}
-
-	if(interrupt < 32){
-		if(handled){
-			printk(
-				"Received trap %d <0x%x>: '%s' at 0x%x\n",
-				interrupt, interrupt, exception_messages[interrupt], regs->ip);
-		}else if(!handled){
-			printk(
-				"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-				interrupt, interrupt, exception_messages[interrupt], regs->ip);
-
-			_print_frame(regs);
-
-			printk("System Halted!\n");
-			while(1){
-				__asm__ volatile ("hlt");
-			}
-
-			__builtin_unreachable();
-		}
-	}
-
-	if(info.route.irq_id == IRQ_WR_TIMER)
-		clockevent_fire();
-
-	if(likely(current))
+	if(likely(current)){
 		*regs = current->regs;
-}
-
-void interrupt_eoi(uint8_t interrupt){
-	pic_send_eoi(interrupt);
-}
-
-void interrupt_mask(uint8_t interrupt){
-	IRQ_set_mask(interrupt);
-}
-
-void interrupt_unmask(uint8_t interrupt){
-	IRQ_clear_mask(interrupt);
+	}
 }

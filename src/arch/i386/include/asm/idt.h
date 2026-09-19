@@ -28,7 +28,10 @@ struct IDTr_ptr{
 	uint32_t base;
 }__attribute__((packed));
 
+enum irq_id;
+
 void idt_init();
 void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
+int arch_irq_id_to_int_no(enum irq_id irq);
 
 #endif

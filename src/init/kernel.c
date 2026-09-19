@@ -77,7 +77,7 @@ static __no_return void init(void){
 
 static __init int rest_init(void* unused){
 	do_initcalls();
-	
+
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
 	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
 
