@@ -172,7 +172,7 @@ export KBUILD_CFLAGS KBUILD_ASFLAGS KBUILD_LDFLAGS KINCLUDE
 
 # --------- Rules ---------------
 
-core-y := core/ memory/ block/ drivers/ fs/ usr/
+core-y := core/ memory/ block/ drivers/ fs/ usr/ init/
 lib-y := lib/
 arch-y := arch/$(ARCH)/
 

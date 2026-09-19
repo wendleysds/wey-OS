@@ -13,7 +13,7 @@ extern unsigned long __initramfs_size;
 extern unsigned long ramdisk_ptr;
 extern unsigned long ramdisk_size;
 
-static int unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
+static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 	int last_err = 0;
 
 	const uint8_t* cursor = NULL;
@@ -79,7 +79,7 @@ static int unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 	return last_err;
 }
 
-static int unpack_initrd(void){
+static int __init unpack_initrd(void){
 	int res = OK;
 
 	if(__initramfs_size || ramdisk_size){

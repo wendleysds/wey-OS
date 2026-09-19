@@ -1,0 +1,1 @@
+obj-y += initramfs.o kernel.o do_mounts.o
