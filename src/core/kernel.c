@@ -13,6 +13,8 @@
 #include <mm/memblock.h>
 #include <mm/page.h>
 
+#include <asm/page.h>
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 extern void setup_arch();
@@ -58,6 +60,11 @@ static __init void do_initcalls(){
 }
 
 static __no_return void init(void){
+	buddy_add_memory(
+		__va(EARLY_STACK_BOTTOM),
+		EARLY_STACK_SIZE 
+	);
+
 	buddy_add_memory(
 		(uintptr_t)(__init_begin),
 		(size_t)(__init_end - __init_begin)
