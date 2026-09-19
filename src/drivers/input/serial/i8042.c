@@ -120,12 +120,19 @@ static inline void _keyboard_handle_scancode(uint8_t sc){
 }
 
 static void _iqr_keyboard_handler(struct irq_info* unused){
-	uint8_t scancode = inb(_PS2_INPUT_PORT);
-	_keyboard_handle_scancode(scancode);
+	while (inb(_PS2_COMMAND_PORT) & 0x01) {
+		uint8_t scancode = inb(_PS2_INPUT_PORT);
+		_keyboard_handle_scancode(scancode);
+	}
 }
 
 static int __init ps2_keyboard_init(){
 	outb(_PS2_COMMAND_PORT, _PS2_ENABLE_FIRST_PORT);
+
+	while (inb(_PS2_COMMAND_PORT) & 0x01) {
+		inb(_PS2_INPUT_PORT);
+	}
+
 	return irq_register(IRQ_KEYBOARD, _iqr_keyboard_handler, NULL);
 }
 
