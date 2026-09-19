@@ -37,6 +37,9 @@ _switch_to:
 	mov eax, [esp+4]
 	mov ecx, [esp+8]
 
+	test eax, eax
+	jz _no_prev
+
 	push ebp
 	push ebx
 	push esi
@@ -57,6 +60,20 @@ _switch_to:
 	add esp, 4
 
 	call task_handle_prev_status
+	add esp, 4
+
+	ret
+
+_no_prev:
+	mov esp, [ecx+4+12]
+
+	pop edi
+	pop esi
+	pop ebx
+	pop ebp
+
+	push ecx
+	call cpu_update_current_task
 	add esp, 4
 
 	ret

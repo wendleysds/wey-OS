@@ -74,8 +74,6 @@ static int __init create_idle_task(){
 	copy_thread(0x0, &idle_task, idle_task_routine, 0x0);
 	idle_task.pid = 0;
 
-	current = &idle_task;
-
 	return SUCCESS;
 }
 
