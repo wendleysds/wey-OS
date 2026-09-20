@@ -5,12 +5,13 @@
 #include <lib/assert.h>
 #include <lib/string.h>
 #include <def/errno.h>
+#include <mm/kheap.h>
 
 #include <asm/page.h>
 
 #include "../internal.h"
 
-extern struct acpi_pm_info* acpi_pm;
+struct acpi_pm_info* acpi_pm = NULL;
 
 static __init void acpi_parse_smi_cmd(struct acpi_fadt *fadt) {
 	acpi_pm->smi_cmd.type = IO_TYPE_PIO;
@@ -233,6 +234,12 @@ int acpi_shutdown(void) {
 
 void __init acpi_parse_fadt(struct acpi_fadt *fadt)
 {
+	acpi_pm = kzalloc(sizeof(struct acpi_pm_info));
+	if(!acpi_pm) {
+		printk("ACPI: Could not allocate memory for PM info");
+		return;
+	}
+
 	acpi_parse_smi_cmd(fadt);
 
 	acpi_parse_pm1a_cnt_blk(fadt);

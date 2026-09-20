@@ -6,6 +6,8 @@
 #include <def/compile.h>
 #include <def/bits.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <sys/types.h>
 
 #include <kernel/acpi.h>
 
@@ -29,18 +31,6 @@
 
 #define MADT_LAPIC_FLAG_ENABLED         BIT(0)
 #define MADT_LAPIC_FLAG_ONLINE_CAPABLE  BIT(1)
-
-/* Entry Types */
-#define MADT_TYPE_LOCAL_APIC           0
-#define MADT_TYPE_IO_APIC              1
-#define MADT_TYPE_INTERRUPT_OVERRIDE   2
-#define MADT_TYPE_NMI_SOURCE           3
-#define MADT_TYPE_LOCAL_NMI            4
-#define MADT_TYPE_LOCAL_APIC_OVERRIDE  5
-#define MADT_TYPE_IO_SAPIC             6
-#define MADT_TYPE_LOCAL_SAPIC          7
-#define MADT_TYPE_LOCAL_X2APIC         9
-#define MADT_TYPE_LOCAL_X2APIC_NMI    10
 
 /* Interrupt flags */
 #define MADT_INT_FLAGS_POLARITY_MASK  0x3
@@ -74,8 +64,8 @@ struct acpi_madt {
 // Type 0: Processor Local APIC
 struct acpi_madt_lapic {
 	struct acpi_madt_entry entry;
-	uint8_t apic_id;      // Local APIC ID
 	uint8_t processor_id; // Processor ID
+	uint8_t apic_id;      // Local APIC ID
 	uint32_t flags;
 } __packed;
 
@@ -134,7 +124,15 @@ struct acpi_madt_local_x2apic {
 	uint32_t acpi_uid;
 } __packed;
 
-// Type 10: Local 2xAPIC NMI
+// Type 10: Local x2APIC NMI
+struct acpi_madt_local_x2apic_nmi {
+	struct acpi_madt_entry entry;
+	uint16_t flags;
+	uint32_t acpi_uid;
+	uint8_t local_x2apic_lint;
+	uint8_t reserved[3];
+} __packed;
+
 // Type 11: GIC CPU Interface (GICC)
 // Type 12: GIC Distributor (GICD)
 // Type 13: GIC MSI Frame
@@ -144,4 +142,61 @@ struct acpi_madt_local_x2apic {
 // Type 17...127: Reserved
 // Type 128...255: OEM defined
 
+/* Parsed MADT Structures for Kernel consumption */
+
+struct acpi_cpu {
+	uint32_t acpi_id;
+	uint32_t apic_id;
+	uint32_t flags;
+	bool is_x2apic;
+};
+
+struct acpi_ioapic {
+	uint8_t id;
+	vaddr_t address;
+	uint32_t gsi_base;
+};
+
+struct acpi_irq_override {
+	uint8_t bus;
+	uint8_t source_irq;
+	uint16_t flags;
+	uint32_t gsi;
+};
+
+struct acpi_local_nmi {
+	uint32_t acpi_id;
+	uint8_t lint;
+	uint16_t flags;
+};
+
+struct acpi_nmi_source {
+	uint8_t source_irq;
+	uint32_t gsi;
+	uint16_t flags;
+};
+
+struct acpi_madt_info {
+	vaddr_t local_apic_address;
+	uint32_t flags;
+
+	struct acpi_cpu *cpus;
+	size_t cpu_count;
+
+	struct acpi_ioapic *ioapics;
+	size_t ioapic_count;
+
+	struct acpi_irq_override *overrides;
+	size_t override_count;
+
+	struct acpi_local_nmi *local_nmis;
+	size_t local_nmi_count;
+
+	struct acpi_nmi_source *nmi_sources;
+	size_t nmi_source_count;
+};
+
+extern struct acpi_madt_info *acpi_madt_info;
+
 #endif
+

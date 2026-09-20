@@ -17,7 +17,8 @@ extern unsigned long acpi_rsdp;
 
 static struct acpi_rsdt *rsdt;
 
-struct acpi_pm_info* acpi_pm;
+extern struct acpi_pm_info *acpi_pm;
+extern struct acpi_madt_info *acpi_madt_info;
 
 struct acpi_table{
 	struct acpi_sdt_header *sdt;
@@ -216,18 +217,15 @@ static __init int acpi_init(void) {
 		acpi_parse_madt(madt);
 		acpi_unmap(madt);
 	}
-	
+
 	struct acpi_fadt *fadt = acpi_find_table(ACPI_FADT_SIGNATURE);
 	if(fadt){
-		acpi_pm = kzalloc(sizeof(struct acpi_pm_info));
-		if(!acpi_pm) {
-			return -ENOMEM;
-		}
-
 		acpi_parse_fadt(fadt);
 		acpi_unmap(fadt);
-		return acpi_enable();
 	}
+	
+	int res = acpi_enable();
+	if(res != -ENODEV) return res;
 
 	return 0;
 }
