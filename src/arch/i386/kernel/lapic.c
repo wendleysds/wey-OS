@@ -4,6 +4,7 @@
 #include <kernel/acpi/tables/madt.h>
 
 #include <arch/i386/lapic.h>
+#include <arch/i386/pic.h>
 
 #define PORT_NEW_API
 #include <io/ports.h>
@@ -44,8 +45,6 @@
 #define IA32_APIC_BASE_X2APIC   BIT(10)
 
 #define LAPIC_TIMER_VECTOR      0x20
-
-#define PIT_FREQUENCY           1193182
 
 extern struct acpi_madt_info *acpi_madt_info;
 static vaddr_t __iomem lapic_base = 0;
@@ -153,18 +152,9 @@ static uint32_t calibrate_lapic_timer_freq(void)
     lapic_write(LAPIC_TDCR, LAPIC_TIMER_DIV_16);
 
     /*
-     * PIT channel 2, mode 0, binary.
+     * Configure PIT channel 2 for one-shot calibration window.
      */
-    port_write8(0x43, 0xB0);
-    port_write8(0x42, pit_ticks & 0xFF);
-    port_write8(0x42, pit_ticks >> 8);
-
-    /*
-     * Enable PIT channel 2 gate.
-     */
-    uint8_t gate = port_read8(0x61);
-    gate = (gate & ~BIT(1)) | BIT(0);
-    port_write8(0x61, gate);
+    pit_prepare_oneshot_ch2(pit_ticks);
 
     /*
      * Start LAPIC timer.
@@ -174,8 +164,7 @@ static uint32_t calibrate_lapic_timer_freq(void)
     /*
      * Wait for PIT channel 2 OUT to become 1.
      */
-    while (!(port_read8(0x61) & BIT(5)))
-        asm volatile("pause");
+    pit_wait_oneshot_ch2();
 
     uint32_t current = lapic_read(LAPIC_TCCR);
 
@@ -237,6 +226,8 @@ int __init lapic_init(int frequency){
 
     lapic_base = (vaddr_t)ioremap(acpi_madt_info->local_apic_address, PAGE_SIZE);
     if(!lapic_base) return -ENOMEM;
+
+    pic_disable();
 
     lapic_hw_enable();
 
