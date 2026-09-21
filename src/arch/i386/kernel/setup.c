@@ -47,15 +47,15 @@ static struct gdt_descriptor gdt_descriptor;
 extern void fault_init();
 extern uint8_t supports_pse;
 
-extern const struct irq_chip i8259A_chip;
+#include <arch/i386/pic.h>
 
 static int pit_clockevent_start(void* data, uint32_t hz){
-	i8259A_chip.init(hz);
+	pic_init(hz);
 	return 0;
 }
 
 static void pit_clockevent_stop(void* data){
-	i8259A_chip.disable();
+	pic_disable();
 }
 
 static const struct clockevent pit_clockevent = {

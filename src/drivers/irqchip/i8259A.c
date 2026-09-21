@@ -154,46 +154,53 @@ void pit_wait_oneshot_ch2(void) {
         asm volatile("pause");
 }
 
-static void pic_send_eoi(int irq) {
-    if (irq == 7) {
+static void pic_send_eoi(struct irq_desc* desc) {
+	int hwirq = desc->hwirq;
+
+    if (hwirq == 7) {
         _irq7_handler();
         return;
     }
 
-    if (irq == 15) {
+    if (hwirq == 15) {
         _irq15_handler();
         return;
     }
 
-    if (irq >= 8) {
+    if (hwirq >= 8) {
         pic_send_cmd_eoi(&slave);
     }
 
     pic_send_cmd_eoi(&master);
 }
 
-static void pic_mask(int IRQline) {
-    if (IRQline < 8) {
-        pic_mask_irq(&master, IRQline);
+static void pic_mask(struct irq_desc* desc) {
+	int hwline = desc->hwirq;
+
+    if (hwline < 8) {
+        pic_mask_irq(&master, hwline);
     } else {
-        pic_mask_irq(&slave, IRQline - 8);
+        pic_mask_irq(&slave, hwline - 8);
     }
 }
 
-static void pic_unmask(int IRQline) {
-    if (IRQline < 8) {
-        pic_unmask_irq(&master, IRQline);
+static void pic_unmask(struct irq_desc* desc) {
+	int hwline = desc->hwirq;
+
+    if (hwline < 8) {
+        pic_unmask_irq(&master, hwline);
     } else {
-        pic_unmask_irq(&slave, IRQline - 8);
+        pic_unmask_irq(&slave, hwline - 8);
     }
 }
 
 const struct irq_chip i8259A_chip = {
     .name = "i8259A",
-    .init = pic_init,
-    .eoi = pic_send_eoi,
-    .disable = pic_disable,
-    .enable = pic_enable,
     .mask = pic_mask,
     .unmask = pic_unmask,
+};
+
+const struct irq_controller i8259A_controller = {
+    .name = "i8259A",
+    .eoi = pic_send_eoi,
 };

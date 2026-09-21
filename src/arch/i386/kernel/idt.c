@@ -11,8 +11,8 @@
 static const char* exception_messages[] = {
 	"Division By Zero", "Debug", "Non Maskable Interrupt", "Breakpoint",
 	"Into Detected Overflow", "Out of Bounds", "Invalid Opcode", "No Coprocessor",
-	"Double fault", "Coprocessor Segment Overrun", "Bad TSS", "Segment not present",
-	"Stack fault", "General protection fault", "Page fault", "Unknown Interrupt",
+	"Double Fault", "Coprocessor Segment Overrun", "Bad TSS", "Segment Not Present",
+	"Stack Fault", "General Protection Fault", "Page Fault", "Unknown Interrupt",
 	"x87 Floating-Point", "Alignment Fault", "Machine Check", "SIMD Floating-Point",
 	"Vitualization",
 	"Reserved", "Reserved", "Reserved", "Reserved", "Reserved", "Reserved",
@@ -69,38 +69,27 @@ void interrupts_disable(){
 	__asm__ volatile ("cli");
 }
 
-int arch_irq_id_to_int_no(enum irq_id irq){
-	int irq_start = 0x20;
-	switch (irq) {
-		case IRQ_WR_TIMER: return      irq_start + 0;
-		case IRQ_KEYBOARD: return      irq_start + 1;
-		case IRQ_ATA_PRIMARY: return   irq_start + 14;
-		case IRQ_ATA_SECONDARY: return irq_start + 15;
-		default: return IRQ_NOT_MAPPED;
-	}
+// tmp solution until irq_domain not is implemented
+int arch_irq_to_hwline(int irq){
+	return irq + 0x20;
+}
+
+int arch_hwline_to_irq(int hwline){
+	if(hwline < 0x20 || hwline > 0x2F) return -1;
+	return hwline - 0x20;
 }
 
 static void _build_irq_info(struct irq_info* info, struct registers* regs){
 	info->cpu.cpu_id = 0;
 	info->cpu.regs = regs;
 	info->cpu.from_user = regs_is_user_mode(regs);
+	info->hwirq = regs->int_no;
 
 	if(regs->int_no < 0x20){
 		info->cpu.exception = true;
 		info->cpu.exception_name = exception_messages[regs->int_no];
 	}
 
-	enum irq_id irq_id = IRQ_NOT_MAPPED;
-	switch (regs->int_no) {
-		case 0x20: irq_id = IRQ_WR_TIMER; break;
-		case 0x20 + 1: irq_id = IRQ_KEYBOARD; break;
-		case 0x20 + 14: irq_id = IRQ_ATA_PRIMARY; break;
-		case 0x20 + 15: irq_id = IRQ_ATA_SECONDARY; break;
-		default:break;
-	}
-
-	info->route.hw_line = regs->int_no;
-	info->route.irq_id = irq_id;
 	info->needs_eoi = (regs->int_no > 0x20 && !info->cpu.from_user);
 }
 
@@ -114,6 +103,10 @@ asmlinkage void arch_handle_irq(struct registers* regs){
 	_build_irq_info(&info, regs);
 
 	generic_handle_irq(&info);
+
+	if(info.hwirq == 0x20){
+		clockevent_fire();
+	}
 
 	if(likely(current)){
 		*regs = current->regs;

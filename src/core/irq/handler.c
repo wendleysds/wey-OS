@@ -10,67 +10,40 @@
 #include <asm/ptrace.h>
 
 extern struct irq_desc* irq_desc_get(int interrupt);
-extern const struct irq_chip i8259A_chip;
 
 void interrupt_eoi(int interrupt){
-	i8259A_chip.eoi(interrupt);
+	struct irq_desc* desc = irq_desc_get(interrupt);
+	if (desc && desc->controller && desc->controller->eoi) {
+        desc->controller->eoi(desc);
+    }
 }
 
 void interrupt_mask(int interrupt){
 	struct irq_desc* desc = irq_desc_get(interrupt);
-	if(!desc) return;
-	
-	desc->masked = true;
-	i8259A_chip.mask(interrupt);
+    if (desc && desc->chip && desc->chip->mask) {
+        desc->masked = true;
+        desc->chip->mask(desc);
+    }
 }
 
 void interrupt_unmask(int interrupt){
 	struct irq_desc* desc = irq_desc_get(interrupt);
-	if(!desc) return;
-	
-	desc->masked = false;
-	i8259A_chip.unmask(interrupt);
+    if (desc && desc->chip && desc->chip->unmask) {
+        desc->masked = false;
+        desc->chip->unmask(desc);
+    }
 }
 
-int irq_register(enum irq_id irq, interrupt_handler_t handler, void *dev){
-	int int_no = arch_irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return -EINVAL;
-	}
-
-	return interrupt_register(int_no, handler, dev);
-}
-
-int irq_unregister(enum irq_id irq, interrupt_handler_t handler, void *dev){
-	int int_no = arch_irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return -EINVAL;
-	}
-
-	return interrupt_unregister(int_no, handler, dev);
-}
-
-void irq_mask(enum irq_id irq){
-	int int_no = arch_irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return;
-	}
-
-	interrupt_mask(int_no);
-}
-
-void irq_unmask(enum irq_id irq){
-	int int_no = arch_irq_id_to_int_no(irq);
-	if(int_no == IRQ_NOT_MAPPED){
-		return;
-	}
-
-	interrupt_unmask(int_no);
-}
+extern const struct irq_chip i8259A_chip;
+extern const struct irq_controller i8259A_controller;
 
 int generic_handle_irq(struct irq_info* info){
-	const struct irq_desc* desc = irq_desc_get(info->route.hw_line);
-	if(!desc) return -ENOENT;	
+	struct irq_desc* desc = irq_desc_get(info->hwirq);
+	if(!desc) return -ENOENT;
+
+	// tmp
+	desc->chip = &i8259A_chip;
+	desc->controller = &i8259A_controller;
 
 	struct irq_handler_node* handler = desc->handlers;
 
@@ -83,7 +56,7 @@ int generic_handle_irq(struct irq_info* info){
 	}
 
 	if(info->cpu.exception){
-		uint32_t interrupt = info->route.hw_line;	
+		uint32_t interrupt = info->hwirq;
 		uintptr_t ip = regs_get_instruction_pointer(info->cpu.regs);
 		const char* name = info->cpu.exception_name;
 
@@ -94,19 +67,19 @@ int generic_handle_irq(struct irq_info* info){
 			);
 		}else if(!handled){
 			printk(
-				"\n\nUnhandled Exception %d <0x%x>: '%s' at 0x%x\n",
+				"Unhandled Exception %d <0x%x>: '%s' at 0x%x\n",
 				interrupt, interrupt, name, ip
 			);
 
 			dump_regs(info->cpu.regs);
 
-			panic("System Halted!");
+			panic("System Halted");
 		}
 	}
 
-	if(info->route.irq_id == IRQ_WR_TIMER){
-		clockevent_fire();
-	}
+	if (info->needs_eoi && desc->controller && desc->controller->eoi) {
+        desc->controller->eoi(desc);
+    }
 
 	return OK;
 }

@@ -28,10 +28,11 @@ struct IDTr_ptr{
 	uint32_t base;
 }__attribute__((packed));
 
-enum irq_id;
 
 void idt_init();
 void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
-int arch_irq_id_to_int_no(enum irq_id irq);
+
+int arch_irq_to_hwline(int irq);
+int arch_hwline_to_irq(int hwline);
 
 #endif

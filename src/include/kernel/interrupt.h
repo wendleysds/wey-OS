@@ -3,28 +3,75 @@
 
 #include <def/config.h>
 #include <lib/list.h>
+#include <sync/atomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 struct registers;
+struct irq_desc;
 
-enum irq_id {
-	IRQ_WR_TIMER,
-	IRQ_ATA_PRIMARY,
-	IRQ_ATA_SECONDARY,
-	IRQ_KEYBOARD,
-	IRQ_NOT_MAPPED,
-	IRQ_MAX = TOTAL_INTERRUPTS
+enum irq_trigger_type {
+	IRQ_TYPE_EDGE,
+	IRQ_TYPE_LEVEL,
+};
+
+enum irq_polarity {
+	IRQ_POLARITY_HIGH,
+	IRQ_POLARITY_LOW,
 };
 
 struct irq_chip {
 	const char *name;
-	int (*init)(int freq);
-	void (*enable)(void);
-	void (*disable)(void);
-	void (*eoi)(int irq);
-	void (*mask)(int irq);
-	void (*unmask)(int irq);
+
+	void (*mask)(struct irq_desc *);
+	void (*unmask)(struct irq_desc *);
+
+	int (*set_type)(struct irq_desc *, enum irq_trigger_type type);
+	int (*set_affinity)(struct irq_desc *, unsigned int cpu);
+};
+
+struct irq_controller {
+	const char *name;
+	void (*eoi)(struct irq_desc *);
+};
+
+struct irq_domain {
+	const char *name;
+
+	int (*map)(
+		struct irq_domain *,
+		unsigned int hwirq,
+		unsigned int *irq
+	);
+
+	void (*unmap)(
+		struct irq_domain *,
+		unsigned int hwirq
+	);
+
+	const struct irq_chip *chip;
+	const struct irq_controller *controller;
+};
+
+struct irq_desc {
+	unsigned int irq;
+	unsigned int hwirq;
+
+	enum irq_trigger_type type;
+	enum irq_polarity polarity;
+
+	const struct irq_chip *chip;
+	const struct irq_controller *controller;
+
+	struct irq_domain *domain;
+
+	void *chip_data;
+
+	bool masked;
+
+	struct irq_handler_node *handlers;
+
+	atomic_t refcount;
 };
 
 struct irq_cpu_context {
@@ -36,14 +83,9 @@ struct irq_cpu_context {
 	const char* exception_name;
 };
 
-struct irq_routing_info {
-	enum irq_id irq_id;
-	unsigned long hw_line;
-};
-
 struct irq_info {
 	struct irq_cpu_context cpu;
-	struct irq_routing_info route;
+	int hwirq;
 
 	bool needs_eoi;
 	void* device;
@@ -57,25 +99,12 @@ struct irq_handler_node {
 	struct irq_handler_node* next;
 };
 
-struct irq_desc {
-	uint32_t hw_line;
-	struct irq_chip* chip;
-
-	bool masked;
-	struct irq_handler_node* handlers;
-};
-
 int interrupt_init();
 int generic_handle_irq(struct irq_info* info);
 
 // For raw interrupts
 int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev);
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev);
-
-int irq_register(enum irq_id irq, interrupt_handler_t handler, void *dev);
-int irq_unregister(enum irq_id irq, interrupt_handler_t handler, void *dev);
-void irq_mask(enum irq_id irq);
-void irq_unmask(enum irq_id irq);
 
 void interrupts_enable();
 void interrupts_disable();
@@ -84,8 +113,10 @@ void interrupt_mask(int interrupt);
 void interrupt_unmask(int interrupt);
 void interrupt_eoi(int interrupt);
 
-// chips
-void irq_set_chip(int irq, struct irq_chip* chip);
-struct irq_chip* irq_get_chip(int irq);
+void interrupt_set_chip(int interrupt, struct irq_chip* chip);
+void interrupt_set_controller(int interrupt, struct irq_controller* controller);
+
+const struct irq_chip* interrupt_get_chip(int interrupt);
+const struct irq_controller* interrupt_get_controller(int interrupt);
 
 #endif
