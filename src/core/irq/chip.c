@@ -5,7 +5,3 @@
 
 static LIST_HEAD(irqchips);
 
-void __init irqchip_register(struct irq_chip* chip){
-	INIT_LIST_HEAD(&chip->node);
-	list_add(&chip->node, &irqchips);
-}

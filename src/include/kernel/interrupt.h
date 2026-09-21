@@ -19,14 +19,12 @@ enum irq_id {
 
 struct irq_chip {
 	const char *name;
-	void (*init)(int freq);
+	int (*init)(int freq);
+	void (*enable)(void);
+	void (*disable)(void);
 	void (*eoi)(int irq);
-	void (*disable)(int irq);
-	void (*enable)(int irq);
 	void (*mask)(int irq);
 	void (*unmask)(int irq);
-
-	struct list_head node;
 };
 
 struct irq_cpu_context {
@@ -60,9 +58,11 @@ struct irq_handler_node {
 };
 
 struct irq_desc {
-	struct irq_handler_node* handlers;
 	uint32_t hw_line;
+	struct irq_chip* chip;
+
 	bool masked;
+	struct irq_handler_node* handlers;
 };
 
 int interrupt_init();
@@ -85,7 +85,7 @@ void interrupt_unmask(int interrupt);
 void interrupt_eoi(int interrupt);
 
 // chips
-void irqchip_register(struct irq_chip* chip);
-void irqchip_unregister(struct irq_chip* chip);
+void irq_set_chip(int irq, struct irq_chip* chip);
+struct irq_chip* irq_get_chip(int irq);
 
 #endif

@@ -55,7 +55,7 @@ static int pit_clockevent_start(void* data, uint32_t hz){
 }
 
 static void pit_clockevent_stop(void* data){
-	i8259A_chip.disable(0);
+	i8259A_chip.disable();
 }
 
 static const struct clockevent pit_clockevent = {
@@ -68,7 +68,7 @@ static const struct clockevent pit_clockevent = {
 static void __init setup_clock(void){
 	struct rtc_time tm = {0};
 
-	if(clock_init(TIMER_FREQUENCY) != 0){
+	if(clock_init(TIMER_FREQUENCY_HZ) != 0){
 		panic("Setup: clock init failed!");
 	}
 
@@ -86,7 +86,7 @@ static void __init setup_clock(void){
 		panic("Setup: clockevent register failed!");
 	}
 
-	if(clockevent_start_periodic(TIMER_FREQUENCY) != 0){
+	if(clockevent_start_periodic(TIMER_FREQUENCY_HZ) != 0){
 		panic("Setup: clockevent start failed!");
 	}
 }

@@ -74,7 +74,7 @@ static void _irq15_handler() {
     port_write8(PIC1_COMMAND, PIC_EOI);
 }
 
-static void __init pic_init(int frequency) {
+static int __init pic_init(int frequency) {
     pic_remap();
 
     uint16_t divisor = (uint16_t)(PIC_FREQUENCY / frequency);
@@ -82,6 +82,7 @@ static void __init pic_init(int frequency) {
     port_write8(PIC_CHANNEL0, 0x36);                  // Channel 0, lobyte/hibyte
     port_write8(PIC_COMMAND, divisor & 0xFF);         // low end
     port_write8(PIC_CHANNEL0, (divisor >> 8) & 0xFF); // high end
+    return 0;
 }
 
 static void pic_send_eoi(int irq)
@@ -103,12 +104,12 @@ static void pic_send_eoi(int irq)
     port_write8(PIC1_COMMAND, PIC_EOI);
 }
 
-static void pic_disable(int irq) {
+static void pic_disable(void) {
     port_write8(PIC1_DATA, 0xff);
     port_write8(PIC2_DATA, 0xff);
 }
 
-static void pic_enable(int irq) {
+static void pic_enable(void) {
     port_write8(PIC1_DATA, 0x0);
     port_write8(PIC2_DATA, 0x0);
 }

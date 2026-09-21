@@ -19,10 +19,8 @@
 #define GDT_USER_DATA    ((GDT_USER_DATA_INDEX << 3) | 3)
 #define GDT_TSS(index)   ((index) << 3)
 
-/* PIC */
-#define TIMER_FREQUENCY 20
+#define TIMER_FREQUENCY_HZ 100
 
-/* Memory */
 #define PAGE_SIZE 0x1000
 #define PAGE_SHIFT 12
 #define MAX_ARCH_PFN (1 << (32 - PAGE_SHIFT))
