@@ -2,6 +2,7 @@
 #define _ACPI_TABLES_H
 
 #include <kernel/acpi/tables/fadt.h>
+#include <kernel/acpi/tables/dsdt.h>
 #include <kernel/acpi/tables/madt.h>
 #include <kernel/acpi/tables/rsdt.h>
 #include <kernel/acpi/tables/xsdt.h>
