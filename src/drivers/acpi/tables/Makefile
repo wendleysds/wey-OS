@@ -1,1 +1,1 @@
-obj-y += fadt.o madt.o
+obj-y := table.o rsdt.o xsdt.o fadt.o madt.o

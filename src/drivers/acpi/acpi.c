@@ -18,70 +18,6 @@ extern unsigned long acpi_rsdp;
 extern struct acpi_pm_info *acpi_pm;
 extern struct acpi_madt_info *acpi_madt_info;
 
-struct acpi_table{
-	struct acpi_sdt_header *sdt;
-	paddr_t physaddr;
-	struct list_head node;
-};
-
-static LIST_HEAD(acpi_tables);
-
-static bool __init acpi_table_exists(paddr_t physaddr) {
-	struct acpi_table *pos;
-	list_for_each_entry(pos, &acpi_tables, node){
-		if(pos->physaddr == physaddr) return true;
-	}
-
-	return false;
-}
-
-int __init acpi_add_table(paddr_t physaddr){
-	if(physaddr == 0) return -EINVAL;
-	if(acpi_table_exists(physaddr)) return -EEXIST;
-
-	struct acpi_sdt_header *sdt = acpi_parse_sdt_header(physaddr);
-	if(!sdt) return -ENOMEM;
-
-	struct acpi_table *table = kmalloc(sizeof(struct acpi_table));
-	if(!table){
-		printk("ACPI: allocation failed for table '%.4s'\n", sdt->signature);
-		acpi_unmap(sdt);
-		return -ENOMEM;
-	}
-
-	table->sdt = sdt;
-	table->physaddr = physaddr;
-	INIT_LIST_HEAD(&table->node);
-	list_add(&table->node, &acpi_tables);
-
-	printk("ACPI: Table '%.4s' at 0x%llx\n", sdt->signature, (vaddr_t)sdt);
-
-	return 0;
-}
-
-void __init acpi_remove_table(paddr_t physaddr){
-	struct acpi_table *pos, *tmp;
-	list_for_each_entry_safe(pos, tmp, &acpi_tables, node){
-		if(pos->physaddr == physaddr) {
-			acpi_unmap(pos->sdt);
-			list_remove(&pos->node);
-			kfree(pos);
-			return;
-		}
-	}
-}
-
-struct acpi_sdt_header *acpi_find_table(const char *signature){
-	struct acpi_table *pos;
-	list_for_each_entry(pos, &acpi_tables, node){
-		if(memcmp(pos->sdt->signature, signature, 4) == 0) {
-			return pos->sdt;
-		}
-	}
-
-	return NULL;
-}
-
 static __init void acpi_print_sdt(const struct acpi_sdt_header *sdt){
 	printk("ACPI: Table '%.4s' at 0x%lx\n", sdt->signature, (uintptr_t)sdt);
 	printk("    length: 0x%x, revision: 0x%x\n", sdt->length, sdt->revision);
@@ -207,25 +143,28 @@ static __init int acpi_get_all_tables(void){
 }
 
 static __init int acpi_init(void) {
-	if(list_empty(&acpi_tables)) return 0;
+	if(!acpi_rsdp) return 0;
+
 	acpi_madt_info = NULL;
 	acpi_pm = NULL;
 
+	// FADT is mandatory to ACPI
+	struct acpi_fadt *fadt = (void*)acpi_find_table(ACPI_FADT_SIGNATURE);
+	if(!fadt) return -ENODEV;
+
+	acpi_parse_fadt(fadt);
+	acpi_unmap(fadt);
+
+	if(!acpi_pm) return -ENODEV;
+
+	// Rest are optional
 	struct acpi_madt *madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
 	if(madt){
 		acpi_parse_madt(madt);
 		acpi_unmap(madt);
 	}
 
-	struct acpi_fadt *fadt = (void*)acpi_find_table(ACPI_FADT_SIGNATURE);
-	if(fadt){
-		acpi_parse_fadt(fadt);
-		acpi_unmap(fadt);
-	}
-	
-	acpi_enable();
-
-	return 0;
+	return acpi_enable();
 }
 
 pure_initcall(acpi_get_all_tables);
