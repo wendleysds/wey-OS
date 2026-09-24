@@ -15,8 +15,6 @@
 
 extern unsigned long acpi_rsdp;
 
-static struct acpi_rsdt *rsdt;
-
 extern struct acpi_pm_info *acpi_pm;
 extern struct acpi_madt_info *acpi_madt_info;
 
@@ -29,7 +27,7 @@ struct acpi_table{
 static LIST_HEAD(acpi_tables);
 
 static bool __init acpi_table_exists(paddr_t physaddr) {
-	struct acpi_table* pos;
+	struct acpi_table *pos;
 	list_for_each_entry(pos, &acpi_tables, node){
 		if(pos->physaddr == physaddr) return true;
 	}
@@ -44,7 +42,7 @@ int __init acpi_add_table(paddr_t physaddr){
 	struct acpi_sdt_header *sdt = acpi_parse_sdt_header(physaddr);
 	if(!sdt) return -ENOMEM;
 
-	struct acpi_table* table = kmalloc(sizeof(struct acpi_table));
+	struct acpi_table *table = kmalloc(sizeof(struct acpi_table));
 	if(!table){
 		printk("ACPI: allocation failed for table '%.4s'\n", sdt->signature);
 		acpi_unmap(sdt);
@@ -56,18 +54,25 @@ int __init acpi_add_table(paddr_t physaddr){
 	INIT_LIST_HEAD(&table->node);
 	list_add(&table->node, &acpi_tables);
 
+	printk("ACPI: Table '%.4s' at 0x%llx\n", sdt->signature, (vaddr_t)sdt);
+
 	return 0;
 }
 
-static void __init acpi_parse_tables(void){
-	const size_t entries = (rsdt->header.length - sizeof(rsdt->header)) / 4;
-	for (size_t i = 0; i < entries; i++){
-		acpi_add_table(rsdt->entries[i]);
+void __init acpi_remove_table(paddr_t physaddr){
+	struct acpi_table *pos, *tmp;
+	list_for_each_entry_safe(pos, tmp, &acpi_tables, node){
+		if(pos->physaddr == physaddr) {
+			acpi_unmap(pos->sdt);
+			list_remove(&pos->node);
+			kfree(pos);
+			return;
+		}
 	}
 }
 
 struct acpi_sdt_header *acpi_find_table(const char *signature){
-	struct acpi_table* pos;
+	struct acpi_table *pos;
 	list_for_each_entry(pos, &acpi_tables, node){
 		if(memcmp(pos->sdt->signature, signature, 4) == 0) {
 			return pos->sdt;
@@ -119,39 +124,6 @@ static __init rsdp_descriptor_t *acpi_parse_rsdp(paddr_t paddr) {
 
 out_invalid:
 	acpi_unmap(rsdp);
-	return NULL;
-}
-
-static __init struct acpi_rsdt *acpi_parse_rsdt(rsdp_descriptor_t *rsdp) {
-	if (rsdp->v1.rsdt_address == 0) return NULL;
-
-	struct acpi_sdt_header *sdt = acpi_map(rsdp->v1.rsdt_address, sizeof(struct acpi_sdt_header));
-	if(!sdt) return NULL;
-
-	struct acpi_rsdt *rsdt = acpi_map(rsdp->v1.rsdt_address, sdt->length);
-	acpi_unmap(sdt);
-
-	if(!rsdt) return NULL;
-
-	if (memcmp(rsdt->header.signature, "RSDT", 4) != 0) {
-		printk("ACPI: Invalid RSDT signature\n");
-		goto out_invalid;
-	}
-
-	if (rsdt->header.length < sizeof(struct acpi_sdt_header)) {
-		printk("ACPI: Invalid RSDT length\n");
-		goto out_invalid;
-	}
-
-	if (!acpi_checksum_ok(rsdt, rsdt->header.length)) {
-		printk("ACPI: Invalid RSDT checksum\n");
-		goto out_invalid;
-	}
-
-	return rsdt;
-
-out_invalid:
-	acpi_unmap(rsdt);
 	return NULL;
 }
 
@@ -207,19 +179,37 @@ static __init int acpi_enable(void){
 	return -ETIMEDOUT;
 }
 
-static __init int acpi_init(void) {
+static __init int acpi_get_all_tables(void){
 	if(!acpi_rsdp) return 0;
-	acpi_pm = NULL;
 
 	rsdp_descriptor_t *rsdp = acpi_parse_rsdp(acpi_rsdp);
 	if(!rsdp) return -ENOENT;
 
-	rsdt = acpi_parse_rsdt(rsdp);
-	if(!rsdt) return -ENOENT;
+	paddr_t rsdp_paddr = rsdp->v1.revision >= 2 ?
+		rsdp->v2.xsdt_address : rsdp->v1.rsdt_address;
 
-	INIT_LIST_HEAD(&acpi_tables);
+	int res = acpi_add_table(rsdp_paddr);
+	if(res) return res;
 
-	acpi_parse_tables();
+	struct acpi_sdt_header *sdt;
+
+	if((sdt = acpi_find_table(ACPI_RSDT_SIGNATURE))){
+		acpi_parse_rsdt((void*)sdt);
+	}
+	else if((sdt = acpi_find_table(ACPI_XSDT_SIGNATURE))){
+		acpi_parse_xsdt((void*)sdt);
+	}else{
+		acpi_remove_table(rsdp_paddr);
+		return -ENOENT;
+	}
+
+	return 0;
+}
+
+static __init int acpi_init(void) {
+	if(list_empty(&acpi_tables)) return 0;
+	acpi_madt_info = NULL;
+	acpi_pm = NULL;
 
 	struct acpi_madt *madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
 	if(madt){
@@ -233,10 +223,10 @@ static __init int acpi_init(void) {
 		acpi_unmap(fadt);
 	}
 	
-	int res = acpi_enable();
-	if(res != -ENODEV) return res;
+	acpi_enable();
 
 	return 0;
 }
 
+pure_initcall(acpi_get_all_tables);
 core_initcall(acpi_init);
