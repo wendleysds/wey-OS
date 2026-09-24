@@ -148,7 +148,7 @@ static __init int acpi_init(void) {
 	acpi_madt_info = NULL;
 	acpi_pm = NULL;
 
-	// FADT is mandatory to ACPI
+	// FADT and DSDT is mandatory to ACPI
 	struct acpi_fadt *fadt = (void*)acpi_find_table(ACPI_FADT_SIGNATURE);
 	if(!fadt) return -ENODEV;
 
@@ -156,6 +156,11 @@ static __init int acpi_init(void) {
 	acpi_unmap(fadt);
 
 	if(!acpi_pm) return -ENODEV;
+
+	struct acpi_dsdt *dsdt = (void*)acpi_find_table(ACPI_DSDT_SIGNATURE);
+	if(!dsdt) return -ENODEV;
+
+	acpi_parse_dsdt(dsdt);
 
 	// Rest are optional
 	struct acpi_madt *madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
