@@ -1,5 +1,7 @@
 #include <kernel/acpi.h>
 #include <kernel/printk.h>
+#include <kernel/init.h>
+
 #include <def/config.h>
 #include <def/errno.h>
 #include <mm/iomem.h>
@@ -8,7 +10,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-bool acpi_checksum_ok(const void *addr, size_t len){
+bool __init acpi_checksum_ok(const void *addr, size_t len){
     u8 sum = 0;
 
     for (size_t i = 0; i < len; i++){
@@ -54,4 +56,24 @@ void acpi_unmap(void __iomem *virt){
 	}
 
 	iounmap(virt);
+}
+
+__init struct acpi_sdt_header* acpi_parse_sdt_header(paddr_t physaddr){
+	if(physaddr == 0) return NULL;
+
+	struct acpi_sdt_header *tmp = acpi_map(physaddr, sizeof(struct acpi_sdt_header));
+	if(!tmp) return NULL;
+
+	struct acpi_sdt_header *sdt = acpi_map(physaddr, tmp->length);
+	acpi_unmap(tmp);
+
+	if(!sdt) return NULL;
+
+	if(!acpi_checksum_ok(sdt, sdt->length)) {
+		printk("ACPI: Invalid table '%.4s' checksum\n", sdt->signature);
+		acpi_unmap(sdt);
+		return NULL;
+	}
+
+	return sdt;
 }
