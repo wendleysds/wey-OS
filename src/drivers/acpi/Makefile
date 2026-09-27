@@ -1,1 +1,1 @@
-obj-y += acpi.o acpi_helpers.o tables/
+obj-y += acpi.o acpi_helpers.o tables/ aml/

@@ -1,0 +1,1 @@
+obj-y += namespace.o stream.o parser/

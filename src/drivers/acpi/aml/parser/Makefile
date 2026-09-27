@@ -1,0 +1,1 @@
+obj-y += crs.o object.o eisaid.o primitives.o
