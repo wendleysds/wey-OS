@@ -1,58 +1,100 @@
 #include <kernel/interrupt.h>
 #include <def/errno.h>
 #include <mm/kheap.h>
-
+#include <lib/string.h>
 #include <asm/idt.h>
 
-// TODO: change to a rbtree
 static struct irq_desc irq_table[TOTAL_INTERRUPTS];
 
-int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev){
-	int hwirq = arch_irq_to_hwline(interrupt);
-	if(hwirq < 0 || hwirq >= TOTAL_INTERRUPTS){
+struct irq_desc* irq_desc_get_by_hwirq(int hwirq) {
+	if (hwirq < 0 || hwirq >= TOTAL_INTERRUPTS) {
+		return NULL;
+	}
+	return &irq_table[hwirq];
+}
+
+struct irq_desc* irq_to_desc(int irq) {
+	if (irq < 0 || irq >= TOTAL_INTERRUPTS) {
+		return NULL;
+	}
+
+	struct irq_domain *domain = irq_domain_get_default();
+	if (domain) {
+		if (irq >= (int)domain->irq_base && irq < (int)(domain->irq_base + domain->nr_irqs)) {
+			int hwirq = domain->hwirq_base + (irq - domain->irq_base);
+			if (hwirq >= 0 && hwirq < TOTAL_INTERRUPTS) {
+				return &irq_table[hwirq];
+			}
+		}
+	}
+
+	if (irq >= 0 && irq < TOTAL_INTERRUPTS) {
+		return &irq_table[irq];
+	}
+
+	return NULL;
+}
+
+struct irq_desc* irq_desc_get(int interrupt) {
+	if (interrupt >= 0x20 && interrupt < TOTAL_INTERRUPTS) {
+		return &irq_table[interrupt];
+	}
+	return irq_to_desc(interrupt);
+}
+
+int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev) {
+	struct irq_desc *desc = irq_to_desc(interrupt);
+	if (!desc) {
 		return -EINVAL;
 	}
 
-	struct irq_handler_node* node = kmalloc(sizeof(struct irq_handler_node));
-	if(!node){
+	struct irq_handler_node *node = kmalloc(sizeof(struct irq_handler_node));
+	if (!node) {
 		return -ENOMEM;
 	}
 
-	struct irq_desc *desc = &irq_table[hwirq];
-
 	desc->irq = interrupt;
-	desc->hwirq = hwirq;
-
 	desc->masked = false;
 
-    node->handler = handler;
-    node->device = dev;
-    node->next = desc->handlers;
+	node->handler = handler;
+	node->device = dev;
+	node->next = desc->handlers;
 
 	desc->handlers = node;
+
+	// If chip has unmask, unmask the IRQ
+	if (desc->chip && desc->chip->unmask) {
+		desc->chip->unmask(desc);
+	}
 
 	return OK;
 }
 
-int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
-	int hwirq = arch_irq_to_hwline(interrupt);
-	if(hwirq < 0 || hwirq >= TOTAL_INTERRUPTS){
+int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev) {
+	struct irq_desc *desc = irq_to_desc(interrupt);
+	if (!desc) {
 		return -EINVAL;
 	}
 
-	struct irq_desc *desc = &irq_table[hwirq];
-	struct irq_handler_node *cur, *prev = NULL;
+	struct irq_handler_node *cur = desc->handlers;
+	struct irq_handler_node *prev = NULL;
 
-	cur = desc->handlers;
-	while(cur){
-		if(cur->device == dev && cur->handler == handler){
-			if(prev){
+	while (cur) {
+		if (cur->device == dev && cur->handler == handler) {
+			if (prev) {
 				prev->next = cur->next;
-			}else{
+			} else {
 				desc->handlers = cur->next;
 			}
 
 			kfree(cur);
+
+			// If no more handlers, mask the IRQ
+			if (!desc->handlers && desc->chip && desc->chip->mask) {
+				desc->masked = true;
+				desc->chip->mask(desc);
+			}
+
 			return OK;
 		}
 
@@ -63,41 +105,12 @@ int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev){
 	return -ENOENT;
 }
 
-struct irq_desc* irq_desc_get(int interrupt) {
-	int hwirq = arch_irq_to_hwline(interrupt);
-	if(hwirq < 0 || hwirq >= TOTAL_INTERRUPTS){
-		return NULL;
+int interrupt_init(void) {
+	memset(irq_table, 0, sizeof(irq_table));
+	for (int i = 0; i < TOTAL_INTERRUPTS; i++) {
+		irq_table[i].hwirq = i;
+		irq_table[i].irq = (i >= 0x20 && i <= 0x2F) ? (i - 0x20) : i;
+		irq_table[i].masked = true;
 	}
-
-	return &irq_table[hwirq];
-}
-
-void interrupt_set_chip(int interrupt, struct irq_chip* chip){
-	struct irq_desc *desc = irq_desc_get(interrupt);
-	if(desc){
-		desc->chip = chip;
-	}
-}
-
-void interrupt_set_controller(int interrupt, struct irq_controller* controller){
-	struct irq_desc *desc = irq_desc_get(interrupt);
-	if(desc){
-		desc->controller = controller;
-	}
-}
-
-const struct irq_chip* interrupt_get_chip(int interrupt){
-	struct irq_desc *desc = irq_desc_get(interrupt);
-	if(desc){
-		return desc->chip;
-	}
-	return NULL;
-}
-
-const struct irq_controller* interrupt_get_controller(int interrupt){
-	struct irq_desc *desc = irq_desc_get(interrupt);
-	if(desc){
-		return desc->controller;
-	}
-	return NULL;
+	return OK;
 }

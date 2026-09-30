@@ -32,7 +32,4 @@ struct IDTr_ptr{
 void idt_init();
 void idt_set_gate(uint8_t interrupt_num, uint32_t base, uint16_t selector, uint8_t flags);
 
-int arch_irq_to_hwline(int irq);
-int arch_hwline_to_irq(int hwline);
-
 #endif

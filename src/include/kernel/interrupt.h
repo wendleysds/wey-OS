@@ -9,6 +9,7 @@
 
 struct registers;
 struct irq_desc;
+struct irq_domain;
 
 enum irq_trigger_type {
 	IRQ_TYPE_EDGE,
@@ -39,18 +40,24 @@ struct irq_domain {
 	const char *name;
 
 	int (*map)(
-		struct irq_domain *,
+		struct irq_domain *d,
 		unsigned int hwirq,
 		unsigned int *irq
 	);
 
 	void (*unmap)(
-		struct irq_domain *,
+		struct irq_domain *d,
 		unsigned int hwirq
 	);
 
 	const struct irq_chip *chip;
 	const struct irq_controller *controller;
+
+	struct list_head list;
+	void *host_data;
+	unsigned int hwirq_base;
+	unsigned int irq_base;
+	unsigned int nr_irqs;
 };
 
 struct irq_desc {
@@ -99,24 +106,56 @@ struct irq_handler_node {
 	struct irq_handler_node* next;
 };
 
-int interrupt_init();
+int interrupt_init(void);
 int generic_handle_irq(struct irq_info* info);
 
-// For raw interrupts
+// Interrupt registration
 int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev);
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev);
 
-void interrupts_enable();
-void interrupts_disable();
+void interrupts_enable(void);
+void interrupts_disable(void);
 
 void interrupt_mask(int interrupt);
 void interrupt_unmask(int interrupt);
 void interrupt_eoi(int interrupt);
 
-void interrupt_set_chip(int interrupt, struct irq_chip* chip);
-void interrupt_set_controller(int interrupt, struct irq_controller* controller);
+struct irq_desc* irq_desc_get(int interrupt);
+struct irq_desc* irq_desc_get_by_hwirq(int hwirq);
+struct irq_desc* irq_to_desc(int irq);
 
-const struct irq_chip* interrupt_get_chip(int interrupt);
-const struct irq_controller* interrupt_get_controller(int interrupt);
+// IRQ Domain API
+int irq_domain_register(struct irq_domain *domain);
+void irq_domain_unregister(struct irq_domain *domain);
+struct irq_domain *irq_domain_get_default(void);
+void irq_domain_set_default(struct irq_domain *domain);
+struct irq_domain *irq_domain_find_by_name(const char *name);
+
+struct irq_domain *irq_domain_create_legacy(
+	const char *name,
+	unsigned int nr_irqs,
+	unsigned int first_hwirq,
+	unsigned int first_irq,
+	const struct irq_chip *chip,
+	const struct irq_controller *controller
+);
+
+struct irq_domain *irq_domain_create_linear(
+	const char *name,
+	unsigned int nr_irqs,
+	const struct irq_chip *chip,
+	const struct irq_controller *controller
+);
+
+int irq_domain_set_chip(
+	struct irq_domain *domain,
+	const struct irq_chip *chip,
+	const struct irq_controller *controller
+);
+
+int irq_domain_map(struct irq_domain *domain, unsigned int hwirq, unsigned int *irq);
+void irq_domain_unmap(struct irq_domain *domain, unsigned int hwirq);
+int irq_find_mapping(struct irq_domain *domain, unsigned int hwirq);
+int irq_create_mapping(struct irq_domain *domain, unsigned int hwirq);
 
 #endif
