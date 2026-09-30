@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <kernel/acpi/types.h>
+
 struct rsdp_descriptor_v1 {
 	char     signature[8];
 	uint8_t  checksum;
@@ -106,6 +108,12 @@ struct acpi_pm_info {
 
 int acpi_reboot(void);
 int acpi_shutdown(void);
+
+int acpi_load_namespace(const uint8_t *aml, size_t length);
+void acpi_unload_namespace(void);
+
+struct acpi_sdt_header *acpi_find_table(const char *signature);
+void acpi_namespace_walk(void (*callback)(aml_object_t*));
 
 #endif
 

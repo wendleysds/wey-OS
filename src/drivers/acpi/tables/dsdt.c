@@ -2,7 +2,6 @@
 #include <kernel/printk.h>
 
 #include "../internal.h"
-#include "../aml/internal/namespace.h"
 
 static void list_devices(aml_object_t* obj) {
 	if(obj->type != AML_OBJ_TYPE_DEVICE) return;
