@@ -1,1 +1,1 @@
-obj-y += i8259A.o
+obj-y += i8259A.o i82093AA.o

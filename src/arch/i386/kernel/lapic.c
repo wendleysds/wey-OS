@@ -137,8 +137,17 @@ void lapic_mask_local_sources(void){
     lapic_mask(LAPIC_LVT_ERROR);
 }
 
-void lapic_send_eoi(void){
+void lapic_eoi(void){
     lapic_write(LAPIC_EOI, 0);
+}
+
+uint32_t lapic_get_id(void){
+    if(!lapic_base) return 0;
+    return (lapic_read(LAPIC_ID) >> 24) & 0xFF;
+}
+
+static void lapic_send_eoi(struct irq_desc *desc){
+    lapic_eoi();
 }
 
 static uint32_t calibrate_lapic_timer_freq(void)
@@ -246,7 +255,7 @@ int __init lapic_init(int frequency){
 
     lapic_timer_init(frequency);
 
-    lapic_send_eoi();
+    lapic_send_eoi(NULL);
 
     uint32_t id = lapic_read(LAPIC_ID) >> 24;
     uint32_t version = lapic_read(LAPIC_VER) & 0xFF;
@@ -256,3 +265,8 @@ int __init lapic_init(int frequency){
 
     return 0;
 }
+
+const struct irq_controller irq_controller_local_apic = {
+    .name = "Local APIC",
+    .eoi = lapic_send_eoi,
+};
