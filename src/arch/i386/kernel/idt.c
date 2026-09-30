@@ -1,12 +1,20 @@
+#include "kernel/acpi.h"
 #include <kernel/sched.h>
 #include <kernel/clock.h>
 #include <kernel/interrupt.h>
 #include <kernel/printk.h>
 #include <kernel/stacktrace.h>
+#include <kernel/panic.h>
 #include <mm/kheap.h>
 #include <asm/idt.h>
 #include <def/errno.h>
 #include <lib/string.h>
+
+#include <kernel/acpi/tables/madt.h>
+
+#include <arch/i386/pic.h>
+#include <arch/i386/lapic.h>
+#include <arch/i386/ioapic.h>
 
 static const char* exception_messages[] = {
 	"Division By Zero", "Debug", "Non Maskable Interrupt", "Breakpoint",
@@ -69,16 +77,6 @@ void interrupts_disable(){
 	__asm__ volatile ("cli");
 }
 
-// tmp solution until irq_domain not is implemented
-int arch_irq_to_hwline(int irq){
-	return irq + 0x20;
-}
-
-int arch_hwline_to_irq(int hwline){
-	if(hwline < 0x20 || hwline > 0x2F) return -1;
-	return hwline - 0x20;
-}
-
 static void _build_irq_info(struct irq_info* info, struct registers* regs){
 	info->cpu.cpu_id = 0;
 	info->cpu.regs = regs;
@@ -112,3 +110,103 @@ asmlinkage void arch_handle_irq(struct registers* regs){
 		*regs = current->regs;
 	}
 }
+
+static int irq_use_pic(void){
+	int res = 0;
+	printk("x86: using PIC.\n");
+	res = pic_init(TIMER_FREQUENCY_HZ);
+	if(res < 0){
+		return res;
+	}
+
+	irq_switch_all_chips(&i8259A_chip, &i8259A_controller);
+
+	return 0;
+}
+
+static int irq_use_pic_and_apic(void){
+	int res = 0;
+	printk("x86: using APIC + PIC.\n");
+
+	res = pic_init(TIMER_FREQUENCY_HZ);
+	if(res < 0){
+		return res;
+	}
+
+	res = lapic_init(TIMER_FREQUENCY_HZ);
+	if(res < 0){
+		return res;
+	}
+
+	res = ioapic_init(lapic_get_id());
+	if(res < 0){
+		return res;
+	}
+
+	irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
+
+	return 0;
+}
+
+static void __init irqdesc_setup(int irq, struct irq_desc *desc){
+	if(irq >= 0x20 && irq <= 0x2F){
+		desc->irq = irq - 0x20;
+	}else{
+		desc->irq = irq;
+	}
+
+	desc->hwirq = irq;
+	desc->masked = true;
+}
+
+static int __init irq_check_chips(void){
+	bool pic_found = false;
+	if(!pic_found && !acpi_madt_info){
+		panic("No IRQ chip found!");
+	}
+
+	if(acpi_madt_info){
+		pic_found |= (acpi_madt_info->flags & MADT_FLAG_PCAT_COMPAT);
+	}
+
+	if(!pic_found){
+		return -ENODEV;
+	}
+
+	irqdesc_init(irqdesc_setup);
+
+	int res;
+	if(pic_found && acpi_madt_info){
+		res = irq_use_pic_and_apic();
+	}else if(pic_found){
+		res = irq_use_pic();
+	}else{
+		panic("x86: only support APIC + PIC.");
+	}
+
+	if(res) return res;
+
+	return 0;
+}
+
+int __init interrupt_init(void){
+	int res;
+
+	if((res = acpi_load_all_tables()) < 0){
+		printk("x86: Failed to load ACPI tables: %d\n", res);
+		return res;
+	}
+
+	struct acpi_madt* madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
+	if(madt){
+		acpi_parse_madt(madt);
+	}
+	
+	if((res = irq_check_chips()) < 0){
+		printk("x86: Failed to setup IRQ chips: %d\n", res);
+		return res;
+	}
+
+	return 0;
+}
+

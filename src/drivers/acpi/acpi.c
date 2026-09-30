@@ -17,6 +17,7 @@ extern unsigned long acpi_rsdp;
 
 extern struct acpi_pm_info *acpi_pm;
 extern struct acpi_madt_info *acpi_madt_info;
+static bool acpi_tables_loaded __initdata = false;
 
 static __init void acpi_print_sdt(const struct acpi_sdt_header *sdt){
 	printk("ACPI: Table '%.4s' at 0x%lx\n", sdt->signature, (uintptr_t)sdt);
@@ -72,7 +73,6 @@ static __init inline void ndelay(uint64_t ns){
 
 static __init int acpi_enable(void){
 	if(!acpi_pm) return -ENODEV;
-
 	if(!acpi_pm->acpi_enable || !acpi_pm->acpi_disable) return -ENODEV;
 	
 	uint16_t value;
@@ -115,11 +115,17 @@ static __init int acpi_enable(void){
 	return -ETIMEDOUT;
 }
 
-static __init int acpi_get_all_tables(void){
-	if(!acpi_rsdp) return 0;
+int __init acpi_load_all_tables(void) {
+	if(!acpi_rsdp) return -ENODEV;
+
+	if(acpi_tables_loaded) return 0;
+	acpi_tables_loaded = true;
+
+	acpi_madt_info = NULL;
+	acpi_pm = NULL;
 
 	rsdp_descriptor_t *rsdp = acpi_parse_rsdp(acpi_rsdp);
-	if(!rsdp) return -ENOENT;
+	if(!rsdp) return -ENODEV;
 
 	paddr_t rsdp_paddr = rsdp->v1.revision >= 2 ?
 		rsdp->v2.xsdt_address : rsdp->v1.rsdt_address;
@@ -142,18 +148,14 @@ static __init int acpi_get_all_tables(void){
 	return 0;
 }
 
-static __init int acpi_init(void) {
+static __init int acpi_parse_tables(void) {
 	if(!acpi_rsdp) return 0;
-
-	acpi_madt_info = NULL;
-	acpi_pm = NULL;
 
 	// FADT and DSDT is mandatory to ACPI
 	struct acpi_fadt *fadt = (void*)acpi_find_table(ACPI_FADT_SIGNATURE);
 	if(!fadt) return -ENODEV;
 
 	acpi_parse_fadt(fadt);
-	acpi_unmap(fadt);
 
 	if(!acpi_pm) return -ENODEV;
 
@@ -169,8 +171,29 @@ static __init int acpi_init(void) {
 		acpi_unmap(madt);
 	}
 
-	return acpi_enable();
+	return 0;
 }
 
-pure_initcall(acpi_get_all_tables);
-core_initcall(acpi_init);
+static __init int acpi_init(void){
+	if(!acpi_rsdp) return 0;
+
+	int res;
+	if((res = acpi_load_all_tables()) != 0){
+		printk("ACPI: failed to load tables\n");
+		return res;
+	}
+
+	if((res = acpi_parse_tables()) != 0){
+		printk("ACPI: failed to parse tables\n");
+		return res;
+	}
+
+	if((res = acpi_enable()) != 0){
+		printk("ACPI: failed to enable ACPI\n");
+		return res;
+	}
+
+	return 0;
+}
+
+subsys_initcall(acpi_init);

@@ -2,6 +2,7 @@
 #include <kernel/interrupt.h>
 #include <kernel/device.h>
 #include <kernel/sched.h>
+#include <kernel/clock.h>
 #include <kernel/fork.h>
 #include <device/terminal.h>
 #include <lib/assert.h>
@@ -103,7 +104,11 @@ __no_return __init void kmain(){
 
 	module_load("Memory", memory_init);
 
+	module_load("Interrupt", interrupt_init);
+
 	module_load("Terminal", terminal_init);
+
+	clock_init(TIMER_FREQUENCY_HZ);
 
 	module_load("Scheduler", scheduler_init);
 

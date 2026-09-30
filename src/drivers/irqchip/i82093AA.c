@@ -264,6 +264,8 @@ int ioapic_init(uint32_t local_apic_id) {
         ioapic_encode_entry(&entry, pin);
     }
 
+    irq_domain_create_legacy("ioapic", 16, 0x20, 0, &ioapic_chip, &ioapic_controller);
+
 	return SUCCESS;
 }
 

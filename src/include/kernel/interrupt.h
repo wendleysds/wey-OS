@@ -120,6 +120,8 @@ void interrupt_mask(int interrupt);
 void interrupt_unmask(int interrupt);
 void interrupt_eoi(int interrupt);
 
+// IRQ descriptor management
+int irqdesc_init(void (*callback)(int hwirq, struct irq_desc* desc));
 struct irq_desc* irq_desc_get(int interrupt);
 struct irq_desc* irq_desc_get_by_hwirq(int hwirq);
 struct irq_desc* irq_to_desc(int irq);

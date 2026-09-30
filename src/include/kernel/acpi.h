@@ -109,6 +109,7 @@ struct acpi_pm_info {
 int acpi_reboot(void);
 int acpi_shutdown(void);
 
+int acpi_load_all_tables(void);
 int acpi_load_namespace(const uint8_t *aml, size_t length);
 void acpi_unload_namespace(void);
 

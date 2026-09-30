@@ -21,6 +21,7 @@ struct pic_info {
 };
 
 extern const struct irq_chip i8259A_chip;
+extern const struct irq_controller i8259A_controller;
 extern struct pic_info master;
 extern struct pic_info slave;
 

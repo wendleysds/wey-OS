@@ -1,4 +1,5 @@
 #include <kernel/clock.h>
+#include <kernel/init.h>
 #include <def/errno.h>
 #include <lib/div64.h>
 #include <lib/list.h>
@@ -42,7 +43,7 @@ static const struct clocksource default_clocksource = {
 	.data = 0x0,
 };
 
-int clock_init(uint32_t timer_hz){
+int __init clock_init(uint32_t timer_hz){
 	if(!timer_hz){
 		return -EINVAL;
 	}

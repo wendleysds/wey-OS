@@ -133,7 +133,7 @@ static int __init ps2_keyboard_init(){
 		inb(_PS2_INPUT_PORT);
 	}
 
-	return irq_register(IRQ_KEYBOARD, _iqr_keyboard_handler, NULL);
+	return interrupt_register(1, _iqr_keyboard_handler, NULL);
 }
 
 device_initcall(ps2_keyboard_init);

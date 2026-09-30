@@ -1,4 +1,5 @@
 #include <kernel/interrupt.h>
+#include <kernel/init.h>
 #include <def/errno.h>
 #include <mm/kheap.h>
 #include <lib/string.h>
@@ -105,12 +106,16 @@ int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev) 
 	return -ENOENT;
 }
 
-int interrupt_init(void) {
+int __init irqdesc_init(void (*callback)(int hwirq, struct irq_desc* desc)) {
 	memset(irq_table, 0, sizeof(irq_table));
 	for (int i = 0; i < TOTAL_INTERRUPTS; i++) {
-		irq_table[i].hwirq = i;
-		irq_table[i].irq = (i >= 0x20 && i <= 0x2F) ? (i - 0x20) : i;
-		irq_table[i].masked = true;
+		if(callback) {
+			callback(i, &irq_table[i]);
+		} else {
+			irq_table[i].hwirq = i;
+			irq_table[i].irq = i;
+			irq_table[i].masked = true;
+		}
 	}
 	return OK;
 }

@@ -47,6 +47,7 @@ static struct gdt_descriptor gdt_descriptor;
 extern void fault_init();
 extern uint8_t supports_pse;
 
+/*
 #include <arch/i386/pic.h>
 
 static int pit_clockevent_start(void* data, uint32_t hz){
@@ -90,6 +91,7 @@ static void __init setup_clock(void){
 		panic("Setup: clockevent start failed!");
 	}
 }
+*/
 
 static inline void gdt_set_tss(int cpu, struct tss *tss){
 	int idx = GDT_TSS_BASE_INDEX + cpu;
@@ -310,8 +312,6 @@ __init void setup_arch(void){
 	gdt_setup();
 
 	cpu_init();
-
-	setup_clock();
 
 	idt_init();
 

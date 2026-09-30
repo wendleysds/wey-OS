@@ -81,6 +81,10 @@ static __init void acpi_parse_madt_local_x2apic_nmi(struct acpi_madt_local_x2api
 void __init acpi_parse_madt(struct acpi_madt *table) {
 	if (!table) return;
 
+	if(acpi_madt_info){
+		return;
+	}
+
 	struct acpi_madt_info *info = kzalloc(sizeof(struct acpi_madt_info));
 	if (!info) {
 		printk("ACPI: Failed to allocate memory for MADT info\n");

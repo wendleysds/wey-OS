@@ -11,6 +11,9 @@
 #define PIC1_BASE         0x20
 #define PIC2_BASE         0xA0
 
+extern const struct irq_chip i8259A_chip;
+extern const struct irq_controller i8259A_controller;
+
 struct pic_info master = {
     .cmd_port = PIC1_BASE,
     .data_port = PIC1_BASE + 1,
@@ -123,6 +126,8 @@ int __init pic_init(int frequency) {
 
     master.current_frequency = frequency;
     slave.current_frequency = frequency;
+
+    irq_domain_create_legacy("i8259A", 16, master.irq_base, 0, &i8259A_chip, &i8259A_controller);
 
     return SUCCESS;
 }
