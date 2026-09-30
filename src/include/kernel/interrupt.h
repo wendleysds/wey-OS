@@ -124,6 +124,25 @@ struct irq_desc* irq_desc_get(int interrupt);
 struct irq_desc* irq_desc_get_by_hwirq(int hwirq);
 struct irq_desc* irq_to_desc(int irq);
 
+// Chip management & switching
+void interrupt_set_chip(int interrupt, const struct irq_chip* chip);
+void interrupt_set_controller(int interrupt, const struct irq_controller* controller);
+void irq_set_chip(int irq, const struct irq_chip *chip);
+void irq_set_controller(int irq, const struct irq_controller *controller);
+void irq_set_chip_and_controller(int irq, const struct irq_chip *chip, const struct irq_controller *controller);
+void irq_set_chip_data(int irq, void *data);
+void *irq_get_chip_data(int irq);
+int irq_switch_chip(int irq, const struct irq_chip *new_chip, const struct irq_controller *new_controller);
+int irq_switch_all_chips(const struct irq_chip *new_chip, const struct irq_controller *new_controller);
+
+const struct irq_chip* interrupt_get_chip(int interrupt);
+const struct irq_controller* interrupt_get_controller(int interrupt);
+const struct irq_chip* irq_get_chip(int irq);
+const struct irq_controller* irq_get_controller(int irq);
+
+int irq_set_trigger_type(int irq, enum irq_trigger_type type);
+int irq_set_affinity(int irq, unsigned int cpu);
+
 // IRQ Domain API
 int irq_domain_register(struct irq_domain *domain);
 void irq_domain_unregister(struct irq_domain *domain);

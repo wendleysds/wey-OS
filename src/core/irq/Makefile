@@ -1,1 +1,1 @@
-obj-y += chip.o handler.o irqdesc.o
+obj-y += chip.o handler.o irqdesc.o irqdomain.o
