@@ -22,4 +22,6 @@ struct acpi_xsdt {
 	uint64_t entries[];
 } __packed;
 
+void acpi_parse_xsdt(struct acpi_xsdt *xsdt);
+
 #endif

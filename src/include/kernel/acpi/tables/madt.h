@@ -200,4 +200,3 @@ extern struct acpi_madt_info *acpi_madt_info;
 void acpi_parse_madt(struct acpi_madt *table);
 
 #endif
-

@@ -12,4 +12,6 @@ struct acpi_dsdt {
 	uint8_t definition_block[];
 };
 
+void acpi_parse_dsdt(struct acpi_dsdt *dsdt);
+
 #endif

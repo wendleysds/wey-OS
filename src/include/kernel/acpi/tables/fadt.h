@@ -104,4 +104,6 @@ struct acpi_fadt {
     struct acpi_generic_address x_gpe1_block;
 } __packed;
 
+void acpi_parse_fadt(struct acpi_fadt *ptr);
+
 #endif

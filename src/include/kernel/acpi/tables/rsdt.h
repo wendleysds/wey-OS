@@ -21,4 +21,6 @@ struct acpi_rsdt {
 	uint32_t entries[];
 } __packed;
 
+void acpi_parse_rsdt(struct acpi_rsdt *rsdt);
+
 #endif
