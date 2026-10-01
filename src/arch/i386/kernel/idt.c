@@ -1,4 +1,3 @@
-#include "kernel/acpi.h"
 #include <kernel/sched.h>
 #include <kernel/clock.h>
 #include <kernel/interrupt.h>
@@ -11,6 +10,7 @@
 #include <lib/string.h>
 
 #include <kernel/acpi/tables/madt.h>
+#include <kernel/acpi/tables/hpet.h>
 
 #include <arch/i386/pic.h>
 #include <arch/i386/lapic.h>
@@ -111,20 +111,48 @@ asmlinkage void arch_handle_irq(struct registers* regs){
 	}
 }
 
-static int irq_use_pic(void){
+static __init void hpet_10ms_wait(void) {
+	hpet_udelay(10000);
+}
+
+static __init void pit_10ms_wait(void){
+	const uint32_t pit_hz = 100;
+	const uint16_t pit_ticks = PIT_FREQUENCY / pit_hz;
+
+	// Problaby the period is not very accurate 
+	// for high precision delays
+	pit_prepare_oneshot_ch2(pit_ticks);
+	pit_wait_oneshot_ch2();
+}
+
+static __init int irq_use_apic_and_hpet(void){
 	int res = 0;
-	printk("x86: using PIC.\n");
-	res = pic_init(TIMER_FREQUENCY_HZ);
+	printk("x86: using APIC + HPET.\n");
+
+	res = hpet_init();
 	if(res < 0){
+		printk("x86: Failed to initialize HPET: %d\n", res);
 		return res;
 	}
 
-	irq_switch_all_chips(&i8259A_chip, &i8259A_controller);
+	res = lapic_init(TIMER_FREQUENCY_HZ, hpet_10ms_wait);
+	if(res < 0){
+		printk("x86: Failed to initialize APIC: %d\n", res);
+		return res;
+	}
 
-	return 0;
+	res = ioapic_init(lapic_get_id());
+	if(res < 0){
+		printk("x86: Failed to initialize IOAPIC: %d\n", res);
+		return res;
+	}
+
+	irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
+	
+	return res;
 }
 
-static int irq_use_pic_and_apic(void){
+static __init int irq_use_apic_and_pic(void){
 	int res = 0;
 	printk("x86: using APIC + PIC.\n");
 
@@ -133,7 +161,7 @@ static int irq_use_pic_and_apic(void){
 		return res;
 	}
 
-	res = lapic_init(TIMER_FREQUENCY_HZ);
+	res = lapic_init(TIMER_FREQUENCY_HZ, pit_10ms_wait);
 	if(res < 0){
 		return res;
 	}
@@ -144,6 +172,19 @@ static int irq_use_pic_and_apic(void){
 	}
 
 	irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
+
+	return 0;
+}
+
+static __init int irq_use_pic(void){
+	int res = 0;
+	printk("x86: using PIC.\n");
+	res = pic_init(TIMER_FREQUENCY_HZ);
+	if(res < 0){
+		return res;
+	}
+
+	irq_switch_all_chips(&i8259A_chip, &i8259A_controller);
 
 	return 0;
 }
@@ -160,33 +201,40 @@ static void __init irqdesc_setup(int irq, struct irq_desc *desc){
 }
 
 static int __init irq_check_chips(void){
-	bool pic_found = false;
-	if(!pic_found && !acpi_madt_info){
+	bool has_pic = false;
+	bool has_hpet = !!acpi_find_table(ACPI_HPET_SIGNATURE);
+
+	int res;
+
+	if(!has_pic && !acpi_madt_info){
 		panic("No IRQ chip found!");
 	}
 
 	if(acpi_madt_info){
-		pic_found |= (acpi_madt_info->flags & MADT_FLAG_PCAT_COMPAT);
+		has_pic |= (acpi_madt_info->flags & MADT_FLAG_PCAT_COMPAT);
 	}
 
-	if(!pic_found){
+	if(!has_pic && !has_hpet){
 		return -ENODEV;
 	}
 
 	irqdesc_init(irqdesc_setup);
-
-	int res;
-	if(pic_found && acpi_madt_info){
-		res = irq_use_pic_and_apic();
-	}else if(pic_found){
-		res = irq_use_pic();
-	}else{
-		panic("x86: only support APIC + PIC.");
+	if(has_hpet && acpi_madt_info){
+		res = irq_use_apic_and_hpet();
+		if (res >= 0) return res;
 	}
 
-	if(res) return res;
+	if(has_pic && acpi_madt_info){
+		res = irq_use_apic_and_pic();
+		if (res >= 0) return res;
+	}
 
-	return 0;
+	if(has_pic){
+		res = irq_use_pic();
+		if (res >= 0) return res;
+	}
+
+	panic("x86: only support APIC + PIC.");
 }
 
 int __init interrupt_init(void){
@@ -206,6 +254,8 @@ int __init interrupt_init(void){
 		printk("x86: Failed to setup IRQ chips: %d\n", res);
 		return res;
 	}
+
+	// Handle overrides if exists
 
 	return 0;
 }

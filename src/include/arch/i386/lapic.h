@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-int lapic_init(int frequency);
+typedef void (*wait_10ms_func_t)(void);
+
+int lapic_init(int frequency, wait_10ms_func_t calibrator);
 void lapic_enable(void);
 void lapic_disable(void);
 

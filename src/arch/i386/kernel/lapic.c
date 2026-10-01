@@ -150,52 +150,26 @@ static void lapic_send_eoi(struct irq_desc *desc){
     lapic_eoi();
 }
 
-static uint32_t calibrate_lapic_timer_freq(void)
-{
-    const uint32_t pit_hz = 100;
-    const uint16_t pit_ticks = PIT_FREQUENCY / pit_hz;
-
-    /*
-     * LAPIC timer divisor = 16.
-     */
+static __init uint32_t lapic_calibrate(wait_10ms_func_t calibrator){
     lapic_write(LAPIC_TDCR, LAPIC_TIMER_DIV_16);
 
-    /*
-     * Configure PIT channel 2 for one-shot calibration window.
-     */
-    pit_prepare_oneshot_ch2(pit_ticks);
+	lapic_write(LAPIC_TICR, 0xFFFFFFFF);
 
-    /*
-     * Start LAPIC timer.
-     */
-    lapic_write(LAPIC_TICR, 0xFFFFFFFF);
+	calibrator();
 
-    /*
-     * Wait for PIT channel 2 OUT to become 1.
-     */
-    pit_wait_oneshot_ch2();
+	uint32_t elapsed = 0xFFFFFFFF - lapic_read(LAPIC_TCCR);
 
-    uint32_t current = lapic_read(LAPIC_TCCR);
+	lapic_write(LAPIC_TICR, 0);
 
-    /*
-     * Number of LAPIC timer ticks during 10 ms.
-     */
-    uint32_t elapsed = 0xFFFFFFFF - current;
-
-    lapic_write(LAPIC_TICR, 0);
-
-    /*
-     * PIT window = 10 ms.
-     */
-    return elapsed * pit_hz;
+	return elapsed * 100;
 }
 
-static void lapic_timer_init(uint32_t target_frequency_hz)
+static __init void lapic_timer_init(uint32_t target_frequency_hz, wait_10ms_func_t wait_func)
 {
     if (!target_frequency_hz)
         return;
 
-    lapic_bus_freq_hz = calibrate_lapic_timer_freq();
+    lapic_bus_freq_hz = lapic_calibrate(wait_func);
 
     uint32_t initial_count =
         lapic_bus_freq_hz / target_frequency_hz;
@@ -217,7 +191,7 @@ static void lapic_timer_init(uint32_t target_frequency_hz)
     lapic_write(LAPIC_TICR, initial_count);
 }
 
-int __init lapic_init(int frequency){
+int __init lapic_init(int frequency, wait_10ms_func_t wait_func){
     if(!acpi_madt_info){
         printk("LAPIC: No MADT info\n");
         return -ENODEV;
@@ -253,7 +227,7 @@ int __init lapic_init(int frequency){
 
     lapic_mask_local_sources();
 
-    lapic_timer_init(frequency);
+    lapic_timer_init(frequency, wait_func);
 
     lapic_send_eoi(NULL);
 
