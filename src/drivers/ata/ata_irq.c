@@ -59,10 +59,11 @@ void ata_register_irq(char channel){
 	}
 
 	atachannel->irqRegistered = 1;
-	uint8_t irq = (channel == 0 ? IRQ_ATA_PRIMARY : IRQ_ATA_SECONDARY);
+	uint8_t irq = (channel == 0 ? 14 : 15);
 
-	irq_register(irq, ata_irq_handler, atachannel);
-	irq_unmask(irq);
+	interrupt_register(irq, ata_irq_handler, atachannel);
+	interrupt_unmask(irq);
+
 	outb(ATA_IO(atachannel, ATA_REG_CONTROL), 0x00);
 }
 
