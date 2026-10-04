@@ -4,6 +4,7 @@
 #include <def/compile.h>
 #include <lib/list.h>
 #include <sys/types.h>
+#include <kernel/resource.h>
 
 #define MINOR_BITS 20
 #define MINOR_MASK ((1U << MINOR_BITS) - 1)
@@ -69,5 +70,18 @@ void driver_unregister(struct device_driver *driver);
 struct device *device_create    (dev_t devt, void *drvdata, const char *name);
 struct device *device_get_by_name(const char *name);
 struct device *device_get_by_devt(dev_t devt);
+
+/*
+ * Generic resource helpers
+ *
+ * device_add_resource() - append a resource to dev->resources singly-linked list (via the sibling pointer)
+ * device_get_resource() - find the n-th resource of a given type (Returns NULL when not found)
+ */
+void device_add_resource(struct device *dev, struct resource *res);
+struct resource *device_get_resource(
+	struct device *dev,
+	resource_type_t type,
+	unsigned int index
+);
 
 #endif

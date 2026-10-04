@@ -1,4 +1,5 @@
 #include <kernel/device.h>
+#include <kernel/resource.h>
 #include <kernel/init.h>
 #include <mm/kheap.h>
 #include <lib/string.h>
@@ -98,6 +99,7 @@ void device_initialize(struct device *dev){
 	memset(dev, 0x0, sizeof(struct device));
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->bus_list);
+	dev->resources = NULL;
 }
 
 int device_register(struct device *dev){
@@ -196,6 +198,45 @@ struct device* device_get_by_devt(dev_t devt){
 		}
 	}
 
+	return NULL;
+}
+
+void device_add_resource(struct device *dev, struct resource *res)
+{
+	if (!dev || !res)
+		return;
+
+	res->sibling = NULL;
+
+	if (!dev->resources) {
+		dev->resources = res;
+		return;
+	}
+
+	struct resource *cur = dev->resources;
+	while (cur->sibling){
+		cur = cur->sibling;
+	}
+
+	cur->sibling = res;
+}
+
+struct resource *device_get_resource(
+	struct device *dev,
+	resource_type_t type,
+	unsigned int index
+){
+	if (!dev)
+		return NULL;
+
+	unsigned int n = 0;
+	for (struct resource *r = dev->resources; r; r = r->sibling) {
+		if (r->type == type) {
+			if (n == index)
+				return r;
+			n++;
+		}
+	}
 	return NULL;
 }
 
