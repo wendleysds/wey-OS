@@ -1,4 +1,5 @@
 #include <kernel/device.h>
+#include <kernel/resource.h>
 #include <kernel/printk.h>
 #include <kernel/init.h>
 #include <device/pci.h>
@@ -457,7 +458,58 @@ int pci_scan_bridge(struct pci_bus *parent, struct pci_device *dev){
 	return res;
 }
 
+static void pci_build_resources(struct pci_device *pdev)
+{
+	uint8_t htype = pdev->header_type & PCI_HEADER_TYPE_MASK;
+	struct pci_bar *bars;
+	int count;
+
+	if (htype == PCI_HEADER_TYPE_BRIDGE) {
+		bars  = pdev->header.bridge.bars;
+		count = 2;
+	} else if (htype == PCI_HEADER_TYPE_NORMAL) {
+		bars  = pdev->header.general.bars;
+		count = 6;
+	} else {
+		return;
+	}
+
+	for (int i = 0; i < count; i++) {
+		struct pci_bar *bar = &bars[i];
+
+		if (bar->type == PCI_BAR_UNUSED || bar->size == 0)
+			continue;
+
+		struct resource *res = kzalloc(sizeof(struct resource));
+		if (!res)
+			return;
+
+		if (bar->type == PCI_BAR_IO) {
+			res->type  = RESOURCE_TYPE_IO;
+			res->flags = RESOURCE_FLAG_IO | RESOURCE_FLAG_READABLE |
+			             RESOURCE_FLAG_WRITABLE;
+			res->name  = "PCI IO";
+			res->io.base = bar->base;
+			res->io.size = bar->size;
+		} else {
+			res->type  = RESOURCE_TYPE_MEMORY;
+			res->flags = RESOURCE_FLAG_MMIO | RESOURCE_FLAG_READABLE |
+			             RESOURCE_FLAG_WRITABLE;
+			if (bar->prefetchable)
+				res->flags |= RESOURCE_FLAG_PREFETCH;
+			res->name  = "PCI MEM";
+			res->range.base = bar->base;
+			res->range.size = bar->size;
+		}
+
+		device_add_resource(&pdev->dev, res);
+	}
+}
+
 static int pci_register_parsed_device(struct pci_bus *bus, struct pci_device *device){
+	/* Populate the generic resource list before registering */
+	pci_build_resources(device);
+
 	if (device_register(&device->dev)) {
 		printk("PCI: %d:%d.%d: failed to register device\n",
 			device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));

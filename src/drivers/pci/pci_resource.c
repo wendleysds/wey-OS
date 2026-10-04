@@ -2,9 +2,6 @@
 
 #include "internal.h"
 
-#define to_pci_device(d)  container_of(d, struct pci_device, dev)
-#define to_pci_driver(d)  container_of(d, struct pci_driver, driver)
-
 const struct pci_device_id *pci_match_id(
 	struct pci_device *dev,
 	const struct pci_device_id *ids
@@ -52,27 +49,4 @@ int pci_driver_match(struct device *dev, struct device_driver *drv){
 
 	const struct pci_device_id *id = pci_match_id(pdev, pdrv->id_table);
 	return (id != NULL);
-}
-
-int pci_device_probe(struct device *dev){
-	struct pci_device *pdev = to_pci_device(dev);
-	struct pci_driver *pdrv = to_pci_driver(dev->driver);
-
-	if (pdrv->probe) {
-		const struct pci_device_id *id = pci_match_id(pdev, pdrv->id_table);
-		return pdrv->probe(pdev, id);
-	}
-
-	return -ENODEV;
-}
-
-int pci_device_remove(struct device *dev){
-	struct pci_device *pdev = to_pci_device(dev);
-	struct pci_driver *pdrv = to_pci_driver(dev->driver);
-
-	if (pdrv->remove) {
-		pdrv->remove(pdev);
-	}
-
-	return 0;
 }

@@ -405,11 +405,6 @@ struct pci_device {
     } header;
 
     struct list_head capabilities;
-
-    struct pci_driver *driver;
-
-    void *driver_data;
-
     struct list_head node;
 };
 
@@ -419,21 +414,8 @@ struct pci_device {
 
 struct pci_driver {
     struct device_driver driver;
-    const char *name;
-
     const struct pci_device_id *id_table;
-
-    int (*probe)(
-        struct pci_device *dev,
-        const struct pci_device_id *id
-    );
-
-    void (*remove)(
-        struct pci_device *dev
-    );
 };
-
-
 
 /*
 * PCI address helpers
@@ -448,6 +430,12 @@ struct pci_driver {
 #define PCI_FUNC(devfn) \
     ((devfn) & 0x07)
 
+/*
+* Casts
+*/
+
+#define to_pci_device(d)  container_of(d, struct pci_device, dev)
+#define to_pci_driver(d)  container_of(d, struct pci_driver, driver)
 
 /*
 * Configuration space access

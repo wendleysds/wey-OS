@@ -42,8 +42,6 @@ const struct pci_config_ops *pci_config_ops = NULL;
 struct bus_type pci_bus_type = {
 	.name = "pci",
 	.match = pci_driver_match,
-	.probe = pci_device_probe,
-	.remove = pci_device_remove,
 };
 
 struct pci_bus *pci_alloc_bus(const struct pci_config_ops *ops){
@@ -80,10 +78,7 @@ int pci_register_driver(struct pci_driver *driver){
 		return -EINVAL;
 	}
 
-	driver->driver.name = driver->name;
     driver->driver.bus = &pci_bus_type;
-    driver->driver.probe = pci_device_probe;
-    driver->driver.remove = pci_device_remove;
 
 	driver_register(&driver->driver);
 	return SUCCESS;
@@ -110,31 +105,40 @@ static __init int pci_init(void){
 
 subsys_initcall(pci_init);
 
-static int test_probe(
-    struct pci_device *dev,
-    const struct pci_device_id *id
-) {
+static int test_probe(struct device *dev) {
+    struct pci_device *pdev = to_pci_device(dev);
+    
     printk(
         "TEST PCI DRIVER: found %04x:%04x\n",
-        dev->vendor_id,
-        dev->device_id
+        pdev->vendor_id,
+        pdev->device_id
     );
 
-    for (int i = 0; i < 6; i++) {
+	struct resource *res = dev->resources;
+	while(res){
+		const char* type;
+		uint64_t base, size;
+		if(res->type == RESOURCE_TYPE_MEMORY){
+			type = "MEM";
+			base = res->range.base;
+			size = res->range.size;
+		} else if(res->type == RESOURCE_TYPE_IO){
+			type = "IO";
+			base = res->io.base;
+			size = res->io.size;
+		} else if(res->type == RESOURCE_TYPE_IRQ){
+			type = "IRQ";
+			base = res->irq;
+			size = 1;
+		}else{
+			type = "UNKNOWN";
+			base = 0;
+			size = 0;
+		}
 
-        struct pci_bar *bar =
-            &dev->header.general.bars[i];
-
-        if (bar->type == PCI_BAR_UNUSED)
-            continue;
-
-        printk(
-            "  BAR%d base=%#llx size=%#llx\n",
-            i,
-            bar->base,
-            bar->size
-        );
-    }
+		printk("     Resource %s: %#llx - %#llx\n", type, base, size);
+		res = res->sibling;
+	}
 
     return 0;
 }
@@ -153,11 +157,12 @@ static const struct pci_device_id test_ids[] = {
 };
 
 static struct pci_driver test_driver = {
-    .name = "pci-test",
+	.id_table = test_ids,
 
-    .id_table = test_ids,
-
-    .probe = test_probe,
+	.driver = {
+		.name = "pci-test",
+		.probe = test_probe,
+	},
 };
 
 static __init int test_driver_init(void){

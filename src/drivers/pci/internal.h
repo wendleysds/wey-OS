@@ -46,7 +46,5 @@ const struct pci_device_id *pci_match_id(
 );
 
 int pci_driver_match(struct device *dev, struct device_driver *drv);
-int pci_device_probe(struct device *dev);
-int pci_device_remove(struct device *dev);
 
 #endif
