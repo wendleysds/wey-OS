@@ -20,8 +20,6 @@ struct bus_type {
 	const char* name;
 
 	int (*match)(struct device *dev, struct device_driver *drv);
-	int (*probe)(struct device *dev);
-	int (*remove)(struct device *dev);
 
 	struct list_head device_list;
 	struct list_head driver_list;
@@ -37,7 +35,7 @@ struct device_driver {
 	struct list_head node;
 };
 
-// Base struct for all devices
+/* Base struct for all devices */
 struct device {
 	const char* name;
 
@@ -46,10 +44,12 @@ struct device {
 
 	struct device *parent;
 
-	void* driver_data;
-	void* bus_data;
+	void *driver_data;
+	void *bus_data;
 
 	dev_t devt;
+
+	struct resource *resources;
 
 	struct list_head bus_list;
 	struct list_head node;
@@ -66,8 +66,8 @@ struct bus_type* bus_find_by_name(const char *name);
 void driver_register(struct device_driver *driver);
 void driver_unregister(struct device_driver *driver);
 
-struct device* device_create(dev_t devt, void *drvdata, const char *name);
-struct device* device_get_by_name(const char* name);
-struct device* device_get_by_devt(dev_t devt);
+struct device *device_create    (dev_t devt, void *drvdata, const char *name);
+struct device *device_get_by_name(const char *name);
+struct device *device_get_by_devt(dev_t devt);
 
 #endif

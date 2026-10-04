@@ -55,7 +55,7 @@ static int bus_probe_device(struct device *dev) {
 	list_for_each_entry(drv, &dev->bus->driver_list, node) {
 		if (dev->bus->match(dev, drv)) {
 			dev->driver = drv;
-			int ret = drv->probe ? drv->probe(dev) : dev->bus->probe(dev);
+			int ret = drv->probe(dev);
 			if (ret == 0) {
 				return 0;
 			}
@@ -77,7 +77,7 @@ void driver_register(struct device_driver *drv){
 		list_for_each_entry(dev, &drv->bus->device_list, bus_list) {
 			if (!dev->driver && drv->bus->match(dev, drv)) {
 				dev->driver = drv;
-				int ret = drv->probe ? drv->probe(dev) : drv->bus->probe(dev);
+				int ret = drv->probe(dev);
 				if (ret != 0) {
 					dev->driver = NULL;
 				}
