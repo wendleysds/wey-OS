@@ -1,17 +1,24 @@
+#include "kernel/device.h"
 #include <kernel/interrupt.h>
 #include <kernel/init.h>
 #include <kernel/input.h>
-#include <io/ports.h>
+#include <kernel/printk.h>
+#include <mm/kheap.h>
+#include <device/acpi.h>
+#include <io/region.h>
+#include <def/errno.h>
 
 /*
  * Simple PS/2 keyboard driver
  */
 
-#define _PS2_COMMAND_PORT 0x64
-#define _PS2_INPUT_PORT 0x60
-#define _PS2_ENABLE_FIRST_PORT 0xAE
+struct ps2_keyboard {
+	io_region_t data_port_region;
+	io_region_t command_port_region;
+	int irq_no;
+};
 
-#define _IQR_KEYBOARD_INTERRUPT 0x21
+#define _PS2_ENABLE_FIRST_PORT 0xAE
 #define _KEYBOARD_KEY_RELEASED 0x80
 
 static enum input_keycode _scancode_to_keycode(uint8_t scancode){
@@ -119,21 +126,93 @@ static inline void _keyboard_handle_scancode(uint8_t sc){
 	}
 }
 
-static void _iqr_keyboard_handler(struct irq_info* unused){
-	while (inb(_PS2_COMMAND_PORT) & 0x01) {
-		uint8_t scancode = inb(_PS2_INPUT_PORT);
+static void _iqr_keyboard_handler(struct irq_info *info){
+	struct ps2_keyboard *keyboard = info->device;
+
+	while (io_read8(&keyboard->command_port_region, 0) & 0x01) {
+		uint8_t scancode = io_read8(&keyboard->data_port_region, 0);
 		_keyboard_handle_scancode(scancode);
 	}
 }
 
-static int __init ps2_keyboard_init(){
-	outb(_PS2_COMMAND_PORT, _PS2_ENABLE_FIRST_PORT);
+static int ps2_keyboard_probe(struct device *dev){
+	struct resource *data_port = device_get_resource(dev, RESOURCE_TYPE_IO, 0);
+	struct resource *command_port = device_get_resource(dev, RESOURCE_TYPE_IO, 1);
+	struct resource *irq = device_get_resource(dev, RESOURCE_TYPE_IRQ, 0);
 
-	while (inb(_PS2_COMMAND_PORT) & 0x01) {
-		inb(_PS2_INPUT_PORT);
+	if(!data_port || !command_port || !irq) return -ENODEV;
+
+	struct ps2_keyboard *keyboard = kmalloc(sizeof(struct ps2_keyboard));
+	if(!keyboard) return -ENOMEM;
+
+	keyboard->data_port_region.pio_base = data_port->io.base;
+	keyboard->data_port_region.type = IO_TYPE_PIO;
+
+	keyboard->command_port_region.pio_base = command_port->io.base;
+	keyboard->command_port_region.type = IO_TYPE_PIO;
+
+	io_write8(&keyboard->command_port_region, 0, _PS2_ENABLE_FIRST_PORT);
+
+	while (io_read8(&keyboard->command_port_region, 0) & 0x01) {
+		io_read8(&keyboard->data_port_region, 0);
 	}
 
-	return interrupt_register(1, _iqr_keyboard_handler, NULL);
+	int irq_no = 0;
+	bool found = false;
+
+	int mask = irq->irq;
+	for (int irq_num = 0; irq_num < 32; irq_num++) {
+        if ((mask >> irq_num) & 1) {
+			irq_no = irq_num;
+			found = true;
+			break;
+        }
+    }
+
+	if(!found) return -ENODEV;
+
+	int err = interrupt_register(irq_no, _iqr_keyboard_handler, keyboard);
+	if(err){
+		printk("PS2: failed to register interrupt %d\n", err);
+		kfree(keyboard);
+		return err;
+	}
+
+	keyboard->irq_no = irq_no;
+	dev->driver_data = keyboard;
+	return 0;
 }
 
-device_initcall(ps2_keyboard_init);
+static int ps2_keyboard_remove(struct device *dev){
+	struct ps2_keyboard *keyboard = dev->driver_data;
+	if(!keyboard) return 0;
+
+	int res = interrupt_unregister(keyboard->irq_no, _iqr_keyboard_handler, keyboard);
+	if(res){
+		printk("PS2: failed to unregister interrupt %d\n", res);
+		return res;
+	}
+	
+	kfree(keyboard);
+	return 0;
+}
+
+static const struct acpi_device_id ps2_keyboard_ids[] = {
+	{"PNP0303"},
+	{},
+};
+
+static struct acpi_driver ps2_keyboard_driver = {
+	.driver = {
+		.name = "ps2-keyboard",
+		.probe = ps2_keyboard_probe,
+		.remove = ps2_keyboard_remove,
+	},
+	.id_table = ps2_keyboard_ids,
+};
+
+static __init int ps2_driver_register(void){
+	return acpi_register_driver(&ps2_keyboard_driver);
+}
+
+device_initcall(ps2_driver_register);
