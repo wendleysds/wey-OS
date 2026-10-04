@@ -7,6 +7,8 @@
 #include <io/ports.h>
 #include <mm/kheap.h>
 
+#include "internal.h"
+
 //static uint8_t last_bus_id = 0;
 
 #define PCI_BAR_IO_MASK      (~0x3u)
@@ -320,6 +322,10 @@ static int pci_parse_device(struct pci_device* dev, uint8_t bus, uint8_t slot, u
 		return res;
 	}
 
+	device_initialize(&dev->dev);
+	dev->dev.bus = &pci_bus_type;
+	dev->dev.bus_data = dev;
+
 	return 0;
 }
 
@@ -332,6 +338,33 @@ static struct pci_device* alloc_pci_device(struct pci_bus *bus) {
 		dev->bus = bus;
 	}
 	return dev;
+}
+
+static void print_device(struct pci_device *device){
+	printk("PCI: %d:%d.%d: %04x:%04x\n", 
+		device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn),
+		device->vendor_id, device->device_id
+	);
+
+	struct pci_bar *bar = NULL;
+	for (int i = 0; i < 6; i++) {
+		bar = device->header_type == PCI_HEADER_TYPE_BRIDGE ?
+					&device->header.bridge.bars[i] :
+					&device->header.general.bars[i];
+		if(bar->index && bar->size){
+			if(bar->type == PCI_BAR_UNUSED) continue;
+			printk("PCI:   BAR[%d]: %s: %#llx - %#llx",
+				i,
+				(bar->type == PCI_BAR_IO) ? "IO" : "MEM",
+				bar->base,
+				bar->base + bar->size
+			);
+
+			if(bar->prefetchable) printk(" [prft]");
+
+			printk("\n");
+		}
+	}
 }
 
 int pci_scan_bus(struct pci_bus *bus) {
@@ -348,11 +381,19 @@ int pci_scan_bus(struct pci_bus *bus) {
 			continue;
 		} parsed++;
 
+		if(device_register(&device->dev)){
+			printk("PCI: %d:%d.%d: failed to register device\n",
+				device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
+			continue;
+		}
+
+		print_device(device);
 		list_add_tail(&device->node, &bus->devices);
 
 		uint8_t tmp = device->header_type;
 		device = alloc_pci_device(bus);
 
+		// Check if has more functions (Bit 7)
 		if (!BIT_CHECK(tmp, 7)) {
 			continue;
 		}
@@ -364,6 +405,13 @@ int pci_scan_bus(struct pci_bus *bus) {
 				continue;
 			} parsed++;
 
+			if(device_register(&device->dev)){
+				printk("PCI: %d:%d.%d: failed to register device\n",
+					device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
+				continue;
+			}
+
+			print_device(device);
 			list_add_tail(&device->node, &bus->devices);
 
 			device = alloc_pci_device(bus);
@@ -373,9 +421,15 @@ int pci_scan_bus(struct pci_bus *bus) {
 	}
 
 	if (device) {
-			kfree(device);
-		}
+		kfree(device);
+	}
 
 	return parsed;
 }
 
+static __init int pci_bus_type_register(void){
+	bus_register(&pci_bus_type);
+	return 0;
+}
+
+core_initcall(pci_bus_type_register);

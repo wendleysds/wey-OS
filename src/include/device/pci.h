@@ -2,6 +2,7 @@
 #define _PCI_H
 
 #include <sync/spinlock.h>
+#include <kernel/device.h>
 #include <lib/list.h>
 
 #include <stdint.h>
@@ -368,6 +369,8 @@ struct pci_header_cardbus {
 */
 
 struct pci_device {
+    struct device dev;
+
     struct pci_bus *bus;
 	spinlock_t lock;
 
@@ -415,6 +418,7 @@ struct pci_device {
 */
 
 struct pci_driver {
+    struct device_driver driver;
     const char *name;
 
     const struct pci_device_id *id_table;
@@ -427,8 +431,6 @@ struct pci_driver {
     void (*remove)(
         struct pci_device *dev
     );
-
-    struct list_head node;
 };
 
 

@@ -1,6 +1,8 @@
 #include <device/pci.h>
 #include <io/ports.h>
 
+#include "internal.h"
+
 // Mechanism #1
 #define PCI_M1_ADDRESS_PORT 0xCF8
 #define PCI_M1_DATA_PORT    0xCFC
@@ -65,7 +67,7 @@ const struct pci_config_ops pci_config_ops_m1 = {
 
 // ...
 
-// Wrapper functions
+// Wrapper functions for devices
 
 uint8_t pci_read8(struct pci_device *dev, uint16_t offset){
 	return dev->bus->config->read8(
@@ -122,4 +124,30 @@ void pci_write32(struct pci_device *dev, uint16_t offset, uint32_t value){
 		offset,
 		value
 	);
+}
+
+// Raw functions
+
+void pci_raw_write32(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint32_t value){
+	pci_config_write32(bus, device, function, offset, value);
+}
+
+void pci_raw_write16(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint16_t value){
+	pci_config_write16(bus, device, function, offset, value);
+}
+
+void pci_raw_write8(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint8_t value){
+	pci_config_write8(bus, device, function, offset, value);
+}
+
+uint32_t pci_raw_read32(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset){
+	return pci_config_read32(bus, device, function, offset);
+}
+
+uint16_t pci_raw_read16(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset){
+	return pci_config_read16(bus, device, function, offset);
+}
+
+uint8_t pci_raw_read8(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset){
+	return pci_config_read8(bus, device, function, offset);
 }
