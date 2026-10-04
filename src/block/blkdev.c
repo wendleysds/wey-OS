@@ -139,7 +139,6 @@ int add_disk(struct gendisk* disk){
 	disk->bdev = bdev;
 
 	struct device* dev = &bdev->dev;
-	dev->type = DEVICE_CLASS_BLOCK;
 	dev->devt = MKDEV(disk->major, disk->first_minor);
 	dev->driver_data = bdev;
 	dev->name = disk->name;
