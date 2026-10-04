@@ -18,17 +18,17 @@
 [x] BAR detection
 [x] BAR size
 [x] capabilities
-[ ] find capabilities
+[x] find capabilities
 [x] driver registry
 [x] device/driver matching
 [x] probe()
 [x] pci_enable_device()
+[x] PCI bridge recursion
 [ ] bus mastering
 [ ] MMIO mapping
 [ ] IRQ
 [ ] MSI
 [ ] MSI-X
-[ ] PCI bridge recursion -> pain (last)
 */
 
 static LIST_HEAD(pci_busses);
@@ -46,15 +46,33 @@ struct bus_type pci_bus_type = {
 	.remove = pci_device_remove,
 };
 
-static struct pci_bus* alloc_pci_bus(const struct pci_config_ops* ops){
-	struct pci_bus* bus = kzalloc(sizeof(struct pci_bus));
-	if(bus){
+struct pci_bus *pci_alloc_bus(const struct pci_config_ops *ops){
+	struct pci_bus *bus = kzalloc(sizeof(struct pci_bus));
+	if (bus) {
 		INIT_LIST_HEAD(&bus->devices);
 		INIT_LIST_HEAD(&bus->node);
 		bus->config = ops;
 	}
 
 	return bus;
+}
+
+struct pci_bus *pci_find_bus(uint8_t number){
+	struct pci_bus *bus;
+
+	list_for_each_entry(bus, &pci_busses, node) {
+		if (bus->number == number)
+			return bus;
+	}
+
+	return NULL;
+}
+
+void pci_add_bus(struct pci_bus *bus){
+	if (!bus || !list_empty(&bus->node))
+		return;
+
+	list_add_tail(&bus->node, &pci_busses);
 }
 
 int pci_register_driver(struct pci_driver *driver){
@@ -76,31 +94,18 @@ static __init int pci_init(void){
 	// For now we just assume mechanism #1 (Ports)
 	pci_set_config_ops(&pci_config_ops_m1);
 
-	struct pci_bus* bus = alloc_pci_bus(pci_config_ops);
+	struct pci_bus *root = pci_alloc_bus(pci_config_ops);
+	if (!root)
+		return -ENOMEM;
 
-	int res = 0;
-	for(uint16_t busnum = 0; busnum < 256; busnum++){
-		if(!bus) return -ENOMEM;
-		bus->number = busnum;
+	root->number = 0;
+	pci_add_bus(root);
 
-		if((res = pci_scan_bus(bus)) < 0){
-			return res;
-		}
+	int res = pci_scan_bus(root);
+	if (res < 0)
+		return res;
 
-		if(res == 0){
-			continue;
-		} 
-
-		list_add_tail(&bus->node, &pci_busses);
-
-		bus = alloc_pci_bus(pci_config_ops);
-	}
-
-	if(bus){
-		kfree(bus);
-	}
-
-	return res;
+	return SUCCESS;
 }
 
 subsys_initcall(pci_init);

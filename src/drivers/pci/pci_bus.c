@@ -9,7 +9,7 @@
 
 #include "internal.h"
 
-//static uint8_t last_bus_id = 0;
+static uint8_t next_bus_number = 1;
 
 #define PCI_BAR_IO_MASK      (~0x3u)
 #define PCI_BAR_MEM_MASK     (~0xFULL)
@@ -346,25 +346,132 @@ static void print_device(struct pci_device *device){
 		device->vendor_id, device->device_id
 	);
 
-	struct pci_bar *bar = NULL;
-	for (int i = 0; i < 6; i++) {
-		bar = device->header_type == PCI_HEADER_TYPE_BRIDGE ?
+	uint8_t header_type = device->header_type & PCI_HEADER_TYPE_MASK;
+	int bar_count = (header_type == PCI_HEADER_TYPE_BRIDGE) ? 2 : 6;
+
+	for (int i = 0; i < bar_count; i++) {
+		struct pci_bar *bar = (header_type == PCI_HEADER_TYPE_BRIDGE) ?
 					&device->header.bridge.bars[i] :
 					&device->header.general.bars[i];
-		if(bar->index && bar->size){
-			if(bar->type == PCI_BAR_UNUSED) continue;
-			printk("PCI:   BAR[%d]: %s: %#llx - %#llx",
-				i,
-				(bar->type == PCI_BAR_IO) ? "IO" : "MEM",
-				bar->base,
-				bar->base + bar->size
-			);
 
-			if(bar->prefetchable) printk(" [prft]");
+		if (bar->type == PCI_BAR_UNUSED || !bar->size)
+			continue;
 
-			printk("\n");
-		}
+		printk("PCI:   BAR[%d]: %s: %#llx - %#llx",
+			i,
+			(bar->type == PCI_BAR_IO) ? "IO" : "MEM",
+			bar->base,
+			bar->base + bar->size
+		);
+
+		if (bar->prefetchable)
+			printk(" [prft]");
+
+		printk("\n");
 	}
+}
+
+static void pci_write_bridge_buses(
+	struct pci_device *dev,
+	uint8_t primary,
+	uint8_t secondary,
+	uint8_t subordinate
+){
+	uint32_t dw = pci_read32(dev, PCI_CONFIG_BRIDGE_PRIMARY_BUS);
+
+	dw = (dw & 0xFF000000)
+	   | primary
+	   | ((uint32_t)secondary << 8)
+	   | ((uint32_t)subordinate << 16);
+
+	pci_write32(dev, PCI_CONFIG_BRIDGE_PRIMARY_BUS, dw);
+
+	dev->header.bridge.primary_bus_number = primary;
+	dev->header.bridge.secondary_bus_number = secondary;
+	dev->header.bridge.subordinate_bus_number = subordinate;
+}
+
+int pci_scan_bridge(struct pci_bus *parent, struct pci_device *dev){
+	if (!parent || !dev)
+		return -EINVAL;
+
+	if ((dev->header_type & PCI_HEADER_TYPE_MASK) != PCI_HEADER_TYPE_BRIDGE)
+		return 0;
+
+	struct pci_header_bridge *hdr = &dev->header.bridge;
+	uint8_t primary = parent->number;
+	uint8_t secondary;
+	uint8_t subordinate;
+	bool assigned = false;
+
+	/*
+	 * Prefer firmware-assigned bus numbers when they look valid.
+	 * Otherwise allocate a fresh secondary bus and leave subordinate
+	 * open (0xFF) until the recursive scan finishes.
+	 */
+	if (hdr->secondary_bus_number > primary) {
+		secondary = hdr->secondary_bus_number;
+		subordinate = hdr->subordinate_bus_number;
+
+		uint8_t end = (subordinate >= secondary) ? subordinate : secondary;
+		if (end >= next_bus_number)
+			next_bus_number = (uint8_t)(end + 1);
+	} else {
+		if (next_bus_number == 0)
+			return -EINVAL;
+
+		assigned = true;
+		secondary = next_bus_number++;
+		subordinate = 0xFF;
+		pci_write_bridge_buses(dev, primary, secondary, subordinate);
+	}
+
+	if (pci_find_bus(secondary)) {
+		printk("PCI: %d:%d.%d: secondary bus %d already enumerated\n",
+			dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
+			secondary);
+		return 0;
+	}
+
+	struct pci_bus *child = pci_alloc_bus(parent->config);
+	if (!child)
+		return -ENOMEM;
+
+	child->number = secondary;
+	child->parent = parent;
+	pci_add_bus(child);
+
+	printk("PCI: %d:%d.%d: bridge -> bus %d\n",
+		dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
+		secondary);
+
+	int res = pci_scan_bus(child);
+	if (res < 0)
+		return res;
+
+	if (assigned) {
+		subordinate = next_bus_number - 1;
+		pci_write_bridge_buses(dev, primary, secondary, subordinate);
+	}
+
+	return res;
+}
+
+static int pci_register_parsed_device(struct pci_bus *bus, struct pci_device *device){
+	if (device_register(&device->dev)) {
+		printk("PCI: %d:%d.%d: failed to register device\n",
+			device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
+		kfree(device);
+		return 0;
+	}
+
+	print_device(device);
+	list_add_tail(&device->node, &bus->devices);
+
+	if ((device->header_type & PCI_HEADER_TYPE_MASK) == PCI_HEADER_TYPE_BRIDGE)
+		return pci_scan_bridge(bus, device);
+
+	return 0;
 }
 
 int pci_scan_bus(struct pci_bus *bus) {
@@ -375,54 +482,46 @@ int pci_scan_bus(struct pci_bus *bus) {
 	int parsed = 0;
 
 	for (uint8_t slot = 0; slot < 32; slot++) {
-		if(!device) return -ENOMEM;
+		if (!device)
+			return -ENOMEM;
 
-		if (pci_parse_device(device, bus->number, slot, 0) != 0) {
+		if (pci_parse_device(device, bus->number, slot, 0) != 0)
 			continue;
-		} parsed++;
 
-		if(device_register(&device->dev)){
-			printk("PCI: %d:%d.%d: failed to register device\n",
-				device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
-			continue;
-		}
+		parsed++;
 
-		print_device(device);
-		list_add_tail(&device->node, &bus->devices);
+		struct pci_device *registered = device;
+		uint8_t header_type = registered->header_type;
 
-		uint8_t tmp = device->header_type;
 		device = alloc_pci_device(bus);
 
-		// Check if has more functions (Bit 7)
-		if (!BIT_CHECK(tmp, 7)) {
+		int res = pci_register_parsed_device(bus, registered);
+		if (res < 0)
+			return res;
+
+		if (!(header_type & PCI_HEADER_MULTIFUNCTION))
 			continue;
-		}
 
 		for (uint8_t func = 1; func < 8; func++) {
-			if(!device) return -ENOMEM;
-			
-			if (pci_parse_device(device, bus->number, slot, func) != 0) {
+			if (!device)
+				return -ENOMEM;
+
+			if (pci_parse_device(device, bus->number, slot, func) != 0)
 				continue;
-			} parsed++;
 
-			if(device_register(&device->dev)){
-				printk("PCI: %d:%d.%d: failed to register device\n",
-					device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
-				continue;
-			}
+			parsed++;
 
-			print_device(device);
-			list_add_tail(&device->node, &bus->devices);
-
+			registered = device;
 			device = alloc_pci_device(bus);
+
+			res = pci_register_parsed_device(bus, registered);
+			if (res < 0)
+				return res;
 		}
-
-		continue;
 	}
 
-	if (device) {
+	if (device)
 		kfree(device);
-	}
 
 	return parsed;
 }

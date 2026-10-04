@@ -10,6 +10,12 @@ static inline void pci_set_config_ops(const struct pci_config_ops *ops){
 	pci_config_ops = ops;
 }
 
+struct pci_bus *pci_alloc_bus(const struct pci_config_ops *ops);
+struct pci_bus *pci_find_bus(uint8_t number);
+void pci_add_bus(struct pci_bus *bus);
+
+int pci_scan_bridge(struct pci_bus *parent, struct pci_device *dev);
+
 static inline void pci_config_write8(unsigned char bus, unsigned char dev, unsigned char fn, unsigned char off, uint8_t val){
 	pci_config_ops->write8(bus, dev, fn, off, val);
 }
