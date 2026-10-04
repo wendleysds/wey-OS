@@ -12,3 +12,6 @@ void acpi_unmap(void __iomem* virt);
 struct acpi_sdt_header *acpi_parse_sdt_header(paddr_t physaddr);
 int acpi_add_table(paddr_t physaddr);
 void acpi_remove_table(paddr_t physaddr);
+
+struct aml_object;
+void acpi_register_device(struct aml_object *obj);

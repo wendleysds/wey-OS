@@ -2,8 +2,7 @@
 #define _UAPI_TERMIOS_H
 
 #include <stdint.h>
-
-#define BIT(x) (1ULL << (x))
+#include <def/bits.h>
 
 #define NCCS 31
 
