@@ -10,6 +10,8 @@
 
 struct mm_struct;
 struct wait_queue_entry;
+struct file_table;
+struct file;
 
 typedef enum {
 	TASK_NEW,
@@ -24,7 +26,7 @@ struct task {
 	struct registers regs;
 
 	char name[PROC_NAME_MAX];
-	struct file* file_table[PROC_FD_MAX];	
+	struct file_table *files;
 	void* kstack;
 	
 	struct list_head tasks;
@@ -46,6 +48,9 @@ struct task {
 struct task* task_create(const char* name, int priority);
 void task_exit(struct task* task, int status);
 void task_destroy(struct task* task);
+
+int task_add_file(struct task* task, struct file* file);
+int task_remove_file(struct task* task, int fd);
 
 struct task* task_get_child(struct task* parent, pid_t pid);
 struct task* task_find_zombie_child(struct task* parent);

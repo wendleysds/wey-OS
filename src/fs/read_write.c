@@ -1,4 +1,5 @@
 #include <fs/vfs.h>
+#include <fs/fdtable.h>
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <kernel/uaccess.h>
@@ -6,15 +7,21 @@
 #include <def/errno.h>
 
 static int get_proc_file(int fd, struct file **out){
-	if(fd < 0 || fd > PROC_FD_MAX){
+	struct file_table *table = current->files;
+	spin_lock(&table->lock);
+
+	if(fd < 0 || fd > table->capacity || !out){
+		spin_unlock(&table->lock);
 		return -EBADF;
 	}
 
-	*out = current->file_table[fd];
+	*out = table->files[fd];
 	if(!*out){
+		spin_unlock(&table->lock);
 		return -EBADF;
 	}
 
+	spin_unlock(&table->lock);
 	return 0;
 }
 

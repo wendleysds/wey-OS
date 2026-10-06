@@ -127,9 +127,9 @@ int file_table_add_file(struct file_table* table, struct file* file) {
 	return fd;
 }
 
-void file_table_remove_file(struct file_table* table, int fd) {
+int file_table_remove_file(struct file_table* table, int fd) {
 	if (!table || fd < 0 || (size_t)fd >= PROC_FD_TABLE_MAX_CAPACITY) {
-		return;
+		return -EBADF;
 	}
 
 	spin_lock(&table->lock);
@@ -146,10 +146,11 @@ void file_table_remove_file(struct file_table* table, int fd) {
 		spin_unlock(&table->lock);
 
 		file_put(f);
-		return;
+		return 0;
 	}
 
 	spin_unlock(&table->lock);
+	return -EBADF;
 }
 
 void file_table_destroy(struct file_table* table) {

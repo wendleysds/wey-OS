@@ -1,5 +1,6 @@
 #include <kernel/sched.h>
 #include <kernel/syscall.h>
+#include <fs/fdtable.h>
 #include <def/errno.h>
 #include <mm/vma.h>
 
@@ -11,16 +12,24 @@ static struct task *copy_process() {
 		return ERR_PTR(-ENOMEM);
 	}
 
+	child->files = file_table_clone(cur->files);
+	if(!child->files){
+		kfree(child);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	pid_t child_pid = pid_alloc();
 	if(child_pid < 0){
+		file_table_destroy(child->files);
 		kfree(child);
 		return ERR_PTR(-ENOENT);
 	}
 
 	void *new_kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
 	if (!new_kstack) {
-		kfree(child);
+		file_table_destroy(child->files);
 		pid_free(child_pid);
+		kfree(child);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -29,21 +38,14 @@ static struct task *copy_process() {
 
 	struct mm_struct *c_mm = vma_dup(cur->mm);
 	if (!c_mm) {
+		file_table_destroy(child->files);
 		kfree(new_kstack);
-		kfree(child);
 		pid_free(child_pid);
+		kfree(child);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	child->mm = c_mm;
-
-	for (int i = 0; i < PROC_FD_MAX; i++) {
-		child->file_table[i] = cur->file_table[i];
-		if (child->file_table[i]){
-			file_get(child->file_table[i]);
-		}
-	}
-
 	child->parent = cur;
 	list_add(&child->sibling, &cur->children);
 

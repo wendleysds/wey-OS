@@ -10,6 +10,7 @@
 #include <def/linker.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <fs/fdtable.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
 #include <mm/page.h>
@@ -82,13 +83,11 @@ static __init int rest_init(void* unused){
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
 	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
 
-	// stdin  - 0
-	// stdout - 1
-	// stderr - 2
+	task_add_file(current, tty); // stdin   0
+	task_add_file(current, tty); // stdout  1
+	task_add_file(current, tty); // stderr  2
 
-	current->file_table[0] = tty;
-	file_get(tty);
-	current->file_table[1] = tty;
+	file_put(tty);
 
 	init();
 

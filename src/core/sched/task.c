@@ -3,6 +3,8 @@
 #include <kernel/wait.h>
 #include <lib/assert.h>
 #include <lib/string.h>
+#include <fs/fdtable.h>
+#include <def/errno.h>
 #include <mm/vma.h>
 
 struct task* init_task;
@@ -13,7 +15,7 @@ struct task* task_create(const char* name, int priority){
 		memset(new_task, 0, sizeof(struct task)); 
 		strncpy(new_task->name, name, PROC_NAME_MAX); 
 		new_task->priority = priority; 
-		new_task->state = TASK_NEW; 
+		new_task->state = TASK_NEW;
 		INIT_LIST_HEAD(&new_task->tasks); 
 		INIT_LIST_HEAD(&new_task->queue); 
 		INIT_LIST_HEAD(&new_task->children); 
@@ -30,15 +32,6 @@ static void task_destroy_mm(struct task* task){
 
 	vma_put(task->mm);
 	task->mm = NULL;
-}
-
-static void task_close_files(struct task* task){
-	for(int i = 0; i < PROC_FD_MAX; i++){
-		if(task->file_table[i] != NULL){
-			vfs_close(task->file_table[i]);
-			task->file_table[i] = NULL;
-		}
-	}
 }
 
 asmlinkage void task_sleep(struct task* task){
@@ -89,6 +82,29 @@ void task_exit(struct task* task, int status){
 	}
 }
 
+int task_add_file(struct task* task, struct file *file){
+	if(!task->files){
+		task->files = file_table_create(PROC_FD_TABLE_INITIAL_CAPACITY);
+		if(!task->files){
+			return -ENOMEM;
+		}
+	}
+	
+	return file_table_add_file(task->files, file);
+}
+
+int task_remove_file(struct task* task, int fd){
+	if (!task || fd < 0) {
+        return -EBADF;
+    }
+
+    if (!task->files) {
+        return -EBADF;
+    }
+
+	return file_table_remove_file(task->files, fd);
+}
+
 void task_destroy(struct task* task){
 	if(task->state != TASK_ZOMBIE){
 		panic("Attempting to destroy a non-zombie task (pid: %d, name: %s)", task->pid, task->name);
@@ -109,7 +125,7 @@ void task_destroy(struct task* task){
 		task->mm = NULL;
 	}
 
-	task_close_files(task);
+	file_table_destroy(task->files);
 
 	list_remove(&task->tasks);
 	list_remove(&task->sibling);
