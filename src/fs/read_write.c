@@ -164,3 +164,13 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 
 	return total_read;
 }
+
+SYSCALL_DEFINE3(lseek, int, fd, int, offset, int, whence){
+	struct file *file;
+	int ret = get_proc_file(fd, &file);
+	if(ret){
+		return ret;
+	}
+
+	return vfs_lseek(file, offset, whence);
+}
