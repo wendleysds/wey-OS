@@ -55,7 +55,7 @@ SYSCALL_DEFINE3(waitpid, pid_t, pid, int*, wstatus, int, options){
 		if(pid > 0){
 			child = task_get_child(current, pid);
 			if(!child){
-				return -ENOENT;
+				return -ECHILD;
 			}
 		}else{
 			child = task_find_zombie_child(current);
