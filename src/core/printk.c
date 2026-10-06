@@ -29,13 +29,14 @@ void printk_show_buffer(){
 		start = printk_cursor - PRINTK_BUFFER_SIZE; 
 	}
 
+	uint64_t count = printk_cursor - start;
 	uint64_t start_idx = start % PRINTK_BUFFER_SIZE;
-	uint64_t end_idx = printk_cursor % PRINTK_BUFFER_SIZE;
-	if(start_idx < end_idx){
-		_printk_ech(&printk_circular_buffer[start_idx], end_idx - start_idx);
+	if(start_idx + count <= PRINTK_BUFFER_SIZE){
+		_printk_ech(&printk_circular_buffer[start_idx], count);
 	}else{
-		_printk_ech(&printk_circular_buffer[start_idx], PRINTK_BUFFER_SIZE - start_idx);
-		_printk_ech(&printk_circular_buffer[0], end_idx);
+		uint64_t first_len = PRINTK_BUFFER_SIZE - start_idx;
+		_printk_ech(&printk_circular_buffer[start_idx], first_len);
+		_printk_ech(&printk_circular_buffer[0], count - first_len);
 	}
 }
 
@@ -47,18 +48,26 @@ int printk(const char* restrict fmt, ...){
 	va_list args;
 	va_start(args, fmt);
 
-	int cursor_start = printk_cursor;
+	uint64_t cursor_start = printk_cursor;
 
 	int ret = vprintfmt(printk_write_char, NULL, fmt, args);
 
-	int cursor_end = printk_cursor;
+	uint64_t cursor_end = printk_cursor;
 	
-	if(_printk_ech){
-		if(cursor_start < cursor_end){
-			_printk_ech(&printk_circular_buffer[cursor_start], cursor_end - cursor_start);
+	if(_printk_ech && cursor_start < cursor_end){
+		uint64_t count = cursor_end - cursor_start;
+		if (count > PRINTK_BUFFER_SIZE) {
+			cursor_start = cursor_end - PRINTK_BUFFER_SIZE;
+			count = PRINTK_BUFFER_SIZE;
+		}
+
+		uint64_t start_idx = cursor_start % PRINTK_BUFFER_SIZE;
+		if(start_idx + count <= PRINTK_BUFFER_SIZE){
+			_printk_ech(&printk_circular_buffer[start_idx], count);
 		}else{
-			_printk_ech(&printk_circular_buffer[cursor_start], PRINTK_BUFFER_SIZE - cursor_start);
-			_printk_ech(&printk_circular_buffer[0], cursor_end);
+			uint64_t first_len = PRINTK_BUFFER_SIZE - start_idx;
+			_printk_ech(&printk_circular_buffer[start_idx], first_len);
+			_printk_ech(&printk_circular_buffer[0], count - first_len);
 		}
 	}
 
