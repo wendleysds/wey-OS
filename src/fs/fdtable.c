@@ -78,6 +78,14 @@ struct file_table *file_table_clone(struct file_table *table) {
 	return new_table;
 }
 
+/*
+ * @brief Adds a file to the file table
+ * @param table The file table to add the file to
+ * @param file The file to add
+ * @return The file descriptor on success, negative value on error
+ *
+ * @note On success the table will hold a reference to the file.
+ */
 int file_table_add_file(struct file_table* table, struct file* file) {
 	if (!table || !file) return -EINVAL;
 
@@ -127,6 +135,14 @@ int file_table_add_file(struct file_table* table, struct file* file) {
 	return fd;
 }
 
+/*
+ * @brief Removes a file from the file table
+ * @param table The file table to remove the file from
+ * @param fd The file descriptor to remove
+ * @return 0 on success, negative value on error
+ *
+ * @note On success the table will release its reference to the file.
+ */
 int file_table_remove_file(struct file_table* table, int fd) {
 	if (!table || fd < 0 || (size_t)fd >= PROC_FD_TABLE_MAX_CAPACITY) {
 		return -EBADF;

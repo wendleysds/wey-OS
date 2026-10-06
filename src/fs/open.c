@@ -1,4 +1,8 @@
 #include <def/errno.h>
+#include <kernel/syscall.h>
+#include <kernel/sched.h>
+#include <kernel/uaccess.h>
+#include <fs/fdtable.h>
 #include <fs/vfs.h>
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
@@ -69,4 +73,38 @@ int vfs_close(struct file *file){
 	}
 
 	return res;
+}
+
+SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mode){
+	char kpath[PATH_MAX];
+	int ret = copy_from_user(kpath, path, PATH_MAX);
+	if(ret){
+		return -EFAULT;
+	}
+	
+	struct file* f = vfs_open(kpath, flags, mode);
+	if(IS_ERR(f)){
+		return PTR_ERR(f);
+	}
+
+	f->pos = 0;
+
+	int fd = task_add_file(current, f);
+	file_put(f); // file_table now holds a reference, so we can release ours
+
+	if(IS_ERR_VALUE(fd)){
+		return fd;
+	}
+
+	return fd;
+}
+
+SYSCALL_DEFINE1(close, int, fd){
+	int res = task_remove_file(current, fd);
+
+	if(IS_ERR_VALUE(res)){
+		return res;
+	}
+
+	return SUCCESS;
 }

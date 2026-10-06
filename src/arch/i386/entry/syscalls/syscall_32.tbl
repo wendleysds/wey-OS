@@ -2,8 +2,8 @@
 1 i386 exit sys_exit
 2 i386 read sys_read
 3 i386 write sys_write
-#4 i386 open sys_open
-#5 i386 close sys_close
+4 i386 open sys_open
+5 i386 close sys_close
 #6 i386 lseek sys_lseek
 #7 i386 execve sys_execve
 8 i386 fork sys_fork
@@ -20,6 +20,11 @@
 #19 i386 rmdir sys_rmdir
 #20 i386 ioctl sys_ioctl
 #21 i386 reboot sys_reboot
+#22 i386 clone sys_clone
+#23 i386 mount sys_mount
+#24 i386 umount sys_umount
+#25 i386 spawn sys_spawn
+#26 i386 dup sys_dup
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write

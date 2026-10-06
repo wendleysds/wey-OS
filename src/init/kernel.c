@@ -20,6 +20,7 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 extern void setup_arch();
+extern struct task* init_task;
 
 static inline void module_load(const char* module_name, int (*func)(void)){
 	int res = func();
@@ -78,6 +79,8 @@ static __no_return void init(void){
 }
 
 static __init int rest_init(void* unused){
+	init_task = current;
+
 	do_initcalls();
 
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
@@ -87,7 +90,7 @@ static __init int rest_init(void* unused){
 	task_add_file(current, tty); // stdout  1
 	task_add_file(current, tty); // stderr  2
 
-	file_put(tty);
+	file_put(tty); // file_table now holds a reference, so we can release ours
 
 	init();
 
