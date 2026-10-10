@@ -14,13 +14,14 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	struct inode *parent = NULL;
 	struct inode *ino = NULL;
 	struct qstr last;
+	int trailing_slash = 0;
 
 	if (flags & O_CREAT) {
 		if (flags & O_DIRECTORY) {
 			return ERR_PTR(-ENOENT);
 		}
 
-		parent = vfs_walk_parent(path, &last);
+		parent = vfs_walk_parent(path, &last, &trailing_slash);
 		if (IS_ERR(parent)) {
 
 			// Edge case: opening "/" as a directory
@@ -35,8 +36,12 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 				return ERR_CAST(parent);
 			}
 		} else {
+			if (trailing_slash) {
+				inode_put(parent);
+				return ERR_PTR(-ENOENT);
+			}
+
 			ino = parent->i_op->lookup(parent, &last);
-			
 			if (IS_ERR(ino)) {
 				inode_put(parent);
 				return ERR_CAST(ino);

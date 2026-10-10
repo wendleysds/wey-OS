@@ -187,7 +187,7 @@ int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res);
 int vfs_walk_path(const char *path, struct path *res);
 
 struct inode* vfs_lookup(struct inode *parent, struct qstr *name);
-struct inode* vfs_walk_parent(const char *path, struct qstr *last);
+struct inode* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash);
 struct inode* vfs_walk(const char *path);
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode);
@@ -209,7 +209,7 @@ int vfs_getattr(const char *restrict path, struct stat *restrict statbuf);
 void vfs_register_filesystem(struct file_system_type* fs);
 void vfs_unregister_filesystem(struct file_system_type* fs);
 
-int path_iterate(const char** cursor, struct qstr* comp);
+int path_iterate(const char** cursor, struct qstr *comp, int *has_trailing_slash);
 
 struct super_block* super_alloc();
 void destroy_super(struct super_block* sb);

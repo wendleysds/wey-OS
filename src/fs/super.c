@@ -56,7 +56,7 @@ static char *dup_mount_name(const char *mountpoint) {
 	struct qstr comp, last = {0};
 	const char *cursor = mountpoint;
 
-	while (path_iterate(&cursor, &comp)) {
+	while (path_iterate(&cursor, &comp, NULL)) {
 		last = comp;
 	}
 

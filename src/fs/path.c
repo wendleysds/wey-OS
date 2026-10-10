@@ -2,10 +2,11 @@
 #include <def/config.h>
 #include <def/errno.h>
 #include <fs/vfs.h>
+#include <fs/stat.h>
 
 extern struct mount *root_mount;
 
-int path_iterate(const char** cursor, struct qstr* comp){
+int path_iterate(const char** cursor, struct qstr *comp, int *has_trailing_slash) {
 	const char* path = *cursor;
 
 	while (*path == '/')
@@ -22,10 +23,24 @@ int path_iterate(const char** cursor, struct qstr* comp){
 
 	comp->len = path - comp->name;
 
-	*cursor = path;
+	const char *lookahead = path;
+	while (*lookahead == '/')
+		lookahead++;
 
+	if (*lookahead == '\0' && *path == '/') {
+		if (has_trailing_slash) {
+			*has_trailing_slash = 1;
+		}
+	} else {
+		if (has_trailing_slash) {
+			*has_trailing_slash = 0;
+		}
+	}
+
+	*cursor = path;
 	return 1;
 }
+
 
 int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
 	if (!parent->i_op || !parent->i_op->lookup)
@@ -56,8 +71,9 @@ int vfs_walk_path(const char *path, struct path *res) {
 
 	const char *cursor = path;
 	struct qstr comp;
+	int trailing_slash = 0;
 
-	while (path_iterate(&cursor, &comp)) {
+	while (path_iterate(&cursor, &comp, &trailing_slash)) {
 		struct path next;
 		int err = vfs_lookup_path(curr_ino, &comp, &next);
 		if (err != SUCCESS) {
@@ -66,7 +82,6 @@ int vfs_walk_path(const char *path, struct path *res) {
 		}
 
 		struct inode *next_ino = next.dentry;
-
 		inode_put(curr_ino);
 		curr_ino = next_ino;
 
@@ -81,12 +96,18 @@ int vfs_walk_path(const char *path, struct path *res) {
 		}
 	}
 
+	// POSIX: if path ends with slash, and the target is not a directory, return -ENOTDIR
+	if (trailing_slash && !S_ISDIR(curr_ino->mode)) {
+		inode_put(curr_ino);
+		return -ENOTDIR;
+	}
+
 	res->mount = curr_mnt;
 	res->dentry = curr_ino;
 	return SUCCESS;
 }
 
-struct inode* vfs_walk_parent(const char *path, struct qstr *last){
+struct inode* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash) {
 	if(!root_mount) return ERR_PTR(-EINVAL);
 
 	struct inode *cur = root_mount->mnt_root;
@@ -94,12 +115,18 @@ struct inode* vfs_walk_parent(const char *path, struct qstr *last){
 
 	struct qstr comp;
 	const char* cursor = path;
-	while(path_iterate(&cursor, &comp)){
+	int has_slash = 0;
+
+	while(path_iterate(&cursor, &comp, &has_slash)){
 		const char* tmp = cursor;
 		struct qstr next;
+		int next_has_slash = 0;
 
-		if(!path_iterate(&tmp, &next)){
+		if(!path_iterate(&tmp, &next, &next_has_slash)){
 			*last = comp;
+			if (trailing_slash) {
+				*trailing_slash = has_slash;
+			}
 			return cur;
 		}
 
