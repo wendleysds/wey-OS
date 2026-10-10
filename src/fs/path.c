@@ -3,6 +3,7 @@
 #include <def/errno.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <fs/dcache.h>
 
 extern struct mount *root_mount;
 
@@ -41,14 +42,22 @@ int path_iterate(const char** cursor, struct qstr *comp, int *has_trailing_slash
 	return 1;
 }
 
-
-int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res){
-	if (!parent->i_op || !parent->i_op->lookup)
+int vfs_lookup_path(struct dentry *parent, struct qstr *name, struct path *res){
+	if (!parent->inode->i_op || !parent->inode->i_op->lookup)
 		return -ENOSYS;
 
-	struct inode *child = parent->i_op->lookup(parent, name);
-	if (IS_ERR_OR_NULL(child))
-		return child ? PTR_ERR(child) : -ENOENT;
+	struct dentry *child = dcache_lookup(parent, name);
+	if (!child) {
+		struct inode *ino = parent->inode->i_op->lookup(parent->inode, name);
+		if (IS_ERR_OR_NULL(ino))
+			return ino ? PTR_ERR(ino) : -ENOENT;
+
+		child = dcache_add(parent, name, ino);
+		inode_put(ino);
+		if (!child){
+			return -ENOMEM;
+		}
+	}
 
 	res->dentry = child;
 	res->mount = NULL;
@@ -66,8 +75,8 @@ int vfs_walk_path(const char *path, struct path *res) {
 	if (!root_mount) return -EINVAL;
 
 	struct mount *curr_mnt = root_mount;
-	struct inode *curr_ino = root_mount->mnt_root;
-	inode_get(curr_ino);
+	struct dentry *curr_dentry = root_mount->mnt_root;
+	dentry_get(curr_dentry);
 
 	const char *cursor = path;
 	struct qstr comp;
@@ -75,43 +84,43 @@ int vfs_walk_path(const char *path, struct path *res) {
 
 	while (path_iterate(&cursor, &comp, &trailing_slash)) {
 		struct path next;
-		int err = vfs_lookup_path(curr_ino, &comp, &next);
+		int err = vfs_lookup_path(curr_dentry, &comp, &next);
 		if (err != SUCCESS) {
-			inode_put(curr_ino);
+			dentry_put(curr_dentry);
 			return err;
 		}
 
-		struct inode *next_ino = next.dentry;
-		inode_put(curr_ino);
-		curr_ino = next_ino;
+		struct dentry *next_dentry = next.dentry;
+		dentry_put(curr_dentry);
+		curr_dentry = next_dentry;
 
 		if (next.mount) {
 			struct mount *next_mnt = next.mount;
-			struct inode *mounted_root = next_mnt->mnt_root;
+			struct dentry *mounted_root = next_mnt->mnt_root;
 
-			inode_get(mounted_root);
-			inode_put(curr_ino);
-			curr_ino = mounted_root;
+			dentry_get(mounted_root);
+			dentry_put(curr_dentry);
+			curr_dentry = mounted_root;
 			curr_mnt = next_mnt;
 		}
 	}
 
 	// POSIX: if path ends with slash, and the target is not a directory, return -ENOTDIR
-	if (trailing_slash && !S_ISDIR(curr_ino->mode)) {
-		inode_put(curr_ino);
+	if (trailing_slash && !S_ISDIR(curr_dentry->inode->mode)) {
+		dentry_put(curr_dentry);
 		return -ENOTDIR;
 	}
 
 	res->mount = curr_mnt;
-	res->dentry = curr_ino;
+	res->dentry = curr_dentry;
 	return SUCCESS;
 }
 
-struct inode* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash) {
+struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash) {
 	if(!root_mount) return ERR_PTR(-EINVAL);
 
-	struct inode *cur = root_mount->mnt_root;
-	inode_get(cur);
+	struct dentry *cur = root_mount->mnt_root;
+	dentry_get(cur);
 
 	struct qstr comp;
 	const char* cursor = path;
@@ -133,27 +142,27 @@ struct inode* vfs_walk_parent(const char *path, struct qstr *last, int *trailing
 		struct path next_path;
 		int err = vfs_lookup_path(cur, &comp, &next_path);
 		if (err != SUCCESS) {
-			inode_put(cur);
+			dentry_put(cur);
 			return ERR_PTR(err);
 		}
 
-		struct inode *child = next_path.dentry;
-		inode_put(cur);
+		struct dentry *child = next_path.dentry;
+		dentry_put(cur);
 		cur = child;
 
 		if (next_path.mount) {
-			struct inode *mounted_root = next_path.mount->mnt_root;
-			inode_get(mounted_root);
-			inode_put(cur);
+			struct dentry *mounted_root = next_path.mount->mnt_root;
+			dentry_get(mounted_root);
+			dentry_put(cur);
 			cur = mounted_root;
 		}
 	}
 
-	inode_put(cur);
+	dentry_put(cur);
 	return ERR_PTR(-EINVAL);
 }
 
-struct inode* vfs_walk(const char *path){
+struct dentry* vfs_walk(const char *path){
 	if(!root_mount) return ERR_PTR(-EINVAL);
 
 	struct path p;

@@ -42,6 +42,7 @@
 #define ATTR_CTIME (1 << 5)
 
 struct mount;
+struct dentry;
 
 struct inode {
 	uint64_t ino;
@@ -162,9 +163,8 @@ struct super_operations{
 };
 
 struct mount {
-	char *name;
-	struct inode *mnt_root;
-	struct inode *mnt_mountpoint;
+	struct dentry *mnt_root;
+	struct dentry *mnt_mountpoint;
 	struct super_block *mnt_sb;
 
 	struct mount *parent;
@@ -174,7 +174,7 @@ struct mount {
 
 struct path {
 	struct mount *mount;
-	struct inode *dentry;
+	struct dentry *dentry;
 };
 
 extern const struct file_operations def_blk_fops;
@@ -183,12 +183,12 @@ extern const struct file_operations def_chr_fops;
 int vfs_mount(const char* source, const char *mountpoint, const char *filesystemtype, unsigned int flags, void* data);
 int vfs_umount(const char *mountpoint);
 
-int vfs_lookup_path(struct inode *parent, struct qstr *name, struct path *res);
+int vfs_lookup_path(struct dentry *parent, struct qstr *name, struct path *res);
 int vfs_walk_path(const char *path, struct path *res);
 
-struct inode* vfs_lookup(struct inode *parent, struct qstr *name);
-struct inode* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash);
-struct inode* vfs_walk(const char *path);
+struct dentry* vfs_lookup(struct dentry *parent, struct qstr *name);
+struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash);
+struct dentry* vfs_walk(const char *path);
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode);
 

@@ -5,6 +5,7 @@
 #include <fs/fdtable.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <fs/dcache.h>
 
 extern struct mount *root_mount;
 
@@ -12,7 +13,10 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	if (!path) return ERR_PTR(-EINVAL);
 
 	struct inode *parent = NULL;
+	struct dentry *parent_dentry = NULL;
+
 	struct inode *ino = NULL;
+
 	struct qstr last;
 	int trailing_slash = 0;
 
@@ -21,12 +25,12 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 			return ERR_PTR(-ENOENT);
 		}
 
-		parent = vfs_walk_parent(path, &last, &trailing_slash);
-		if (IS_ERR(parent)) {
+		parent_dentry = vfs_walk_parent(path, &last, &trailing_slash);
+		if (IS_ERR(parent_dentry)) {
 
 			// Edge case: opening "/" as a directory
-			if (PTR_ERR(parent) == -EINVAL && path[0] == '/' && path[1] == '\0') {
-				ino = root_mount->mnt_root;
+			if (PTR_ERR(parent_dentry) == -EINVAL && path[0] == '/' && path[1] == '\0') {
+				ino = root_mount->mnt_root->inode;
 				inode_get(ino);
 				if (flags & O_EXCL) { 
 					inode_put(ino); 
@@ -40,6 +44,10 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 				inode_put(parent);
 				return ERR_PTR(-ENOENT);
 			}
+
+			parent = parent_dentry->inode;
+			inode_get(parent);
+			dentry_put(parent_dentry);
 
 			ino = parent->i_op->lookup(parent, &last);
 			if (IS_ERR(ino)) {
@@ -58,8 +66,12 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 				
 				if (res < 0) return ERR_PTR(res);
 
-				ino = vfs_walk(path); 
-				if (IS_ERR(ino)) return ERR_CAST(ino);
+				struct dentry *ino_dentry = vfs_walk(path); 
+				if (IS_ERR(ino_dentry)) return ERR_CAST(ino_dentry);
+
+				ino = ino_dentry->inode;
+				inode_get(ino);
+				dentry_put(ino_dentry);
 			} else {
 				inode_put(parent);
 				if (flags & O_EXCL) {
@@ -69,8 +81,12 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 			}
 		}
 	} else {
-		ino = vfs_walk(path);
-		if (IS_ERR(ino)) return ERR_CAST(ino);
+		struct dentry *ino_dentry = vfs_walk(path);
+		if (IS_ERR(ino_dentry)) return ERR_CAST(ino_dentry);
+
+		ino = ino_dentry->inode;
+		inode_get(ino);
+		dentry_put(ino_dentry);
 	}
 
 	if ((flags & O_DIRECTORY) && !S_ISDIR(ino->mode)) {

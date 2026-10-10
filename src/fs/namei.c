@@ -5,6 +5,7 @@
 #include <def/errno.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <fs/dcache.h>
 
 extern struct mount *root_mount;
 
@@ -12,10 +13,15 @@ int vfs_create(const char *restrict path, umode_t mode){
 	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
-	struct inode* parent = vfs_walk_parent(path, &name, NULL);
-	if(IS_ERR_OR_NULL(parent)){
-		return PTR_ERR(parent);
+	int trailing_slash = 0;
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
+	if(IS_ERR_OR_NULL(parent_dentry)){
+		return PTR_ERR(parent_dentry);
 	}
+
+	struct inode* parent = parent_dentry->inode;
+	inode_get(parent);
+	dentry_put(parent_dentry);
 
 	if(!parent->i_op || !parent->i_op->create){
 		inode_put(parent);
@@ -32,10 +38,15 @@ int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
-	struct inode* parent = vfs_walk_parent(path, &name, NULL);
-	if(IS_ERR_OR_NULL(parent)){
-		return PTR_ERR(parent);
+	int trailing_slash = 0;
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
+	if(IS_ERR_OR_NULL(parent_dentry)){
+		return PTR_ERR(parent_dentry);
 	}
+
+	struct inode* parent = parent_dentry->inode;
+	inode_get(parent);
+	dentry_put(parent_dentry);
 
 	if(!parent->i_op || !parent->i_op->mknod){
 		inode_put(parent);
@@ -53,10 +64,14 @@ int vfs_unlink(const char *restrict path){
 
 	struct qstr name;
 	int trailing_slash = 0;
-	struct inode* parent = vfs_walk_parent(path, &name, &trailing_slash);
-	if(IS_ERR_OR_NULL(parent)){
-		return PTR_ERR(parent);
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
+	if(IS_ERR_OR_NULL(parent_dentry)){
+		return PTR_ERR(parent_dentry);
 	}
+
+	struct inode* parent = parent_dentry->inode;
+	inode_get(parent);
+	dentry_put(parent_dentry);
 
 	if(trailing_slash){
 		inode_put(parent);
@@ -78,10 +93,14 @@ int vfs_mkdir(const char *restrict path, umode_t mode){
 	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
-	struct inode* parent = vfs_walk_parent(path, &name, NULL);
-	if(IS_ERR_OR_NULL(parent)){
-		return PTR_ERR(parent);
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, NULL);
+	if(IS_ERR_OR_NULL(parent_dentry)){
+		return PTR_ERR(parent_dentry);
 	}
+
+	struct inode* parent = parent_dentry->inode;
+	inode_get(parent);
+	dentry_put(parent_dentry);
 
 	if ((name.len == 1 && name.name[0] == '.') || 
 		(name.len == 2 && name.name[0] == '.' && name.name[1] == '.')) {
@@ -118,10 +137,14 @@ int vfs_rmdir(const char *restrict path){
 	int res;
 	struct qstr name;
 	int trailing_slash = 0;
-	struct inode* parent = vfs_walk_parent(path, &name, &trailing_slash);
-	if(IS_ERR_OR_NULL(parent)){
-		return PTR_ERR(parent);
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
+	if(IS_ERR_OR_NULL(parent_dentry)){
+		return PTR_ERR(parent_dentry);
 	}
+
+	struct inode* parent = parent_dentry->inode;
+	inode_get(parent);
+	dentry_put(parent_dentry);
 
 	if (name.len == 1 && name.name[0] == '.') {
 		res = -EINVAL;

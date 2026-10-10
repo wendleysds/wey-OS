@@ -1,6 +1,8 @@
 #include <def/config.h>
 #include <def/errno.h>
 #include <fs/vfs.h>
+#include <fs/dcache.h>
+#include <fs/stat.h>
 #include <kernel/init.h>
 #include <lib/string.h>
 
@@ -52,28 +54,6 @@ void super_destroy(struct super_block *sb) {
 	kfree(sb); 
 }
 
-static char *dup_mount_name(const char *mountpoint) {
-	struct qstr comp, last = {0};
-	const char *cursor = mountpoint;
-
-	while (path_iterate(&cursor, &comp, NULL)) {
-		last = comp;
-	}
-
-	if (!last.name) {
-		return strdup("/");
-	}
-
-	char *name = kmalloc(last.len + 1);
-	if (!name) {
-		return NULL;
-	}
-
-	memcpy(name, last.name, last.len);
-	name[last.len] = '\0';
-	return name;
-}
-
 static int do_umount(struct mount* mount){
 	struct super_block *sb;
 	struct inode *ino, *tmp;
@@ -84,6 +64,11 @@ static int do_umount(struct mount* mount){
 		ret = -EBUSY;
 		goto out_unlock;
 	}
+
+	if (mount->mnt_root) {
+        dentry_put(mount->mnt_root);
+        mount->mnt_root = NULL;
+    }
 
 	sb = mount->mnt_sb;
 	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
@@ -109,10 +94,6 @@ static int do_umount(struct mount* mount){
 		root_mount = NULL;
 	}
 
-	if (mount->name) {
-		kfree(mount->name);
-	}
-
 	kfree(mount);
 	super_destroy(sb);
 
@@ -120,14 +101,21 @@ out_unlock:
 	return ret;
 }
 
+static struct dentry *d_make_root(struct inode *root_inode) {
+	if (!root_inode) return NULL;
+	struct qstr root_name = { .name = "/", .len = 1 };
+	return dcache_add(NULL, &root_name, root_inode);
+}
+
 int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, unsigned int flags, void *data) {
 	const struct file_system_type *target_fs = find_fs_by_name(fs_name);
 	struct path target_point;
 	struct mount *mount = NULL;
-	struct inode *root = NULL;
-
+	struct inode *root_inode = NULL;
+	struct dentry *root_dentry = NULL;
 	int ret;
-	memset(&target_point, 0x0, sizeof(struct path));
+
+	memset(&target_point, 0, sizeof(struct path));
 
 	if (!target_fs) {
 		return -ENOENT;
@@ -138,64 +126,75 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 		if (IS_ERR_VALUE(ret)) {
 			return ret;
 		}
+
+		if (!S_ISDIR(target_point.dentry->inode->mode)) {
+			ret = -ENOTDIR;
+			goto out_point;
+		}
+
+		spin_lock(&target_point.dentry->lock);
+		if (target_point.dentry->mounted_here) {
+			spin_unlock(&target_point.dentry->lock);
+			ret = -EBUSY;
+			goto out_point;
+		}
+		spin_unlock(&target_point.dentry->lock);
 	}
 
-	mount = kmalloc(sizeof(*mount));
+	mount = kzalloc(sizeof(*mount));
 	if (!mount) {
 		ret = -ENOMEM;
 		goto out_point;
 	}
 
-	memset(mount, 0x0, sizeof(*mount));
 	INIT_LIST_HEAD(&mount->children);
 	INIT_LIST_HEAD(&mount->sibling);
 
-	mount->name = dup_mount_name(mountpoint);
-	if (!mount->name) {
-		ret = -ENOMEM;
+	root_inode = target_fs->mount(target_fs, source, data);
+	if (IS_ERR_OR_NULL(root_inode)) {
+		ret = root_inode ? PTR_ERR(root_inode) : -EAGAIN;
 		goto out_mount;
 	}
+
+	root_dentry = d_make_root(root_inode);
+	if (!root_dentry) {
+		ret = -ENOMEM;
+		inode_destroy(root_inode);
+		goto out_mount;
+	}
+
+	inode_put(root_inode);
+	mount->mnt_sb = root_inode->i_sb;
+	mount->mnt_root = root_dentry;
 
 	spin_lock(&mount_lock);
 
-	root = target_fs->mount(target_fs, source, data);
-	if (IS_ERR_OR_NULL(root)) {
-		ret = root ? PTR_ERR(root) : -EAGAIN;
-		spin_unlock(&mount_lock);
-		goto out_mount;
-	}
-
-	mount->mnt_sb = root->i_sb;
-	mount->mnt_root = root;
-	mount->mnt_mountpoint = target_point.dentry;
-
-	if (root_mount) {
-		spin_lock(&target_point.dentry->lock);
-		target_point.dentry->mounted_here = mount;
-	} else {
+	if (!root_mount) {
+		mount->mnt_mountpoint = NULL;
+		mount->parent = mount;
 		root_mount = mount;
 		spin_unlock(&mount_lock);
 		return SUCCESS;
 	}
 
-	struct mount *p = target_point.mount;
-	list_add(&mount->sibling, &p->children);
-	mount->parent = p;
+	// inherits the reference obtained in vfs_walk_path
+	mount->mnt_mountpoint = target_point.dentry;
+	mount->parent = target_point.mount;
+	list_add(&mount->sibling, &target_point.mount->children);
+
+	spin_lock(&target_point.dentry->lock);
+	target_point.dentry->mounted_here = mount;
+	spin_unlock(&target_point.dentry->lock);
 
 	spin_unlock(&mount_lock);
-	spin_unlock(&target_point.dentry->lock);
 	return SUCCESS;
 
 out_mount:
-	if (mount->name) {
-		kfree(mount->name);
-	}
 	kfree(mount);
 out_point:
 	if (target_point.dentry) {
-		inode_put(target_point.dentry);
+		dentry_put(target_point.dentry);
 	}
-
 	return ret;
 }
 
@@ -205,27 +204,29 @@ int vfs_umount(const char *mountpoint) {
 	if (err != SUCCESS) return err;
 
 	struct mount *mnt = target_path.mount;
+	dentry_put(target_path.dentry);
 
-	inode_put(target_path.dentry); 
+	if (mnt == root_mount) {
+		return -EBUSY;
+	}
 
 	spin_lock(&mount_lock);
-	
-	struct inode *point = mnt->mnt_mountpoint;
+	struct dentry *point = mnt->mnt_mountpoint;
 	if (point) {
 		spin_lock(&point->lock);
 		point->mounted_here = NULL;
 	}
-
+	
 	int ret = do_umount(mnt);
 
-	if(unlikely(ret != SUCCESS) && point){
+	if (unlikely(ret != SUCCESS) && point) {
 		point->mounted_here = mnt;
 		spin_unlock(&point->lock);
-	} else if(point) {
-		inode_put(point);
+	} else if (point) {
+		dentry_put(point);
 		spin_unlock(&point->lock);
 	}
-	
+
 	spin_unlock(&mount_lock);
 	return ret;
 }
