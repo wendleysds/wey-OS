@@ -223,6 +223,6 @@ const struct inode_operations ramfs_iops = {
 	.mkdir = ramfs_mkdir,
 	.rmdir = ramfs_rmdir,
 	.getattr = ramfs_getattr,
-	.setarrt = ramfs_setarrt,
+	.setattr = ramfs_setarrt,
 	.mknod = ramfs_mknod
 };

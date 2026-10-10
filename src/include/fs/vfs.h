@@ -122,7 +122,7 @@ struct inode_operations {
 	int (*mkdir)(struct inode *dir, struct qstr *name);
 	int (*rmdir)(struct inode *dir, struct qstr *name);
 	int (*getattr)(struct inode *ino, struct stat* restrict statbuf);
-	int (*setarrt)(struct inode *ino, struct iattr* attr);
+	int (*setattr)(struct inode *ino, struct iattr* attr);
 	int (*mknod)(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev);
 };
 

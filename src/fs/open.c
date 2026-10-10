@@ -88,11 +88,11 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 			inode_put(ino);
 			return ERR_PTR(-EISDIR);
 		}
-		if (ino->i_op && ino->i_op->setarrt) {
+		if (ino->i_op && ino->i_op->setattr) {
 			struct iattr iattr;
 			iattr.valid = ATTR_SIZE;
 			iattr.stat.size = 0;
-			ino->i_op->setarrt(ino, &iattr);
+			ino->i_op->setattr(ino, &iattr);
 		}
 	}
 
