@@ -1,3 +1,5 @@
+#include <kernel/syscall.h>
+#include <kernel/uaccess.h>
 #include <lib/string.h>
 #include <def/config.h>
 #include <def/errno.h>
@@ -103,4 +105,37 @@ int vfs_rmdir(const char *restrict path){
 	inode_put(parent);
 
 	return res;
+}
+
+static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
+	for(size_t i = 0; i < maxlen; i++){
+		if(copy_from_user(kpath + i, upath + i, 1)){
+			return -EFAULT;
+		}
+
+		if(!kpath[i]){
+			return i+1;
+		}
+	}
+	return -ENAMETOOLONG;
+}
+
+SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
+	char kpath[PATH_MAX];
+	size_t len = path_copy(kpath, path, PATH_MAX);
+	if(IS_ERR_VALUE(len)){
+		return len;
+	}
+
+	return vfs_mkdir(kpath);
+}
+
+SYSCALL_DEFINE1(rmdir, __user const char*, path){
+	char kpath[PATH_MAX];
+	size_t len = path_copy(kpath, path, PATH_MAX);
+	if(IS_ERR_VALUE(len)){
+		return len;
+	}
+
+	return vfs_rmdir(kpath);
 }
