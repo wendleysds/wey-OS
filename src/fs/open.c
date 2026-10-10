@@ -4,33 +4,86 @@
 #include <kernel/uaccess.h>
 #include <fs/fdtable.h>
 #include <fs/vfs.h>
+#include <fs/stat.h>
 
-struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
-	if(!path){
-		return ERR_PTR(-EINVAL);
-	}
+extern struct mount *root_mount;
 
-	struct inode* ino = vfs_walk(path); // always return ino->refcount >= 1
-	if(IS_ERR(ino)){
-		if((PTR_ERR(ino) == -ENOENT || PTR_ERR(ino) == -ENOENT) && (flags & O_CREAT)){
-			int res = vfs_create(path, mode);
-			if(IS_ERR_VALUE(res)) return ERR_PTR(res);
+struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
+	if (!path) return ERR_PTR(-EINVAL);
 
-			ino = vfs_walk(path);
-			if(IS_ERR(ino)) return ERR_CAST(ino);
-		}else{
-			return ERR_CAST(ino);
+	struct inode *parent = NULL;
+	struct inode *ino = NULL;
+	struct qstr last;
+
+	if (flags & O_CREAT) {
+		if (flags & O_DIRECTORY) {
+			return ERR_PTR(-ENOENT);
 		}
+
+		parent = vfs_walk_parent(path, &last);
+		if (IS_ERR(parent)) {
+
+			// Edge case: opening "/" as a directory
+			if (PTR_ERR(parent) == -EINVAL && path[0] == '/' && path[1] == '\0') {
+				ino = root_mount->mnt_root;
+				inode_get(ino);
+				if (flags & O_EXCL) { 
+					inode_put(ino); 
+					return ERR_PTR(-EEXIST); 
+				}
+			} else {
+				return ERR_CAST(parent);
+			}
+		} else {
+			ino = parent->i_op->lookup(parent, &last);
+			
+			if (IS_ERR(ino)) {
+				inode_put(parent);
+				return ERR_CAST(ino);
+			}
+
+			if (ino == NULL) {
+				if (!parent->i_op->create) {
+					inode_put(parent);
+					return ERR_PTR(-ENOSYS);
+				}
+				
+				int res = parent->i_op->create(parent, &last, mode);
+				inode_put(parent);
+				
+				if (res < 0) return ERR_PTR(res);
+
+				ino = vfs_walk(path); 
+				if (IS_ERR(ino)) return ERR_CAST(ino);
+			} else {
+				inode_put(parent);
+				if (flags & O_EXCL) {
+					inode_put(ino);
+					return ERR_PTR(-EEXIST);
+				}
+			}
+		}
+	} else {
+		ino = vfs_walk(path);
+		if (IS_ERR(ino)) return ERR_CAST(ino);
 	}
 
-	struct file* f = (struct file*)kmalloc(sizeof(struct file));
-	if(!f){
+	if ((flags & O_DIRECTORY) && !S_ISDIR(ino->mode)) {
 		inode_put(ino);
-		return ERR_PTR(-ENOMEM);
+		return ERR_PTR(-ENOTDIR);
 	}
 
-	if(flags & O_TRUNC){
-		if(ino->i_op->setarrt){
+	if (S_ISDIR(ino->mode) && (flags & (O_WRONLY | O_RDWR))) {
+		inode_put(ino);
+		return ERR_PTR(-EISDIR);
+	}
+
+	if (flags & O_TRUNC) {
+		if (S_ISDIR(ino->mode)) {
+			inode_put(ino);
+			return ERR_PTR(-EISDIR);
+		}
+		if (ino->i_op && ino->i_op->setarrt) {
 			struct iattr iattr;
 			iattr.valid = ATTR_SIZE;
 			iattr.stat.size = 0;
@@ -38,12 +91,17 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
 		}
 	}
 
+	struct file* f = (struct file*)kmalloc(sizeof(struct file));
+	if (!f) {
+		inode_put(ino);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	f->inode = ino;
 	f->pos = 0;
 	f->flags = flags;
 	f->private_data = NULL;
 	f->f_op = ino->i_fop;
-
 	atomic_set(&f->refcount, 1);
 
 	if (f->f_op && f->f_op->open) {
@@ -52,6 +110,10 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode){
 			file_put(f);
 			return ERR_PTR(ret);
 		}
+	}
+
+	if(flags & O_APPEND){
+		f->pos = f->inode->size;
 	}
 
 	return f;
@@ -75,11 +137,24 @@ int vfs_close(struct file *file){
 	return res;
 }
 
+static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
+	for(size_t i = 0; i < maxlen; i++){
+		if(copy_from_user(kpath + i, upath + i, 1)){
+			return -EFAULT;
+		}
+
+		if(!kpath[i]){
+			return i+1;
+		}
+	}
+	return -ENAMETOOLONG;
+}
+
 SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mode){
 	char kpath[PATH_MAX];
-	int ret = copy_from_user(kpath, path, PATH_MAX);
-	if(ret){
-		return -EFAULT;
+	size_t len = path_copy(kpath, path, PATH_MAX);
+	if(IS_ERR_VALUE(len)){
+		return len;
 	}
 	
 	struct file* f = vfs_open(kpath, flags, mode);
