@@ -192,18 +192,63 @@ err_free_new:
 	return res;
 }
 
+static int fixup_page_fault(pf_info_t* pf){
+	int handle_res = -EFAULT;
+	struct vm_region* region = vma_lookup(current->mm, pf->addr);
+
+	if(!region){
+		return -EFAULT;
+	}
+
+	if (pf->write && !(region->mem_flags & MEM_WRITE))
+		return -EFAULT;
+
+	if (!pf->write && !(region->mem_flags & MEM_READ))
+		return -EFAULT;
+
+	if (pf->exec && !(region->mem_flags & MEM_EXEC))
+		return -EFAULT;
+
+	if(pf->present){
+		if(pf->write && (region->mem_flags & MEM_WRITE)){
+			handle_res = vm_handle_cow(region, pf->addr);
+			goto check_res;
+		}
+
+		return -EFAULT;
+	}
+
+	if(region->mem_flags & MEM_GROWSDOWN){
+		handle_res = vm_handle_stack(region, pf->addr);
+	}
+	else if(region->file){
+		handle_res = vm_handle_file(region, pf->addr);
+	}else{
+		//TODO: handle anonymous pages
+	}
+
+check_res:
+	if(handle_res != 0){
+		printk("page_fault_handler: failed with status \"%d\"!\n", handle_res);
+	}
+
+	return handle_res;
+}
+	
+
 void page_fault_handler(struct registers* regs){
 	pf_info_t pf = pf_decode(regs->err_code, cr2());
-	
-	int handle_res = -EFAULT;
 
 	if(!current || !pf.user){
-
 		struct exception_entry* e = find_extable(regs->ip);
 		if (e){
-			printk("Exception handler found at %#010lx\n", e->fixup);
-			regs->ip = e->fixup;
-			return;
+			int res = fixup_page_fault(&pf);
+			if(IS_ERR_VALUE(res)){
+				regs->ip = e->fixup; 
+				return;
+			}
+
+			return; // continue where the fault accured
 		}
 
 		show_pf_info(&pf);
@@ -212,60 +257,14 @@ void page_fault_handler(struct registers* regs){
 		panic("Kernel page fault!");
 	}
 
-
-	struct vm_region* region = vma_lookup(current->mm, pf.addr);
-	if(!region){
-		goto segfault;
+	int res = fixup_page_fault(&pf);
+	if(!IS_ERR_VALUE(res)){
+		return;
 	}
-
-	if(pf.present){
-		if (pf.write && !(region->mem_flags & MEM_WRITE))
-			goto segfault;
-
-		if (!pf.write && !(region->mem_flags & MEM_READ))
-			goto segfault;
-
-		if (pf.exec && !(region->mem_flags & MEM_EXEC))
-			goto segfault;
-
-		if(pf.write && (region->mem_flags & MEM_WRITE)){
-			handle_res = vm_handle_cow(region, pf.addr);
-			goto check_res;
-		}
-		
-		goto segfault;
-	}
-
-	if (pf.write && !(region->mem_flags & MEM_WRITE))
-		goto segfault;
-
-	if (!pf.write && !(region->mem_flags & MEM_READ))
-		goto segfault;
-
-	if (pf.exec && !(region->mem_flags & MEM_EXEC))
-		goto segfault;
-
-	if(region->mem_flags & MEM_GROWSDOWN){
-		handle_res = vm_handle_stack(region, pf.addr);
-	}
-	else if(region->file){
-		handle_res = vm_handle_file(region, pf.addr);
-	}
-
-check_res:
-	if(handle_res != 0){
-		printk("page_fault_handler: failed with status \"%d\"!\n", handle_res);
-		goto kill;
-	}
-
-	return; // OK
-
-segfault:
-	printk("Segmentation fault at address %#010lx\n", pf.addr);
 	
-kill:
+	show_pf_info(&pf);
 	dump_regs(regs);
-	task_exit(current, handle_res);
+	task_exit(current, res);
 
 	schedule();
 	unreachable();
