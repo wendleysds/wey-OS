@@ -33,7 +33,7 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 		);
 
 		if(S_ISDIR(cpio.mode)){
-			if((last_err = vfs_mkdir(cpio.name))){
+			if((last_err = vfs_mkdir(cpio.name, cpio.mode))){
 				printk("Initrd: mkdir failed: %d\n", last_err);
 				return last_err;
 			}

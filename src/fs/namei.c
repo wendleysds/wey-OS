@@ -74,7 +74,7 @@ int vfs_unlink(const char *restrict path){
 	return res;
 }
 
-int vfs_mkdir(const char *restrict path){
+int vfs_mkdir(const char *restrict path, umode_t mode){
 	if(!root_mount) return -EINVAL;
 
 	struct qstr name;
@@ -106,7 +106,7 @@ int vfs_mkdir(const char *restrict path){
 		return -EEXIST;
 	}
 	
-	int res = parent->i_op->mkdir(parent, &name);
+	int res = parent->i_op->mkdir(parent, &name, mode);
 	inode_put(parent);
 
 	return res;
@@ -183,7 +183,7 @@ SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
 		return len;
 	}
 
-	return vfs_mkdir(kpath);
+	return vfs_mkdir(kpath, mode);
 }
 
 SYSCALL_DEFINE1(rmdir, __user const char*, path){

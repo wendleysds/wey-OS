@@ -165,8 +165,8 @@ static int ramfs_create(struct inode *dir, struct qstr *name, umode_t mode){
 	return ramfs_create_common(dir, name, mode | S_IFREG, 0, 0);
 }
 
-static int ramfs_mkdir(struct inode *dir, struct qstr *name){
-	return ramfs_create_common(dir, name, S_IFDIR | 0777, 1, 0);
+static int ramfs_mkdir(struct inode *dir, struct qstr *name, umode_t mode){
+	return ramfs_create_common(dir, name, S_IFDIR | mode, 1, 0);
 }
 
 static int ramfs_unlink(struct inode *dir, struct qstr *name){
