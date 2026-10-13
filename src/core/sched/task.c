@@ -4,6 +4,7 @@
 #include <lib/assert.h>
 #include <lib/string.h>
 #include <fs/fdtable.h>
+#include <fs/dcache.h>
 #include <def/errno.h>
 #include <mm/vma.h>
 
@@ -110,9 +111,9 @@ void task_destroy(struct task* task){
 		panic("Attempting to destroy a non-zombie task (pid: %d, name: %s)", task->pid, task->name);
 	}
 
-	if(task->pwd){
-		kfree(task->pwd);
-		task->pwd = NULL;
+	if(task->cwd.dentry){
+		dentry_put(task->cwd.dentry);
+		task->cwd.dentry = NULL;
 	}
 
 	if(task->kstack){
@@ -140,9 +141,9 @@ void asmlinkage task_handle_prev_status(struct task* prev){
 
 	switch (prev->state) {
 		case TASK_ZOMBIE:
-			if(prev->pwd){
-				kfree(prev->pwd);
-				prev->pwd = NULL;
+			if(prev->cwd.dentry){
+				dentry_put(prev->cwd.dentry);
+				prev->cwd.dentry = NULL;
 			}
 
 			if(prev->kstack){

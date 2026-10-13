@@ -3,6 +3,7 @@
 #include <fs/fdtable.h>
 #include <def/errno.h>
 #include <mm/vma.h>
+#include <fs/dcache.h>
 
 static struct task *copy_process() {
 	struct task *cur = current;
@@ -50,6 +51,10 @@ static struct task *copy_process() {
 	list_add(&child->sibling, &cur->children);
 
 	child->pid = child_pid;
+
+	child->cwd.dentry = dentry_get(cur->cwd.dentry);
+	child->cwd.mount = cur->cwd.mount;
+
 	return child;
 }
 

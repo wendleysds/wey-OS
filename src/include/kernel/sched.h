@@ -7,6 +7,7 @@
 #include <def/config.h>
 #include <kernel/init.h>
 #include <lib/list.h>
+#include <fs/vfs.h>
 
 struct mm_struct;
 struct wait_queue_entry;
@@ -33,7 +34,8 @@ struct task {
 	struct list_head queue;
 
 	struct mm_struct* mm;
-	char *pwd;
+
+	struct path cwd;
 
 	task_state_t state;
 	int priority;

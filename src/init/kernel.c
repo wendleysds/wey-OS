@@ -11,6 +11,7 @@
 #include <fs/vfs.h>
 #include <fs/stat.h>
 #include <fs/fdtable.h>
+#include <fs/dcache.h>
 #include <mm/memory.h>
 #include <mm/memblock.h>
 #include <mm/page.h>
@@ -20,7 +21,9 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 extern void setup_arch();
+
 extern struct task* init_task;
+extern struct mount *root_mount;
 
 static inline void module_load(const char* module_name, int (*func)(void)){
 	int res = func();
@@ -85,6 +88,9 @@ static __init int rest_init(void* unused){
 
 	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
 	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
+
+	current->cwd.dentry = dentry_get(root_mount->mnt_root);
+	current->cwd.mount = root_mount;
 
 	task_add_file(current, tty); // stdin   0
 	task_add_file(current, tty); // stdout  1
