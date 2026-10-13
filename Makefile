@@ -47,6 +47,7 @@ abs_output := $(CURDIR)
 MAKEFLAGS += -rR # Remove make intenal compile rules
 MAKEFLAGS += --warn-undefined-variables
 #MAKEFLAGS += --always-make
+export GNUMAKEFLAGS ?=
 
 # Verbose
 ifeq ("$(origin V)", "command line")

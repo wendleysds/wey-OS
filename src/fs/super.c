@@ -101,7 +101,7 @@ out_unlock:
 	return ret;
 }
 
-static struct dentry *d_make_root(struct inode *root_inode) {
+struct dentry *d_make_root(struct inode *root_inode) {
 	if (!root_inode) return NULL;
 	struct qstr root_name = { .name = "/", .len = 1 };
 	return dcache_add(NULL, &root_name, root_inode);
@@ -111,7 +111,6 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 	const struct file_system_type *target_fs = find_fs_by_name(fs_name);
 	struct path target_point;
 	struct mount *mount = NULL;
-	struct inode *root_inode = NULL;
 	struct dentry *root_dentry = NULL;
 	int ret;
 
@@ -150,21 +149,13 @@ int vfs_mount(const char *source, const char *mountpoint, const char *fs_name, u
 	INIT_LIST_HEAD(&mount->children);
 	INIT_LIST_HEAD(&mount->sibling);
 
-	root_inode = target_fs->mount(target_fs, source, data);
-	if (IS_ERR_OR_NULL(root_inode)) {
-		ret = root_inode ? PTR_ERR(root_inode) : -EAGAIN;
+	root_dentry = target_fs->mount(target_fs, source, data);
+	if (IS_ERR_OR_NULL(root_dentry)) {
+		ret = root_dentry ? PTR_ERR(root_dentry) : -EAGAIN;
 		goto out_mount;
 	}
 
-	root_dentry = d_make_root(root_inode);
-	if (!root_dentry) {
-		ret = -ENOMEM;
-		inode_destroy(root_inode);
-		goto out_mount;
-	}
-
-	inode_put(root_inode);
-	mount->mnt_sb = root_inode->i_sb;
+	mount->mnt_sb = root_dentry->inode->i_sb;
 	mount->mnt_root = root_dentry;
 
 	spin_lock(&mount_lock);

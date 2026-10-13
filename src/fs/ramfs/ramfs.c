@@ -3,6 +3,7 @@
 #include <def/errno.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <fs/dcache.h>
 #include <lib/string.h>
 
 #include "ramfs_internal.h"
@@ -71,40 +72,42 @@ static const struct super_operations ramfs_sops = {
 	.destroy_inode = ramfs_destroy_inode,
 };
 
-static struct inode* ramfs_mount(const struct file_system_type* self, const char* dev_name, void* data){
-	struct super_block* sb = super_alloc();
-	if(!sb){
-		return ERR_PTR(-ENOMEM);
-	}
 
-	struct ramfs_sb* rsb = kzalloc(sizeof(struct ramfs_sb));
-	if(!rsb){
-		kfree(sb);
-		return ERR_PTR(-ENOMEM);
-	}
+static struct dentry* ramfs_mount(const struct file_system_type* self, const char* dev_name, void* data){
+    struct super_block* sb = super_alloc();
+    if (!sb) return ERR_PTR(-ENOMEM);
 
-	rsb->next_ino = 1;
+    struct ramfs_sb* rsb = kzalloc(sizeof(struct ramfs_sb));
+    if (!rsb) {
+        super_destroy(sb);
+        return ERR_PTR(-ENOMEM);
+    }
+    rsb->next_ino = 1;
+    sb->private_data = rsb;
+    sb->fs_type = self;
+    sb->s_op = &ramfs_sops;
 
-	sb->private_data = rsb;
-	sb->fs_type = self;
-	sb->s_op = &ramfs_sops;
+    struct inode *root_inode = inode_new(sb);
+    if (!root_inode) {
+        kfree(rsb);
+        super_destroy(sb);
+        return ERR_PTR(-ENOMEM);
+    }
 
-	struct inode *root = inode_new(sb);
-	if(!root){
-		kfree(sb);
-		kfree(rsb);
-		return ERR_PTR(-ENOMEM);
-	}
+    root_inode->mode = S_IFDIR;
+    root_inode->i_op = &ramfs_iops;
+    root_inode->i_fop = &ramfs_fops;
+    sb->root_inode = root_inode;
 
-	root->mode = S_IFDIR;
+    struct dentry *root = d_make_root(root_inode);
+    if (!root) {
+        inode_destroy(root_inode);
+        return ERR_PTR(-ENOMEM);
+    }
 
-	root->i_op = &ramfs_iops;
-	root->i_fop = &ramfs_fops;
-
-	sb->root_inode = root;
-
-	return root;
+    return root;
 }
+
 
 static void ramfs_unmount(struct super_block* sb){
 	if(sb->private_data){

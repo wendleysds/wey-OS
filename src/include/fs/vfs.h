@@ -117,20 +117,20 @@ struct file_operations {
 };
 
 struct inode_operations {
-	struct inode* (*lookup)(struct inode *dir, struct qstr *name);
-	int (*create)(struct inode *dir, struct qstr *name, umode_t mode);
-	int (*unlink)(struct inode *dir, struct qstr *name);
-	int (*mkdir)(struct inode *dir, struct qstr *name, umode_t mode);
-	int (*rmdir)(struct inode *dir, struct qstr *name);
+	struct inode* (*lookup)(struct inode *dir, struct dentry *dentry);
+	int (*create)(struct inode *dir, struct dentry *dentry, umode_t mode);
+	int (*unlink)(struct inode *dir, struct dentry *dentry);
+	int (*mkdir)(struct inode *dir, struct dentry *dentry, umode_t mode);
+	int (*rmdir)(struct inode *dir, struct dentry *dentry);
 	int (*getattr)(struct inode *ino, struct stat* restrict statbuf);
 	int (*setattr)(struct inode *ino, struct iattr* attr);
-	int (*mknod)(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev);
+	int (*mknod)(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev);
 };
 
 struct file_system_type{
 	const char *name;
 
-	struct inode* (*mount)(const struct file_system_type*, const char* dev_name, void* data);
+	struct dentry* (*mount)(const struct file_system_type*, const char* dev_name, void* data);
 	void (*unmount)(struct super_block*);
 
 	struct list_head list;
@@ -212,7 +212,8 @@ void vfs_unregister_filesystem(struct file_system_type* fs);
 int path_iterate(const char** cursor, struct qstr *comp, int *has_trailing_slash);
 
 struct super_block* super_alloc();
-void destroy_super(struct super_block* sb);
+void super_destroy(struct super_block* sb);
+struct dentry *d_make_root(struct inode *root_inode);
 
 struct inode* inode_alloc(struct super_block *sb);
 struct inode* inode_new(struct super_block *sb);
@@ -235,7 +236,7 @@ static inline void super_get(struct super_block* sb){
 
 static inline void super_put(struct super_block* sb){
 	if(atomic_dec_and_test(&sb->refcount)){
-		destroy_super(sb);
+		super_destroy(sb);
 	}
 }
 

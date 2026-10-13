@@ -47,22 +47,29 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 
 			parent = parent_dentry->inode;
 			inode_get(parent);
-			dentry_put(parent_dentry);
 
-			ino = parent->i_op->lookup(parent, &last);
+			struct dentry dentry = {
+				.parent = parent_dentry,
+				.name = last,
+			};
+
+			ino = parent->i_op->lookup(parent, &dentry);
 			if (IS_ERR(ino)) {
 				inode_put(parent);
+				dentry_put(parent_dentry);
 				return ERR_CAST(ino);
 			}
 
 			if (ino == NULL) {
 				if (!parent->i_op->create) {
 					inode_put(parent);
+					dentry_put(parent_dentry);
 					return ERR_PTR(-ENOSYS);
 				}
 				
-				int res = parent->i_op->create(parent, &last, mode);
+				int res = parent->i_op->create(parent, &dentry, mode);
 				inode_put(parent);
+				dentry_put(parent_dentry);
 				
 				if (res < 0) return ERR_PTR(res);
 
@@ -74,6 +81,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 				dentry_put(ino_dentry);
 			} else {
 				inode_put(parent);
+				dentry_put(parent_dentry);
 				if (flags & O_EXCL) {
 					inode_put(ino);
 					return ERR_PTR(-EEXIST);

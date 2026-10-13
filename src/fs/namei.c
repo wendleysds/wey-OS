@@ -21,15 +21,21 @@ int vfs_create(const char *restrict path, umode_t mode){
 
 	struct inode* parent = parent_dentry->inode;
 	inode_get(parent);
-	dentry_put(parent_dentry);
 
 	if(!parent->i_op || !parent->i_op->create){
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -ENOSYS;
 	}
 
-	int res = parent->i_op->create(parent, &name, mode);
+	struct dentry dentry = {
+		.parent = parent_dentry,
+		.name = name,
+	};
+
+	int res = parent->i_op->create(parent, &dentry, mode);
 	inode_put(parent);
+	dentry_put(parent_dentry);
 	
 	return res;
 }
@@ -46,15 +52,21 @@ int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 
 	struct inode* parent = parent_dentry->inode;
 	inode_get(parent);
-	dentry_put(parent_dentry);
 
 	if(!parent->i_op || !parent->i_op->mknod){
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -ENOSYS;
 	}
 
-	int res = parent->i_op->mknod(parent, &name, mode, dev);
+	struct dentry dentry = {
+		.parent = parent_dentry,
+		.name = name,
+	};
+
+	int res = parent->i_op->mknod(parent, &dentry, mode, dev);
 	inode_put(parent);
+	dentry_put(parent_dentry);
 	
 	return res;
 }
@@ -71,20 +83,27 @@ int vfs_unlink(const char *restrict path){
 
 	struct inode* parent = parent_dentry->inode;
 	inode_get(parent);
-	dentry_put(parent_dentry);
 
 	if(trailing_slash){
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -ENOTDIR;
 	}
 
 	if(!parent->i_op || !parent->i_op->unlink){
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -ENOSYS;
 	}
+
+	struct dentry dentry = {
+		.parent = parent_dentry,
+		.name = name,
+	};
 	
-	int res = parent->i_op->unlink(parent, &name);
+	int res = parent->i_op->unlink(parent, &dentry);
 	inode_put(parent);
+	dentry_put(parent_dentry);
 
 	return res;
 }
@@ -100,33 +119,42 @@ int vfs_mkdir(const char *restrict path, umode_t mode){
 
 	struct inode* parent = parent_dentry->inode;
 	inode_get(parent);
-	dentry_put(parent_dentry);
 
 	if ((name.len == 1 && name.name[0] == '.') || 
 		(name.len == 2 && name.name[0] == '.' && name.name[1] == '.')) {
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -EEXIST;
 	}
 
 	if (!parent->i_op || !parent->i_op->mkdir || !parent->i_op->lookup) {
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -ENOSYS;
 	}
 
-	struct inode *child = parent->i_op->lookup(parent, &name);
+	struct dentry dentry = {
+		.parent = parent_dentry,
+		.name = name,
+	};
+
+	struct inode *child = parent->i_op->lookup(parent, &dentry);
 	if (child) {
 		if (IS_ERR(child)) {
 			inode_put(parent);
+			dentry_put(parent_dentry);
 			return PTR_ERR(child);
 		}
 
 		inode_put(child);
 		inode_put(parent);
+		dentry_put(parent_dentry);
 		return -EEXIST;
 	}
 	
-	int res = parent->i_op->mkdir(parent, &name, mode);
+	int res = parent->i_op->mkdir(parent, &dentry, mode);
 	inode_put(parent);
+	dentry_put(parent_dentry);
 
 	return res;
 }
@@ -144,7 +172,6 @@ int vfs_rmdir(const char *restrict path){
 
 	struct inode* parent = parent_dentry->inode;
 	inode_get(parent);
-	dentry_put(parent_dentry);
 
 	if (name.len == 1 && name.name[0] == '.') {
 		res = -EINVAL;
@@ -161,7 +188,12 @@ int vfs_rmdir(const char *restrict path){
 		goto put_parent;
 	}
 
-	struct inode *child = parent->i_op->lookup(parent, &name);
+	struct dentry dentry = {
+		.parent = parent_dentry,
+		.name = name,
+	};
+
+	struct inode *child = parent->i_op->lookup(parent, &dentry);
 	if (!child) {
 		res = -ENOENT;
 		goto put_parent;
@@ -177,12 +209,13 @@ int vfs_rmdir(const char *restrict path){
 		goto put_child;
 	}
 
-	res = parent->i_op->rmdir(parent, &name);
+	res = parent->i_op->rmdir(parent, &dentry);
 
 put_child:
 	inode_put(child);
 put_parent:
 	inode_put(parent);
+	dentry_put(parent_dentry);
 	return res;
 }
 

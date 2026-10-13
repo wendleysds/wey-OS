@@ -48,7 +48,11 @@ int vfs_lookup_path(struct dentry *parent, struct qstr *name, struct path *res){
 
 	struct dentry *child = dcache_lookup(parent, name);
 	if (!child) {
-		struct inode *ino = parent->inode->i_op->lookup(parent->inode, name);
+		struct dentry dentry = {
+			.parent = parent,
+			.name = *name,
+		};
+		struct inode *ino = parent->inode->i_op->lookup(parent->inode, &dentry);
 		if (IS_ERR_OR_NULL(ino))
 			return ino ? PTR_ERR(ino) : -ENOENT;
 

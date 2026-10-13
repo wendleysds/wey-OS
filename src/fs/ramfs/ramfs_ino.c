@@ -1,4 +1,5 @@
 #include <fs/vfs.h>
+#include <fs/dcache.h>
 #include <fs/stat.h>
 #include <lib/string.h>
 #include <lib/list.h>
@@ -62,8 +63,9 @@ int ramfs_do_truncate(struct inode *inode, size_t new_size){
 	return 0;
 }
 
-struct inode* ramfs_lookup(struct inode *dir, struct qstr *name){
+struct inode* ramfs_lookup(struct inode *dir, struct dentry *dentry){
 	struct ramfs_inode *rdir = dir->private_data;
+	const struct qstr *name = &dentry->name;
 
 	spin_lock(&rdir->spinlock);
 
@@ -80,15 +82,16 @@ struct inode* ramfs_lookup(struct inode *dir, struct qstr *name){
 	return NULL;
 }
 
-static int ramfs_create_common(struct inode *dir, struct qstr *name, umode_t mode, uint8_t isDir, dev_t dev){
+static int ramfs_create_common(struct inode *dir, struct dentry *dentry, umode_t mode, uint8_t isDir, dev_t dev){
 	struct ramfs_inode *rdir = dir->private_data;
 
-	struct inode *existing = ramfs_lookup(dir, name);
+	struct inode *existing = ramfs_lookup(dir, dentry);
 	if(existing){
 		inode_put(existing);
 		return -EEXIST;
 	}
 
+	const struct qstr *name = &dentry->name;
 	char tmp[name->len + 1];
 	memcpy(tmp, name->name, name->len);
 	tmp[name->len] = '\0';
@@ -124,8 +127,9 @@ static int ramfs_create_common(struct inode *dir, struct qstr *name, umode_t mod
 	return SUCCESS;
 }
 
-static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isFile){
+static int ramfs_remove_common(struct inode *dir, struct dentry *dentry, uint8_t isFile){
 	struct ramfs_inode *rdir = dir->private_data;
+	const struct qstr *name = &dentry->name;
 
 	spin_lock(&rdir->spinlock);
 
@@ -156,25 +160,25 @@ static int ramfs_remove_common(struct inode *dir, struct qstr *name, uint8_t isF
 	return -ENOENT;
 }
 
-static int ramfs_mknod(struct inode *dir, struct qstr *name, umode_t mode, dev_t dev){
-	return ramfs_create_common(dir, name, mode, S_ISDIR(mode), dev);
+static int ramfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev){
+	return ramfs_create_common(dir, dentry, mode, S_ISDIR(mode), dev);
 }
 
-static int ramfs_create(struct inode *dir, struct qstr *name, umode_t mode){
+static int ramfs_create(struct inode *dir, struct dentry *dentry, umode_t mode){
 	if(S_ISDIR(mode)) return -EINVAL;
-	return ramfs_create_common(dir, name, mode | S_IFREG, 0, 0);
+	return ramfs_create_common(dir, dentry, mode | S_IFREG, 0, 0);
 }
 
-static int ramfs_mkdir(struct inode *dir, struct qstr *name, umode_t mode){
-	return ramfs_create_common(dir, name, S_IFDIR | mode, 1, 0);
+static int ramfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode){
+	return ramfs_create_common(dir, dentry, S_IFDIR | mode, 1, 0);
 }
 
-static int ramfs_unlink(struct inode *dir, struct qstr *name){
-	return ramfs_remove_common(dir, name, 1);
+static int ramfs_unlink(struct inode *dir, struct dentry *dentry){
+	return ramfs_remove_common(dir, dentry, 1);
 }
 
-static int ramfs_rmdir(struct inode *dir, struct qstr *name){
-	return ramfs_remove_common(dir, name, 0);
+static int ramfs_rmdir(struct inode *dir, struct dentry *dentry){
+	return ramfs_remove_common(dir, dentry, 0);
 }
 
 static int ramfs_getattr(struct inode *ino, struct stat* restrict statbuf){
