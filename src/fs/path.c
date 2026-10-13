@@ -1,3 +1,5 @@
+#include <kernel/uaccess.h>
+#include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
@@ -242,4 +244,127 @@ struct dentry* vfs_walk(const char *path){
 	}
 
 	return p.dentry;
+}
+
+int vfs_chdir(const char *path) {
+	struct path p;
+	int err = vfs_walk_path(path, &p);
+	if (err != SUCCESS) return err;
+
+	if (!S_ISDIR(p.dentry->inode->mode)) {
+		dentry_put(p.dentry);
+		return -ENOTDIR;
+	}
+
+	if (current->cwd.dentry) {
+		dentry_put(current->cwd.dentry);
+	}
+
+	current->cwd.dentry = p.dentry;
+	current->cwd.mount  = p.mount;
+
+	return SUCCESS;
+}
+
+static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
+	for(size_t i = 0; i < maxlen; i++){
+		if(copy_from_user(kpath + i, upath + i, 1)){
+			return -EFAULT;
+		}
+
+		if(!kpath[i]){
+			return i+1;
+		}
+	}
+	return -ENAMETOOLONG;
+}
+
+SYSCALL_DEFINE1(chdir, __user const char*, path){
+	if(!root_mount) return -EINVAL;
+
+	char kpath[PATH_MAX];
+	size_t len = path_copy(kpath, path, PATH_MAX);
+	if(IS_ERR_VALUE(len)){
+		return len;
+	}
+	
+	struct path p;
+	int err = vfs_walk_path(kpath, &p);
+	if (err != SUCCESS) return err;
+
+	if (!S_ISDIR(p.dentry->inode->mode)) {
+		dentry_put(p.dentry);
+		return -ENOTDIR;
+	}
+
+	if (current->cwd.dentry) {
+		dentry_put(current->cwd.dentry);
+	}
+
+	current->cwd.dentry = p.dentry;
+	current->cwd.mount  = p.mount;
+
+	return SUCCESS;
+}
+
+SYSCALL_DEFINE2(getcwd, __user char*, buff, size_t, len) {
+	if (len == 0) return -EINVAL;
+
+	struct dentry *cur = current->cwd.dentry;
+	struct dentry *root = root_mount->mnt_root;
+
+	if (cur == root) {
+		if (len < 2) return -ERANGE;
+		if (copy_to_user(buff, "/", 2)) return -EFAULT;
+		return 2;
+	}
+
+	size_t pos = len;
+
+	pos--;
+	if (copy_to_user(buff + pos, "\0", 1)) return -EFAULT;
+
+	dentry_get(cur);
+	while (cur && cur != root) {
+		struct qstr comp = cur->name;
+		size_t namelen = comp.len;
+
+		if (pos < namelen + 1) {
+			dentry_put(cur);
+			return -ERANGE;
+		}
+
+		pos -= namelen;
+		if (copy_to_user(buff + pos, comp.name, namelen)) {
+			dentry_put(cur);
+			return -EFAULT;
+		}
+
+		pos--;
+		if (copy_to_user(buff + pos, "/", 1)) {
+			dentry_put(cur);
+			return -EFAULT;
+		}
+
+		struct dentry *parent = cur->parent;
+		if (parent) dentry_get(parent);
+		dentry_put(cur);
+		cur = parent;
+	}
+
+	if (cur) {
+		dentry_put(cur);
+	}
+
+	size_t path_len = len - pos;
+
+	if (pos > 0) {
+		char c;
+		for (size_t i = 0; i < path_len; i++) {
+			if (copy_from_user(&c, buff + pos + i, 1)) return -EFAULT;
+			if (copy_to_user(buff + i, &c, 1)) return -EFAULT;
+		}
+	}
+
+	return path_len;
 }
