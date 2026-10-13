@@ -1,9 +1,10 @@
-#include <lib/string.h>
-#include <def/config.h>
-#include <def/errno.h>
+#include <kernel/sched.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
 #include <fs/dcache.h>
+#include <def/config.h>
+#include <def/errno.h>
+#include <lib/string.h>
 
 extern struct mount *root_mount;
 
@@ -78,8 +79,22 @@ int vfs_lookup_path(struct dentry *parent, struct qstr *name, struct path *res){
 int vfs_walk_path(const char *path, struct path *res) {
 	if (!root_mount) return -EINVAL;
 
-	struct mount *curr_mnt = root_mount;
-	struct dentry *curr_dentry = root_mount->mnt_root;
+	struct mount *curr_mnt;
+    struct dentry *curr_dentry;
+
+    if (path[0] == '/') {
+        curr_mnt = root_mount;
+        curr_dentry = root_mount->mnt_root;
+    } else {
+        if (current && current->cwd.dentry) {
+            curr_dentry = current->cwd.dentry;
+            curr_mnt = current->cwd.mount;
+        } else {
+            curr_mnt = root_mount;
+            curr_dentry = root_mount->mnt_root;
+        }
+    }
+
 	dentry_get(curr_dentry);
 
 	const char *cursor = path;
@@ -87,6 +102,31 @@ int vfs_walk_path(const char *path, struct path *res) {
 	int trailing_slash = 0;
 
 	while (path_iterate(&cursor, &comp, &trailing_slash)) {
+		if (comp.len == 1 && comp.name[0] == '.') {
+			continue;
+		}
+
+		if (comp.len == 2 && comp.name[0] == '.' && comp.name[1] == '.') {
+			if (curr_dentry == root_mount->mnt_root) {
+				continue;
+			}
+
+			if (curr_dentry == curr_mnt->mnt_root && curr_mnt != root_mount) {
+				struct mount *parent_mnt = curr_mnt->parent;
+				struct dentry *mountpoint = curr_mnt->mnt_mountpoint;
+				struct dentry *parent_dentry = dentry_get(mountpoint->parent);
+				dentry_put(curr_dentry);
+				curr_dentry = parent_dentry;
+				curr_mnt = parent_mnt;
+				continue;
+			}
+
+			struct dentry *parent_dentry = dentry_get(curr_dentry->parent);
+			dentry_put(curr_dentry);
+			curr_dentry = parent_dentry;
+			continue;
+		}
+
 		struct path next;
 		int err = vfs_lookup_path(curr_dentry, &comp, &next);
 		if (err != SUCCESS) {
@@ -123,7 +163,14 @@ int vfs_walk_path(const char *path, struct path *res) {
 struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash) {
 	if(!root_mount) return ERR_PTR(-EINVAL);
 
-	struct dentry *cur = root_mount->mnt_root;
+	struct dentry *cur;
+	if (path[0] == '/') {
+		cur = root_mount->mnt_root;
+	} else if (current && current->cwd.dentry) {
+		cur = current->cwd.dentry;
+	} else {
+		cur = root_mount->mnt_root;
+	}
 	dentry_get(cur);
 
 	struct qstr comp;
@@ -141,6 +188,23 @@ struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailin
 				*trailing_slash = has_slash;
 			}
 			return cur;
+		}
+
+		if (comp.len == 1 && comp.name[0] == '.') {
+			continue;
+		}
+
+		if (comp.len == 2 && comp.name[0] == '.' && comp.name[1] == '.') {
+			if (cur == root_mount->mnt_root) {
+				continue;
+			}
+			if (cur == cur->parent) {
+				continue;
+			}
+			struct dentry *parent = dentry_get(cur->parent);
+			dentry_put(cur);
+			cur = parent;
+			continue;
 		}
 
 		struct path next_path;
