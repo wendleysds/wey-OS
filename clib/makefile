@@ -1,62 +1,99 @@
-TARGET=$(BUILD_DIR)/clib.o
+LIB_NAME  ?= libc.a
+BUILD_DIR ?= build
+OBJ_DIR   ?= $(BUILD_DIR)/objs
+TARGET    ?= $(BUILD_DIR)/$(LIB_NAME)
 
-# Compilers
-CC = i686-elf-gcc
+CROSS_COMPILE ?=
 
-CFLAGS = -Iinclude -Wall -Werror
+# Tools
+CC      = $(CROSS_COMPILE)gcc
+AS      = nasm
+AR      = $(CROSS_COMPILE)ar
+RANLIB  = $(CROSS_COMPILE)ranlib
 
-# Bare-metal Flags
-CFLAGS += -ffreestanding -nostdlib -nostartfiles
-# Warnig Suppresion Flags
-CFLAGS += -Wno-unused-function -Wno-unused-parameter -Wno-cpp
-# Alignment Flags
-CFLAGS += -falign-jumps -falign-functions -falign-loops -falign-labels
-# Optimzation Flags
-CFLAGS += -fstrength-reduce -finline-functions
+# CFLAGS
+CFLAGS := -m32 \
+    -Iinclude \
+    -std=gnu11 \
+    -ffreestanding \
+    -nostdlib \
+    -nostdinc \
+    -nostartfiles \
+    -nodefaultlibs \
+    -Wall \
+    -Werror \
+    -Wextra \
+    -Wno-int-to-pointer-cast \
+    -Wno-attribute-alias \
+    -Wno-cpp \
+    -Wno-unused-function \
+    -Wno-unused-parameter \
+    -Wno-address-of-packed-member \
+    -Wno-implicit-fallthrough \
+    -ffunction-sections \
+    -fdata-sections \
+    -fno-strict-aliasing \
+    -falign-jumps \
+    -falign-functions \
+    -falign-loops \
+    -falign-labels \
+    -fno-asynchronous-unwind-tables \
+    -fno-unwind-tables \
+    -fno-ident \
+    -fno-pic \
+    -fno-stack-protector \
+    -fno-omit-frame-pointer \
+    -mfpmath=387 \
+    -mno-sse \
+    -mno-mmx \
+    -mno-sse2 \
+    -mno-3dnow \
+    -mno-avx \
+    -mno-sse4a \
+    -MMD -MP
 
-ASM = nasm
-ASMFLAGS =
+ASFLAGS := -f elf32 -Iinclude/
 
-LD = i686-elf-ld
-LDFLAGS = -m elf_i386 -relocatable
+# ARFLAGS
+ARFLAGS := rcs
 
-SRC_DIR = src
-BUILD_DIR = build
-OBJ_DIR = $(BUILD_DIR)/objs
+# Sources and Objects
+SRC_DIR       := src
+SRC_C_FILES   := $(shell find $(SRC_DIR) -type f -name "*.c")
+SRC_ASM_FILES := $(shell find $(SRC_DIR) -type f -name "*.asm")
 
-# Create directories
-BUILD_DIRS = $(OBJ_DIR)
+OBJ_C_FILES   := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C_FILES))
+OBJ_ASM_FILES := $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_ASM_FILES))
+ALL_OBJS      := $(OBJ_C_FILES) $(OBJ_ASM_FILES)
 
-SRC_C_FILES = $(shell find $(SRC_DIR) -type f -name "*.c")
-SRC_ASM_FILES = $(shell find $(SRC_DIR) -type f -name "*.asm")
+DEPS_C        := $(OBJ_C_FILES:.o=.d)
+DEPS_ASM      := $(OBJ_ASM_FILES:.asm.o=.asm.d)
+ALL_DEPS      := $(DEPS_C) $(DEPS_ASM)
 
-OBJ_C_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C_FILES))
-OBJ_ASM_FILES = $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_ASM_FILES))
+.PHONY: all clean
 
-# Build Target
-$(TARGET): $(OBJ_C_FILES) $(OBJ_ASM_FILES) | $(BUILD_DIRS)
-	@echo "Creating CLib Linkable Object in $@"
-	$(LD) $(LDFLAGS) -o $@ $^
+all: $(TARGET)
 
-# Create directories
-$(BUILD_DIRS):
-	mkdir -p $@
+# Create the static library .a containing all isolated objects
+$(TARGET): $(ALL_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	@echo " [AR]  $@"
+	@$(AR) $(ARFLAGS) $@ $^
 
-# Compile Objects
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	@echo "Compiling $< ..."
+# Compile C code
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -m32 -c $< -o $@
+	@echo " [CC]  $<"
+	@$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm | $(OBJ_DIR)
-	@echo "Compiling $< ..."
+# Compile Assembly (NASM) com geração de dependências (-MD)
+$(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm
 	@mkdir -p $(dir $@)
-	$(ASM) $(ASMFLAGS) -f elf32 $< -o $@
-
-
-all:
-	make clean
-	make
+	@echo " [AS]  $<"
+	@$(AS) $(ASFLAGS) -MD $(OBJ_DIR)/$*.asm.d $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	@echo " [CLEAN]"
+	@rm -rf $(BUILD_DIR)
+
+-include $(ALL_DEPS)

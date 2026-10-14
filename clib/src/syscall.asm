@@ -1,16 +1,37 @@
+bits 32
+
 global do_syscall
 
-;  long syscall(long long no, long long arg1, long long arg2, long long arg3, long long arg4, long long arg5, long long arg6)
+extern errno ; int
+
+; long do_syscall(long no, ...)
 do_syscall:
 	push ebp
-	mov ebp, esp
-	mov eax, [ebp+8]   ; syscall number
-	mov ebx, [ebp+12]  ; arg1
-	mov ecx, [ebp+16]  ; arg2
-	mov edx, [ebp+20]  ; arg3
-	mov esi, [ebp+24]  ; arg4
-	mov edi, [ebp+28]  ; arg5
-	mov ebp, [ebp+32]  ; arg6
+	push edi
+	push esi
+	push ebx
+
+	mov eax, [esp+20]  ; syscall number
+	mov ebx, [esp+24]  ; arg1
+	mov ecx, [esp+28]  ; arg2
+	mov edx, [esp+32]  ; arg3
+	mov esi, [esp+36]  ; arg4
+	mov edi, [esp+40]  ; arg5
+	mov ebp, [esp+44]  ; arg6
+
 	int 0x80
+
+	pop ebx
+	pop esi
+	pop edi
 	pop ebp
+
+	cmp eax, 0
+	jge .positive
+
+	neg eax
+	mov dword [errno], eax
+	mov eax, -1
+
+.positive:
 	ret

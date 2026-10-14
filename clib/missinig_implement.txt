@@ -1,0 +1,10 @@
+signal.h
+  signal
+
+stdio.h
+  remove
+  rename 
+
+stdlib.h
+  getenv
+  system
