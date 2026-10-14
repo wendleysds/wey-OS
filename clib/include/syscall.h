@@ -1,5 +1,5 @@
-#ifndef _SYSCALL_H
-#define _SYSCALL_H
+#ifndef _CLIB_SYSCALL_H
+#define _CLIB_SYSCALL_H
 
 #define SYS_write 100
 
