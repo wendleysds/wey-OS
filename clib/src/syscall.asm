@@ -1,6 +1,10 @@
-global do_syscall
+bits 32
 
-;  long syscall(long long no, long long arg1, long long arg2, long long arg3, long long arg4, long long arg5, long long arg6)
+global do_syscallsyscall
+
+extern errno ; int
+
+; long do_syscall(long no, ...)
 do_syscall:
 	push ebp
 	mov ebp, esp
@@ -12,5 +16,13 @@ do_syscall:
 	mov edi, [ebp+28]  ; arg5
 	mov ebp, [ebp+32]  ; arg6
 	int 0x80
+
+	cmp eax, 0
+	jge positive
+
+	mov dword [errno], eax
+	mov eax, -1
+	
+positive:
 	pop ebp
 	ret

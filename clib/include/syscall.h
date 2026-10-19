@@ -1,12 +1,37 @@
 #ifndef _CLIB_SYSCALL_H
 #define _CLIB_SYSCALL_H
 
-#define SYS_write 100
+#include <errno.h>
 
-extern long __attribute__((regparm(0))) do_syscall(long no, long arg1, long arg2, long arg3, long arg4, long arg5, long arg6);
+#define SYS_exit 1
+#define SYS_read 2
+#define SYS_write 3
+#define SYS_open 4
+#define SYS_close 5
+#define SYS_lseek 6
+#define SYS_execve 7
+#define SYS_fork 8
+#define SYS_waitpid 9
+#define SYS_getpid 10
+#define SYS_brk 11
+#define SYS_mmap 12
+#define SYS_munmap 13
+#define SYS_getdents 14
+#define SYS_chdir 15
+#define SYS_getcwd 16
+#define SYS_unlink 17
+#define SYS_mkdir 18
+#define SYS_rmdir 19
+#define SYS_ioctl 20
+#define SYS_reboot 21
+#define SYS_clone 22
+#define SYS_mount 23
+#define SYS_umount 24
+#define SYS_spawn 25
+#define SYS_dup 26
 
-static inline long __attribute__((regparm(0))) syscall(long no, long arg1, long arg2, long arg3, long arg4, long arg5, long arg6) {
-	return do_syscall(no, arg1, arg2, arg3, arg4, arg5, arg6);
-}
+#define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
+
+extern long __attribute__((regparm(0))) do_syscall(long no, ...);
 
 #endif
