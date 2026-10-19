@@ -1,6 +1,8 @@
 #ifndef _CLIB_STANDART_LIBRARY_H
 #define _CLIB_STANDART_LIBRARY_H
 
+#include <stddef.h>
+
 // memory management
 /*
 malloc()    Aloca memória dinamicamente.
@@ -20,17 +22,94 @@ system()    Executa um comando por meio de um processador de comandos.
 */
 
 // conversion
-/*
-atoi()      Converte string em inteiro, sem tratamento robusto de erros.
-atol()      Converte string em long.
-strtol()    Converte string em inteiro com controle de erros.
-strtoul()   Converte string em inteiro sem sinal.
-strtoll()   Converte string em long long.
-strtoull()  Converte string em unsigned long long.
-strtof()    Converte string em float.
-strtod()    Converte string em double.
-strtold()   Converte string em long double.
-*/
+/**
+ * @brief Convert string to int.
+ * @param str The string to convert.
+ * @return The int value.
+ */
+int atoi(const char *str);
+
+/**
+ * @brief Convert string to long.
+ * @param str The string to convert.
+ * @return The long value.
+ */
+long atol(const char *str);
+
+/**
+ * @brief Convert string to long long.
+ * @param str The string to convert.
+ * @return The long long value.
+ */
+long long atoll(const char *str);
+
+/**
+ * @brief Convert string to unsigned long.
+ * @param str The string to convert.
+ * @return The unsigned long value.
+ */
+unsigned long strtoul(const char *str, char **endptr, int base);
+
+/**
+ * @brief Convert string to long.
+ * @param str The string to convert.
+ * @return The long value.
+ */
+long strtol(const char *str, char **endptr, int base);
+
+/**
+ * @brief Convert string to long long.
+ * @param str The string to convert.
+ * @return The long long value.
+ */
+long long strtoll(const char *str, char **endptr, int base);
+
+/**
+ * @brief Convert string to unsigned long long.
+ * @param str The string to convert.
+ * @return The unsigned long long value.
+ */
+unsigned long long strtoull(const char *str, char **endptr, int base);
+
+/**
+ * @brief Convert unsigned int to string.
+ * @param val The unsigned int to convert.
+ * @param str The string to convert to.
+ * @param size The size of the string buffer.
+ * @param base The base to convert to.
+ * @return The string.
+ */
+char *utoa(unsigned int val, char *str, size_t size, int base);
+
+/**
+ * @brief Convert int to string.
+ * @param val The int to convert.
+ * @param str The string to convert to.
+ * @param size The size of the string buffer.
+ * @param base The base to convert to.
+ * @return The string.
+ */
+char *itoa(int val, char *str, size_t size, int base);
+
+/**
+ * @brief Convert long long to string.
+ * @param val The long long to convert.
+ * @param str The string to convert to.
+ * @param size The size of the string buffer.
+ * @param base The base to convert to.
+ * @return The string.
+ */
+char *lltoa(long long val, char *str, size_t size, int base);
+
+/**
+ * @brief Convert unsigned long long to string.
+ * @param val The unsigned long long to convert.
+ * @param str The string to convert to.
+ * @param size The size of the string buffer.
+ * @param base The base to convert to.
+ * @return The string.
+ */
+char *ulltoa(unsigned long long val, char *str, size_t size, int base);
 
 // sorting
 /*
@@ -55,8 +134,4 @@ NULL
 MB_CUR_MAX
 */
 
-
-void itoa(int value, char* result, int base);
-void utoa(unsigned int value, char* result, int base);
-
-#endif
+#endif /* _CLIB_STANDART_LIBRARY_H */
