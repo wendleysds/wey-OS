@@ -1,8 +1,6 @@
 #ifndef _CLIB_SYSCALL_H
 #define _CLIB_SYSCALL_H
 
-#include <errno.h>
-
 #define SYS_exit 1
 #define SYS_read 2
 #define SYS_write 3
