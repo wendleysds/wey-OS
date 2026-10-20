@@ -111,12 +111,16 @@ char *lltoa(long long val, char *str, size_t size, int base);
  */
 char *ulltoa(unsigned long long val, char *str, size_t size, int base);
 
-// sorting
+// utils
 /*
 qsort()     Ordena um array usando um comparador.
 bsearch()   Busca um elemento em um array ordenado.
 rand()      Gera números pseudoaleatórios.
 srand()     Define a semente do gerador de rand().
+*/
+
+// math
+/*
 abs()       Valor absoluto de um int.
 labs()      Valor absoluto de um long.
 llabs()     Valor absoluto de um long long.
@@ -124,6 +128,25 @@ div()       Retorna quociente e resto de uma divisão inteira.
 ldiv()      Variante para long.
 lldiv()     Variante para long long.
 */
+
+typedef struct {
+    int quot;
+    int rem;
+} div_t;
+
+typedef struct {
+    long quot;
+    long rem;
+} ldiv_t;
+
+typedef struct {
+    long long quot;
+    long long rem;
+} lldiv_t;
+
+div_t div(int numer, int denom);
+ldiv_t ldiv(long numer, long denom);
+lldiv_t lldiv(long long numer, long long denom);
 
 // important macros
 /*
