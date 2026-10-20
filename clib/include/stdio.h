@@ -144,6 +144,16 @@ int putchar(int c);
 int getchar(void);
 
 /**
+ * @brief Reads a line from a file stream.
+ * 
+ * @param str Buffer to store the read string.
+ * @param size Maximum number of characters to read (including terminating null byte).
+ * @param stream A pointer to the FILE object to read from.
+ * @return str on success, or NULL on error or EOF with no characters read.
+ */
+char *fgets(char *restrict str, int size, FILE *restrict stream);
+
+/**
  * @brief Writes a character to a file.
  * 
  * @param c The character to write.
