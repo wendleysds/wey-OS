@@ -4,6 +4,9 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+extern uint64_t do_div_64(uint64_t *n, uint64_t base);
 
 static unsigned long long strtox_impl(const char *nptr, char **endptr, int base, bool is_signed, unsigned long long max_val, long long min_val) {
     const char *s = nptr;
@@ -49,9 +52,18 @@ static unsigned long long strtox_impl(const char *nptr, char **endptr, int base,
         return 0;
     }
 
-    unsigned long long cutoff = neg ? ((unsigned long long)-(min_val)) : max_val;
-    unsigned long long cutlim = cutoff % base;
-    cutoff /= base;
+    /* Ajuste para calcular cutoff e cutlim simultaneamente via lldiv / do_div_64 */
+    unsigned long long cutoff;
+    unsigned long long cutlim;
+
+    unsigned long long limit = neg ? ((unsigned long long)-(min_val)) : max_val;
+
+    /* Como limit e base são não-assinados (uint64_t), usamos do_div_64 
+       para evitar casting assinado com lldiv caso limit > LLONG_MAX */
+    uint64_t tmp_limit = limit;
+    cutlim = do_div_64(&tmp_limit, (uint32_t)base);
+    cutoff = tmp_limit;
+
     for (;; s++) {
         c = (unsigned char)*s;
         if (isdigit(c)) {
