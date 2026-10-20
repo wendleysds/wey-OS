@@ -159,4 +159,13 @@ char* strtok(char* s, const char* delimiters);
  */
 size_t strxfrm(char* dest, const char* src, size_t n);
 
+/**
+ * @brief Computes the number of characters in str that are not in reject.
+ * 
+ * @param str The string to search.
+ * @param reject The characters to reject.
+ * @return The number of characters in str that are not in reject.
+ */
+size_t strcspn(const char *str, const char *reject);
+
 #endif
