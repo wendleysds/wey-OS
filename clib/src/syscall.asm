@@ -1,6 +1,6 @@
 bits 32
 
-global do_syscallsyscall
+global do_syscall
 
 extern errno ; int
 
@@ -18,11 +18,11 @@ do_syscall:
 	int 0x80
 
 	cmp eax, 0
-	jge positive
+	jge .positive
 
 	mov dword [errno], eax
 	mov eax, -1
 	
-positive:
+.positive:
 	pop ebp
 	ret

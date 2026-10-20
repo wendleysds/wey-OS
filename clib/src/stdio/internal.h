@@ -2,7 +2,6 @@
 #define _CLIB_STDIO_INTERNAL_H
 
 #include <stdio.h>
-#include <stdint.h>
 
 #define _FILE_READ   (1 << 0)
 #define _FILE_WRITE  (1 << 1)
@@ -20,5 +19,14 @@ struct file {
     int flags;
     int ungetc_buf; // -1 == empty, else == character
 };
+
+struct stream_source {
+    void *ctx;
+    int (*getc)(void *);
+    int (*ungetc)(int, void *);
+};
+
+int vprintfmt(void (*putc)(char c, void *ctx), void *ctx, const char *fmt, va_list args);
+int vscanfmt(struct stream_source *restrict stream, const char *restrict fmt, va_list ap);
 
 #endif

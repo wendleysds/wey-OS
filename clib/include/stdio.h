@@ -18,6 +18,10 @@ extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
 
+#define stdin stdin
+#define stdout stdout
+#define stderr stderr
+
 // print family
 /**
  * @brief Prints formatted text to stdout.

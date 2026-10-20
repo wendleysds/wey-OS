@@ -29,6 +29,7 @@ CFLAGS := -m32 \
     -Wno-unused-function \
     -Wno-unused-parameter \
     -Wno-address-of-packed-member \
+    -Wno-implicit-fallthrough \
     -ffunction-sections \
     -fdata-sections \
     -fno-strict-aliasing \

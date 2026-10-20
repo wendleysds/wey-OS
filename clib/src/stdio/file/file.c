@@ -6,29 +6,6 @@
 static struct file *opened_files[FOPEN_MAX];
 static struct file file_pool[FOPEN_MAX];
 
-static struct file _stdin = {
-    .fd = STDIN_FILENO,
-    .flags = _FILE_READ | _FILE_UNBUF
-};
-
-static struct file _stdout = {
-    .fd = STDOUT_FILENO,
-    .flags = _FILE_WRITE | _FILE_UNBUF
-};
-
-static struct file _stderr = {
-    .fd = STDERR_FILENO,
-    .flags = _FILE_WRITE | _FILE_UNBUF
-};
-
-struct file *stdin = &_stdin;
-struct file *stdout = &_stdout;
-struct file *stderr = &_stderr;
-
-#define stdin stdin
-#define stdout stdout
-#define stderr stderr
-
 static int __mode_to_file_flags(const char *mode){
     int flags = 0;
     
@@ -162,36 +139,4 @@ int fclose(struct file *stream){
     }
 
     return 0;
-}
-
-void rewind(struct file *stream){
-    if (!stream) return;
-
-    stream->ungetc_buf = -1;
-
-    fseek(stream, 0, SEEK_SET);
-
-    stream->flags &= ~_FILE_EOF;
-    stream->flags &= ~_FILE_ERR;
-}
-
-int feof(struct file *stream){
-    if (!stream) return 0;
-    return (stream->flags & _FILE_EOF);
-}
-
-int ferror(struct file *stream){
-    if (!stream) return 0;
-    return (stream->flags & _FILE_ERR);
-}
-
-void clearerr(struct file *stream){
-    if (!stream) return;
-    stream->flags &= ~_FILE_EOF;
-    stream->flags &= ~_FILE_ERR;
-}
-
-int fileno(struct file *stream){
-    if (!stream) return -1;
-    return stream->fd;
 }
