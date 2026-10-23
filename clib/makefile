@@ -48,10 +48,10 @@ CFLAGS := -m32 \
     -mno-sse2 \
     -mno-3dnow \
     -mno-avx \
-    -mno-sse4a
+    -mno-sse4a \
+    -MMD -MP
 
-# ASMFLAGS
-ASFLAGS := -f elf32
+ASFLAGS := -f elf32 -Iinclude/
 
 # ARFLAGS
 ARFLAGS := rcs
@@ -64,6 +64,10 @@ SRC_ASM_FILES := $(shell find $(SRC_DIR) -type f -name "*.asm")
 OBJ_C_FILES   := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_C_FILES))
 OBJ_ASM_FILES := $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/%.asm.o, $(SRC_ASM_FILES))
 ALL_OBJS      := $(OBJ_C_FILES) $(OBJ_ASM_FILES)
+
+DEPS_C        := $(OBJ_C_FILES:.o=.d)
+DEPS_ASM      := $(OBJ_ASM_FILES:.asm.o=.asm.d)
+ALL_DEPS      := $(DEPS_C) $(DEPS_ASM)
 
 .PHONY: all clean
 
@@ -81,12 +85,14 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo " [CC]  $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile Assembly (NASM)
+# Compile Assembly (NASM) com geração de dependências (-MD)
 $(OBJ_DIR)/%.asm.o: $(SRC_DIR)/%.asm
 	@mkdir -p $(dir $@)
 	@echo " [AS]  $<"
-	@$(AS) $(ASFLAGS) $< -o $@
+	@$(AS) $(ASFLAGS) -MD $(OBJ_DIR)/$*.asm.d $< -o $@
 
 clean:
 	@echo " [CLEAN]"
 	@rm -rf $(BUILD_DIR)
+
+-include $(ALL_DEPS)
