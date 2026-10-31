@@ -5,6 +5,11 @@
 #include <lib/list.h>
 #include <mm/kheap.h>
 #include <sync/spinlock.h>
+#include <def/config.h>
+
+#include <uapi/clock/time.h>
+
+extern int arch_setup_clock(void);
 
 /*
  * TODO:
@@ -43,30 +48,32 @@ static const struct clocksource default_clocksource = {
 	.data = 0x0,
 };
 
-int __init clock_init(uint32_t timer_hz){
-	if(!timer_hz){
-		return -EINVAL;
-	}
-
+int __init clock_init(void){
 	spinlock_init(&clockevent_lock);
 	spinlock_init(&clocksource_lock);
 	INIT_LIST_HEAD(&clockevent_listeners);
 
 	clock_tick_ns = NSEC_PER_SEC;
-	clock_tick_ns_remainder = do_div(clock_tick_ns, timer_hz);
+	clock_tick_ns_remainder = do_div(clock_tick_ns, TIMER_FREQUENCY_HZ);
 	clock_remainder_accum = 0;
-	clock_hz = timer_hz;
+	clock_hz = TIMER_FREQUENCY_HZ;
 	clock_ticks = 0;
 	clock_monotonic_ns = 0;
 	clock_realtime_offset_ns = 0;
 	current_clocksource = &default_clocksource;
 	current_clockevent = 0x0;
 
+	int ret = arch_setup_clock();
+	if(ret < 0){
+		return ret;
+	}
+
 	return SUCCESS;
 }
 
 void clock_set_realtime_ns(time_ns_t time_ns){
-	clock_realtime_offset_ns = (int64_t)time_ns - (int64_t)clock_monotonic_ns;
+	int64_t mono = (int64_t)clock_get_monotonic_ns();
+	clock_realtime_offset_ns = (int64_t)time_ns - mono;
 }
 
 static void clock_tick(void){
@@ -81,6 +88,13 @@ static void clock_tick(void){
 			clock_remainder_accum -= clock_hz;
 		}
 	}
+}
+
+time_ns_t clock_get_resolution_ns(void){
+	if(current_clocksource == &default_clocksource)
+		return clock_tick_ns ? clock_tick_ns : 1;
+
+	return 1;
 }
 
 tick_t clock_get_ticks(void){

@@ -2,6 +2,7 @@
 #define _ACPI_TABLE_HPET
 
 #include <kernel/acpi.h>
+#include <kernel/clock.h>
 #include <def/compile.h>
 
 #define ACPI_HPET_SIGNATURE "HPET"
@@ -18,5 +19,8 @@ struct acpi_hpet {
 int hpet_init(void);
 uint64_t hpet_get_ticks(void);
 void hpet_udelay(uint64_t us);
+bool hpet_is_initialized(void);
+
+extern const struct clocksource hpet_clocksource;
 
 #endif

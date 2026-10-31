@@ -25,7 +25,9 @@ extern const struct irq_controller i8259A_controller;
 extern struct pic_info master;
 extern struct pic_info slave;
 
-int pic_init(int frequency);
+int pic_irqchip_init(void);
+void pic_start_periodic(uint32_t hz);
+
 void pic_disable(void);
 void pic_enable(void);
 
@@ -36,5 +38,7 @@ uint8_t pic_read_data(struct pic_info *pic);
 
 void pit_prepare_oneshot_ch2(uint16_t ticks);
 void pit_wait_oneshot_ch2(void);
+
+extern const struct clockevent i8259a_clockevent;
 
 #endif /* _I386_PIC_H */

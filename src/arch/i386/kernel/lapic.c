@@ -1,10 +1,11 @@
 #include <kernel/interrupt.h>
 #include <kernel/init.h>
 #include <kernel/printk.h>
+#include <kernel/clock.h>
 #include <kernel/acpi/tables/madt.h>
+#include <lib/assert.h>
 
 #include <arch/i386/lapic.h>
-#include <arch/i386/pic.h>
 
 #define PORT_NEW_API
 #include <io/ports.h>
@@ -48,7 +49,7 @@
 
 extern struct acpi_madt_info *acpi_madt_info;
 static vaddr_t __iomem lapic_base = 0;
-static uint32_t lapic_bus_freq_hz = 0;
+static uint32_t lapic_timer_freq_hz = 0;
 
 static inline uint32_t lapic_read(uint32_t reg) {
     return mmio_read32(lapic_base + reg);
@@ -164,53 +165,33 @@ static __init uint32_t lapic_calibrate(wait_10ms_func_t calibrator){
 	return elapsed * 100;
 }
 
-static __init void lapic_timer_init(uint32_t target_frequency_hz, wait_10ms_func_t wait_func)
-{
-    if (!target_frequency_hz)
-        return;
+bool __init lapic_supporte(){
+	if(!acpi_madt_info)
+		return false;
+	
+	if(!cpu_supports_msr())
+		return false;
+	
+	if(!cpu_supports_apic())
+		return false;
 
-    lapic_bus_freq_hz = lapic_calibrate(wait_func);
-
-    uint32_t initial_count =
-        lapic_bus_freq_hz / target_frequency_hz;
-
-    printk(
-        "LAPIC: Timer frequency: %u Hz, initial count for %u Hz: %u\n",
-        lapic_bus_freq_hz,
-        target_frequency_hz,
-        initial_count
-    );
-
-    lapic_write(LAPIC_TDCR, LAPIC_TIMER_DIV_16);
-
-    lapic_write(
-        LAPIC_LVT_TIMER,
-        LAPIC_TIMER_VECTOR | LAPIC_TIMER_PERIODIC
-    );
-
-    lapic_write(LAPIC_TICR, initial_count);
+	return true;
 }
 
-int __init lapic_init(int frequency, wait_10ms_func_t wait_func){
-    if(!acpi_madt_info){
-        printk("LAPIC: No MADT info\n");
-        return -ENODEV;
-    }
-
-    if(!cpu_supports_msr()){
-        printk("LAPIC: CPU does not support MSR\n");
-        return -ENODEV;
-    }
-
-    if(!cpu_supports_apic()){
-        printk("LAPIC: CPU does not support APIC\n");
-        return -ENODEV;
-    }
+int __init lapic_prepare_init(void){
+    if(!lapic_supporte())
+		return -EOPNOTSUPP;
 
     lapic_base = (vaddr_t)ioremap(acpi_madt_info->local_apic_address, PAGE_SIZE);
-    if(!lapic_base) return -ENOMEM;
+    if(!lapic_base)
+        return -ENOMEM;
 
-    pic_disable();
+    return 0;
+}
+
+void __init lapic_init(int frequency, wait_10ms_func_t wait_func){
+    BUG_ON(!lapic_supporte());
+    BUG_ON(!lapic_base);
 
     lapic_hw_enable();
 
@@ -227,7 +208,7 @@ int __init lapic_init(int frequency, wait_10ms_func_t wait_func){
 
     lapic_mask_local_sources();
 
-    lapic_timer_init(frequency, wait_func);
+    lapic_timer_freq_hz = lapic_calibrate(wait_func);
 
     lapic_send_eoi(NULL);
 
@@ -236,11 +217,45 @@ int __init lapic_init(int frequency, wait_10ms_func_t wait_func){
 
     printk("LAPIC: ID: %d\n", id);
     printk("LAPIC: Version: %d\n", version);
-
-    return 0;
 }
 
 const struct irq_controller irq_controller_local_apic = {
     .name = "Local APIC",
     .eoi = lapic_send_eoi,
+};
+
+static int lapic_clockevent_start_periodic(void* data, uint32_t hz){
+    (void)data;
+    if (!hz || !lapic_timer_freq_hz)
+        return -EINVAL;
+
+    uint32_t count = lapic_timer_freq_hz / hz;
+    if (!count)
+        return -EINVAL;
+
+    lapic_write(LAPIC_TDCR, LAPIC_TIMER_DIV_16);
+    lapic_write(LAPIC_LVT_TIMER, LAPIC_TIMER_VECTOR | LAPIC_TIMER_PERIODIC);
+    lapic_write(LAPIC_TICR, count);
+
+    printk(
+        "LAPIC: Timer frequency: %u Hz, initial count for %u Hz: %u\n",
+        lapic_timer_freq_hz,
+        hz,
+        count
+    );
+
+    return 0;
+}
+
+static void lapic_clockevent_stop(void* data){
+    (void)data;
+    lapic_write(LAPIC_LVT_TIMER, lapic_read(LAPIC_LVT_TIMER) | (1u << 16));
+    lapic_write(LAPIC_TICR, 0);
+}
+
+const struct clockevent lapic_clockevent = {
+	.name           = "lapic",
+	.start_periodic = lapic_clockevent_start_periodic,
+	.stop           = lapic_clockevent_stop,
+	.data           = 0x0,
 };

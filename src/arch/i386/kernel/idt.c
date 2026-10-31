@@ -15,6 +15,11 @@
 #include <arch/i386/pic.h>
 #include <arch/i386/lapic.h>
 #include <arch/i386/ioapic.h>
+#include <arch/i386/timer_caps.h>
+
+#define X86_IRQ_MODE_APIC  0
+#define X86_IRQ_MODE_PIC   1
+#define X86_IRQ_MODE_UNKNOWN -1
 
 static const char* exception_messages[] = {
 	"Division By Zero", "Debug", "Non Maskable Interrupt", "Breakpoint",
@@ -33,6 +38,7 @@ static struct InterruptDescriptor idt[TOTAL_INTERRUPTS];
 static struct IDTr_ptr idtr_ptr;
 
 static struct irq_desc irq_table[TOTAL_INTERRUPTS];
+static int x86_irq_mode = X86_IRQ_MODE_UNKNOWN;
 
 extern void kernel_registers();
 extern void user_registers();
@@ -116,77 +122,74 @@ static __init void hpet_10ms_wait(void) {
 }
 
 static __init void pit_10ms_wait(void){
-	const uint32_t pit_hz = 100;
-	const uint16_t pit_ticks = PIT_FREQUENCY / pit_hz;
-
-	// Problaby the period is not very accurate 
-	// for high precision delays
+	const uint16_t pit_ticks = PIT_FREQUENCY / 100;
 	pit_prepare_oneshot_ch2(pit_ticks);
 	pit_wait_oneshot_ch2();
 }
 
-static __init int irq_use_apic_and_hpet(void){
-	int res = 0;
-	printk("x86: using APIC + HPET.\n");
+static __init wait_10ms_func_t select_calibrate_func(struct x86_timer_caps* caps){
+	if(hpet_is_initialized())
+        return hpet_10ms_wait;
 
-	res = hpet_init();
-	if(res < 0){
-		printk("x86: Failed to initialize HPET: %d\n", res);
-		return res;
-	}
+    if (caps->pit_available)
+        return pit_10ms_wait;
 
-	res = lapic_init(TIMER_FREQUENCY_HZ, hpet_10ms_wait);
-	if(res < 0){
-		printk("x86: Failed to initialize APIC: %d\n", res);
-		return res;
-	}
-
-	res = ioapic_init(lapic_get_id());
-	if(res < 0){
-		printk("x86: Failed to initialize IOAPIC: %d\n", res);
-		return res;
-	}
-
-	irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
-	
-	return res;
+    return NULL;
 }
 
-static __init int irq_use_apic_and_pic(void){
-	int res = 0;
-	printk("x86: using APIC + PIC.\n");
+static __init int lapic_timer_prepare(){
+    int ret;
 
-	res = pic_init(TIMER_FREQUENCY_HZ);
-	if(res < 0){
-		return res;
+	ret = lapic_prepare_init();
+	if(ret < 0){
+		printk("x86: LAPIC timer prepare failed: %d\n", ret);
+		return ret;
 	}
 
-	res = lapic_init(TIMER_FREQUENCY_HZ, pit_10ms_wait);
-	if(res < 0){
-		return res;
-	}
-
-	res = ioapic_init(lapic_get_id());
-	if(res < 0){
-		return res;
-	}
-
-	irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
-
-	return 0;
+    return 0;
 }
 
-static __init int irq_use_pic(void){
-	int res = 0;
-	printk("x86: using PIC.\n");
-	res = pic_init(TIMER_FREQUENCY_HZ);
-	if(res < 0){
-		return res;
+int x86_irqchip_init(struct x86_timer_caps* caps){
+	int ret;
+
+	bool has_lapic = caps->lapic_available && lapic_supporte();
+	if (has_lapic && caps->ioapic_available) {
+		wait_10ms_func_t wait_fn = select_calibrate_func(caps);
+
+		if (wait_fn) {
+			ret = lapic_timer_prepare();
+			if (ret >= 0) {
+				if(caps->pic_legacy){
+					pic_disable();
+				}
+
+				lapic_init(TIMER_FREQUENCY_HZ, wait_fn);
+
+				ret = ioapic_init(lapic_get_id());
+				if (ret >= 0) {
+					x86_irq_mode = X86_IRQ_MODE_APIC;
+					return 0;
+				}else{
+					if(caps->pic_legacy){
+						pic_enable();
+					}
+				}
+			}
+		}
+
+		printk("x86: APIC setup failed, trying legacy PIC\n");
 	}
 
-	irq_switch_all_chips(&i8259A_chip, &i8259A_controller);
+	if (caps->pic_legacy) {
+		ret = pic_irqchip_init();
+		if (ret < 0)
+			return ret;
 
-	return 0;
+		x86_irq_mode = X86_IRQ_MODE_PIC;
+		return 0;
+	}
+
+	return -ENODEV;
 }
 
 static void __init irqdesc_setup(int irq, struct irq_desc *desc){
@@ -200,63 +203,75 @@ static void __init irqdesc_setup(int irq, struct irq_desc *desc){
 	desc->masked = true;
 }
 
-static int __init irq_check_chips(void){
-	bool has_pic = false;
-	bool has_hpet = !!acpi_find_table(ACPI_HPET_SIGNATURE);
+static __init int x86_clockevent_start(void)
+{
+	const struct clockevent *ce;
+	int ret;
 
-	int res;
+	switch (x86_irq_mode) {
+	case X86_IRQ_MODE_APIC:
+		ce = &lapic_clockevent;
+		break;
 
-	if(!has_pic && !acpi_madt_info){
-		panic("No IRQ chip found!");
-	}
+	case X86_IRQ_MODE_PIC:
+		ce = &i8259a_clockevent;
+		break;
 
-	if(acpi_madt_info){
-		has_pic |= (acpi_madt_info->flags & MADT_FLAG_PCAT_COMPAT);
-	}
-
-	if(!has_pic && !has_hpet){
+	default:
 		return -ENODEV;
 	}
 
-	irqdesc_init(irqdesc_setup);
-	if(has_hpet && acpi_madt_info){
-		res = irq_use_apic_and_hpet();
-		if (res >= 0) return res;
-	}
+	interrupt_unmask(0);
 
-	if(has_pic && acpi_madt_info){
-		res = irq_use_apic_and_pic();
-		if (res >= 0) return res;
-	}
+	ret = clockevent_register(ce);
+	if (ret < 0)
+		return ret;
 
-	if(has_pic){
-		res = irq_use_pic();
-		if (res >= 0) return res;
-	}
+	ret = clockevent_start_periodic(TIMER_FREQUENCY_HZ);
+	if (ret < 0)
+		return ret;
 
-	panic("x86: only support APIC + PIC.");
-}
-
-int __init interrupt_init(void){
-	int res;
-
-	if((res = acpi_load_all_tables()) < 0){
-		printk("x86: Failed to load ACPI tables: %d\n", res);
-		return res;
-	}
-
-	struct acpi_madt* madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
-	if(madt){
-		acpi_parse_madt(madt);
-	}
-	
-	if((res = irq_check_chips()) < 0){
-		printk("x86: Failed to setup IRQ chips: %d\n", res);
-		return res;
-	}
-
-	// Handle overrides if exists
+	printk("x86: clockevent started! %s @ %u Hz\n",
+		x86_irq_mode == X86_IRQ_MODE_APIC ? "APIC" : "PIC",
+		TIMER_FREQUENCY_HZ
+	);
 
 	return 0;
 }
 
+static __init int interrupt_setup_chips(void){
+	switch(x86_irq_mode){
+		case X86_IRQ_MODE_APIC:
+			return irq_switch_all_chips(&ioapic_chip, &ioapic_controller);
+		case X86_IRQ_MODE_PIC:
+			return irq_switch_all_chips(&i8259A_chip, &i8259A_controller);
+		default:
+			return -ENODEV;
+	}
+}
+
+int __init interrupt_init(void){
+	int ret;	
+
+	ret = irqdesc_init(irqdesc_setup);
+	if(ret < 0){
+		printk("x86: irqdesc init failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = interrupt_setup_chips();
+	if(ret < 0){
+		printk("x86: interrupt setup failed: %d\n", ret);
+		return ret;
+	}
+
+	// Handle overrides if exists
+	// TODO: Implement Irq overrides
+
+	// Always called after irq vector have be setup
+	ret = x86_clockevent_start();
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}

@@ -6,6 +6,7 @@
 #include <sys/types.h>
 
 #define NSEC_PER_SEC 1000000000ULL
+#define CLOCK_SET_MAX_SEC  ((uint64_t)INT64_MAX / NSEC_PER_SEC - 1)
 
 struct clocksource {
 	const char* name;
@@ -20,7 +21,7 @@ struct clockevent {
 	void* data;
 };
 
-int clock_init(uint32_t timer_hz);
+int clock_init(void);
 void clock_set_time_ns(time_ns_t time_ns);
 void clock_set_realtime_ns(time_ns_t time_ns);
 

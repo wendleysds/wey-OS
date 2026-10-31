@@ -1,5 +1,6 @@
 #include <kernel/interrupt.h>
 #include <kernel/init.h>
+#include <kernel/clock.h>
 #include <def/bits.h>
 #include <def/errno.h>
 
@@ -13,6 +14,9 @@
 
 extern const struct irq_chip i8259A_chip;
 extern const struct irq_controller i8259A_controller;
+
+static bool pic_remaped = false;
+static bool pic_running = false;
 
 struct pic_info master = {
     .cmd_port = PIC1_BASE,
@@ -64,6 +68,11 @@ static uint8_t pic_get_irq_reg(struct pic_info *pic, uint8_t ocw3) {
 }
 
 static void __init pic_remap(void) {
+    if(pic_remaped)
+        return;
+
+    pic_remaped = true;
+
     pic_write_cmd(&master, 0x11);
     pic_write_cmd(&slave, 0x11);
 
@@ -105,31 +114,6 @@ static void _irq15_handler(void) {
 
     pic_send_cmd_eoi(&slave);
     pic_send_cmd_eoi(&master);
-}
-
-static bool pic_remaped = false;
-int __init pic_init(int frequency) {
-    if (frequency <= 0 || frequency > PIT_FREQUENCY) {
-        return -EINVAL;
-    }
-
-    if(!pic_remaped){
-       pic_remap();
-       pic_remaped = true;
-    }
-
-    uint16_t divisor = (uint16_t)(PIT_FREQUENCY / frequency);
-
-    port_write8(PIT_COMMAND, 0x36);
-    port_write8(PIT_CHANNEL0, divisor & 0xFF);
-    port_write8(PIT_CHANNEL0, (divisor >> 8) & 0xFF);
-
-    master.current_frequency = frequency;
-    slave.current_frequency = frequency;
-
-    irq_domain_create_legacy("i8259A", 16, master.irq_base, 0, &i8259A_chip, &i8259A_controller);
-
-    return SUCCESS;
 }
 
 void pic_disable(void) {
@@ -199,6 +183,32 @@ static void pic_unmask(struct irq_desc* desc) {
     }
 }
 
+void pic_start_periodic(uint32_t hz){
+	if(pic_running) return;
+
+    pic_running = true;
+	uint16_t divisor = (uint16_t)(PIT_FREQUENCY / hz);
+
+	port_write8(PIT_COMMAND, 0x36); /* canal 0, modo 3 (square wave), binary */
+	port_write8(PIT_CHANNEL0, divisor & 0xFF);
+	port_write8(PIT_CHANNEL0, (divisor >> 8) & 0xFF);
+
+	master.current_frequency = (int)hz;
+	slave.current_frequency  = (int)hz;
+
+    uint8_t mask = pic_read_data(&master) & ~(1 << 0);
+	pic_write_data(&master, mask);
+}
+
+// PIC as IRQCHIP
+int __init pic_irqchip_init() {
+    pic_remap();
+
+    irq_domain_create_legacy("i8259A", 16, master.irq_base, 0, &i8259A_chip, &i8259A_controller);
+
+    return SUCCESS;
+}
+
 const struct irq_chip i8259A_chip = {
     .name = "i8259A",
     .mask = pic_mask,
@@ -208,4 +218,30 @@ const struct irq_chip i8259A_chip = {
 const struct irq_controller i8259A_controller = {
     .name = "i8259A",
     .eoi = pic_send_eoi,
+};
+
+// PIC as Clock
+static int i8259a_clockevent_start_periodic(void *data, uint32_t hz){
+	if(!hz || hz > PIT_FREQUENCY)
+		return -EINVAL;
+
+    // Necessary to not conflict with cpu exceptions
+    pic_remap();
+
+	pic_start_periodic(hz);
+
+	return 0;
+}
+
+static void i8259a_clockevent_stop(void *data){
+	uint8_t mask = pic_read_data(&master) | (1 << 0);
+	pic_write_data(&master, mask);
+    pic_running = false;
+}
+
+const struct clockevent i8259a_clockevent = {
+	.name           = "pit-i8259A",
+	.start_periodic = i8259a_clockevent_start_periodic,
+	.stop           = i8259a_clockevent_stop,
+	.data           = 0x0,
 };

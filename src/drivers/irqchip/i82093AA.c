@@ -204,7 +204,7 @@ int ioapic_init(uint32_t local_apic_id) {
     ioapic_version = ver_reg & 0xFF;
     ioapic_max_entries = ((ver_reg >> 16) & 0xFF) + 1;
 
-    printk("IOAPIC: ID %u, Version %u, Max Redirection Entries %u at 0x%lx (GSI base %u)\n",
+    printk("IOAPIC: ID=%u V=%u, Max Redirection Entries %u at 0x%lx (GSI base %u)\n",
            ioapic_id, ioapic_version, ioapic_max_entries, (unsigned long)phys_addr, gsi_base);
 
     // Initialize default ISA IRQ mappings (0-15)

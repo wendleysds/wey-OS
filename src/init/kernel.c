@@ -112,11 +112,11 @@ __no_return __init void kmain(){
 
 	module_load("Memory", memory_init);
 
+	module_load("Clock", clock_init);
+
 	module_load("Interrupt", interrupt_init);
 
 	module_load("Terminal", terminal_init);
-
-	clock_init(TIMER_FREQUENCY_HZ);
 
 	module_load("Scheduler", scheduler_init);
 
@@ -124,9 +124,9 @@ __no_return __init void kmain(){
 
 	kernel_thread(rest_init, "init", NULL);
 
-	interrupts_enable();
-
 	scheduler_start();
+
+	interrupts_enable();
 
 	while(1) cpu_relax();
 }

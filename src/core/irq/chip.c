@@ -113,21 +113,25 @@ int irq_switch_chip(int irq, const struct irq_chip *new_chip, const struct irq_c
 }
 
 int irq_switch_all_chips(const struct irq_chip *new_chip, const struct irq_controller *new_controller) {
-	for (int i = 0; i < TOTAL_INTERRUPTS; i++) {
-		struct irq_desc *desc = irq_desc_get_by_hwirq(i);
-		if (desc && (desc->chip || desc->handlers)) {
-			bool was_unmasked = !desc->masked;
+	struct irq_desc *desc;
 
+	for (int i = 0; i < TOTAL_INTERRUPTS; i++) {
+		desc = irq_desc_get_by_hwirq(i);
+		if(!desc) continue;
+
+		bool was_unmasked = !desc->masked;
+
+		if (desc->chip || desc->handlers) {
 			if (was_unmasked && desc->chip && desc->chip->mask) {
 				desc->chip->mask(desc);
 			}
+		}
 
-			desc->chip = new_chip;
-			desc->controller = new_controller;
+		desc->chip = new_chip;
+		desc->controller = new_controller;
 
-			if (was_unmasked && desc->chip && desc->chip->unmask) {
-				desc->chip->unmask(desc);
-			}
+		if (was_unmasked && desc->chip && desc->chip->unmask) {
+			desc->chip->unmask(desc);
 		}
 	}
 

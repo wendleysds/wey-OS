@@ -5,7 +5,6 @@
 #include <lib/list.h>
 #include <sync/atomic.h>
 #include <stdbool.h>
-#include <stdint.h>
 
 struct registers;
 struct irq_desc;
