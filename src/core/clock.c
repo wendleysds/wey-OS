@@ -1,4 +1,6 @@
 #include <kernel/clock.h>
+#include <kernel/syscall.h>
+#include <kernel/uaccess.h>
 #include <kernel/init.h>
 #include <def/errno.h>
 #include <lib/div64.h>
@@ -191,4 +193,76 @@ void clockevent_fire(void){
 		listener->handler(listener->data);
 	}
 	spin_unlock(&clockevent_lock);
+}
+
+SYSCALL_DEFINE2(clock_gettime, clockid_t, clockid, __user struct timespec *, ts){
+	struct timespec ktm;
+	time_ns_t nsec;
+
+	switch(clockid){
+	case CLOCK_REALTIME:
+		nsec = clock_get_realtime_ns();
+		break;
+	case CLOCK_MONOTONIC:
+		nsec = clock_get_monotonic_ns();
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	uint32_t rem = do_div(nsec, NSEC_PER_SEC);
+	ktm.tv_sec  = (time_t)nsec;
+	ktm.tv_nsec = (long)rem; 
+
+	if(copy_to_user(ts, &ktm, sizeof(ktm)) != 0)
+		return -EFAULT;
+
+	return 0;
+}
+
+SYSCALL_DEFINE2(clock_getres, clockid_t, clockid, __user struct timespec *, res){
+    struct timespec ktm;
+    time_ns_t nsec;
+
+    switch(clockid){
+    case CLOCK_REALTIME:
+    case CLOCK_MONOTONIC:
+        nsec = clock_get_resolution_ns();
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    if(!res)
+        return 0;
+
+    uint32_t rem = do_div(nsec, NSEC_PER_SEC);  /* nsec vira segundos */
+    ktm.tv_sec  = (time_t)nsec;
+    ktm.tv_nsec = (long)rem;
+
+    if(copy_to_user(res, &ktm, sizeof(ktm)) != 0)
+        return -EFAULT;
+
+    return 0;
+}
+
+SYSCALL_DEFINE2(clock_settime, clockid_t, clockid, __user const struct timespec *, ts){
+    struct timespec ktm;
+
+    if(clockid != CLOCK_REALTIME)
+        return -EINVAL;
+
+    if(copy_from_user(&ktm, ts, sizeof(ktm)) != 0)
+        return -EFAULT;
+
+    if(ktm.tv_sec < 0 || ktm.tv_nsec < 0 || ktm.tv_nsec >= NSEC_PER_SEC)
+        return -EINVAL;
+
+    if((uint64_t)ktm.tv_sec > CLOCK_SET_MAX_SEC)
+        return -EINVAL;
+
+    time_ns_t ns = (time_ns_t)ktm.tv_sec * NSEC_PER_SEC + (time_ns_t)ktm.tv_nsec;
+
+    clock_set_realtime_ns(ns);
+    return 0;
 }

@@ -23,8 +23,11 @@
 #22 i386 clone sys_clone
 #23 i386 mount sys_mount
 #24 i386 umount sys_umount
-#25 i386 spawn sys_spawn
+#25 i386 posix_spawn sys_posix_spawn
 #26 i386 dup sys_dup
+27 i386 clock_gettime sys_clock_gettime
+28 i386 clock_getres sys_clock_getres
+29 i386 clock_settime sys_clock_settime
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write
