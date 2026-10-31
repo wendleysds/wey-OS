@@ -109,7 +109,7 @@ static inline void gdt_set_tss(int cpu, struct tss *tss){
 }
 
 static inline void tss_init(int cpu){
-	if(cpu >= MAX_CPUS){
+	if(cpu < 0 || cpu >= MAX_CPUS){
 		return;
 	}
 
@@ -127,10 +127,10 @@ struct cpu* get_cpu(void){
 	return &cpus[0];
 }
 
-__init void cpu_init(void){
-	struct cpu *cpu = &cpus[0];
+void cpu_init(struct cpu *cpu){
 	cpu->id = 0;
 	tss_init(cpu->id);
+	cpu_detect_caps(cpu);
 }
 
 static __init void gdt_setup(){
@@ -311,7 +311,7 @@ __init void setup_arch(void){
 
 	gdt_setup();
 
-	cpu_init();
+	cpu_init(&cpus[0]);
 
 	idt_init();
 
