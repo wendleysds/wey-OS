@@ -1,6 +1,9 @@
 #ifndef _INPUT_KEYCODES_H
 #define _INPUT_KEYCODES_H
 
+// ALISES
+#define KEY_QUOTE KEY_APOSTROPHE
+
 enum input_keycode {
 	KEY_NONE = 0,
 	KEY_UNKNOWN,
@@ -55,7 +58,6 @@ enum input_keycode {
 	KEY_COMMA,
 	KEY_DOT,
 	KEY_SLASH,
-	KEY_QUOTE,
 
 	// Dedicated Navigation Cluster
 	KEY_INSERT,
