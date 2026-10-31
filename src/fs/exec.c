@@ -115,7 +115,7 @@ static int exec_binprm(struct binprm* bprm){
 
 	struct vm_region* region = vma_add(
 		bprm->mm, 
-		PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_SIZE, 
+		(PROC_USER_STACK_VIRUTAL_TOP - PROC_USER_STACK_INITIAL_SIZE) & ~(0x10 - 1), 
 		PROC_USER_STACK_VIRUTAL_TOP, 
 		(MEM_READ | MEM_WRITE | MEM_USER | MEM_GROWSDOWN), 
 		PROT_MAP_PRIVATE, 
