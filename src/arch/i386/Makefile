@@ -35,14 +35,23 @@ $(kernelsecs): $(BIN_DIR)/kernel.elf
 
 $(KBUILD_LDS): $(OBJ_DIR)/arch/i386/built-in.o ;
 
-kallsyms_src := $(OBJ_DIR)/kallsyms_data.c
-kallsyms_obj := $(OBJ_DIR)/kallsyms_data.o
+kallsyms1_src := $(OBJ_DIR)/kallsyms_data1.c
+kallsyms1_obj := $(OBJ_DIR)/kallsyms_data1.o
+kallsyms_src  := $(OBJ_DIR)/kallsyms_data.c
+kallsyms_obj  := $(OBJ_DIR)/kallsyms_data.o
 
-$(kallsyms_src): $(KBUILD_LDS) $(core-builtins) | $(BIN_DIR)
+$(kallsyms1_src): $(KBUILD_LDS) $(core-builtins) | $(BIN_DIR)
 	@mkdir -p $(dir $@)
-	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $(BIN_DIR)/kernel.tmp.elf $(core-builtins)
+	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $(BIN_DIR)/kernel.tmp1.elf $(core-builtins)
+	$(Q)python3 $(srcroot)/scripts/gen_kallsyms.py $(BIN_DIR)/kernel.tmp1.elf $@ $(NM)
+
+$(kallsyms1_obj): $(kallsyms1_src)
+	$(Q)$(CC) $(KBUILD_CFLAGS) -c $< -o $@
+
+$(kallsyms_src): $(KBUILD_LDS) $(core-builtins) $(kallsyms1_obj) | $(BIN_DIR)
+	$(Q)$(LD) $(KBUILD_LDFLAGS) -T $(KBUILD_LDS) -o $(BIN_DIR)/kernel.tmp2.elf $(core-builtins) $(kallsyms1_obj)
 	@echo "  GEN        kallsyms_data.c"
-	$(Q)python3 $(srcroot)/scripts/gen_kallsyms.py $(BIN_DIR)/kernel.tmp.elf $@ $(NM)
+	$(Q)python3 $(srcroot)/scripts/gen_kallsyms.py $(BIN_DIR)/kernel.tmp2.elf $@ $(NM)
 
 $(kallsyms_obj): $(kallsyms_src)
 	@echo "  CC         kallsyms_data.c"
