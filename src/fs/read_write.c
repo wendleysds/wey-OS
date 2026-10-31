@@ -74,7 +74,7 @@ SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
 		return -EFAULT;
 	}
 
-	if(!file->f_op->write){
+	if(!file->f_op || !file->f_op->write){
 		return -ENOSYS;
 	}
 
@@ -126,7 +126,7 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 		return -EFAULT;
 	}
 
-	if(!file->f_op->read){
+	if(!file->f_op || !file->f_op->read){
 		return -ENOSYS;
 	}
 
