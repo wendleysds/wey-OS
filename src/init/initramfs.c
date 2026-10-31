@@ -44,7 +44,7 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 		if(S_ISREG(cpio.mode)){
 			struct file* file = vfs_open(
 				cpio.name,
-				O_CREAT | O_TRUNC,
+				O_CREAT | O_TRUNC | O_WRONLY,
 				cpio.mode
 			);
 

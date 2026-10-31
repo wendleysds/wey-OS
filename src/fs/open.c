@@ -10,9 +10,15 @@
 extern struct mount *root_mount;
 
 struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
-	if (!path) return ERR_PTR(-EINVAL);
+	if (!path)
+		return ERR_PTR(-EINVAL);
 
-	struct inode *parent = NULL;
+	if (!*path)
+		return ERR_PTR(-ENOENT);
+
+	if ((flags & O_CREAT) && (flags & O_DIRECTORY))
+		return ERR_PTR(-EINVAL);
+
 	struct dentry *parent_dentry = NULL;
 
 	struct inode *ino = NULL;
@@ -20,11 +26,8 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	struct qstr last;
 	int trailing_slash = 0;
 
+	mode = (mode & ~S_IFMT) | S_IFREG;
 	if (flags & O_CREAT) {
-		if (flags & O_DIRECTORY) {
-			return ERR_PTR(-ENOENT);
-		}
-
 		parent_dentry = vfs_walk_parent(path, &last, &trailing_slash);
 		if (IS_ERR(parent_dentry)) {
 
@@ -37,15 +40,15 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 					return ERR_PTR(-EEXIST); 
 				}
 			} else {
-				return ERR_CAST(parent);
+				return ERR_CAST(parent_dentry);
 			}
 		} else {
 			if (trailing_slash) {
-				inode_put(parent);
+				dentry_put(parent_dentry);
 				return ERR_PTR(-ENOENT);
 			}
 
-			parent = parent_dentry->inode;
+			struct inode *parent = parent_dentry->inode;
 			inode_get(parent);
 
 			struct dentry dentry = {
@@ -108,19 +111,34 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	}
 
 	if (flags & O_TRUNC) {
+		if (!(flags & (O_WRONLY | O_RDWR))) {
+			inode_put(ino);
+			return ERR_PTR(-EINVAL);
+		}
+
 		if (S_ISDIR(ino->mode)) {
 			inode_put(ino);
 			return ERR_PTR(-EISDIR);
 		}
-		if (ino->i_op && ino->i_op->setattr) {
-			struct iattr iattr;
-			iattr.valid = ATTR_SIZE;
-			iattr.stat.size = 0;
-			ino->i_op->setattr(ino, &iattr);
+
+		if (!ino->i_op || !ino->i_op->setattr) {
+			inode_put(ino);
+			return ERR_PTR(-ENOSYS);
+		}
+
+		struct iattr attr = {
+			.valid = ATTR_SIZE,
+			.stat.size = 0,
+		};
+
+		int ret = ino->i_op->setattr(ino, &attr);
+		if (ret < 0) {
+			inode_put(ino);
+			return ERR_PTR(ret);
 		}
 	}
 
-	struct file* f = (struct file*)kmalloc(sizeof(struct file));
+	struct file* f = (struct file*)kzalloc(sizeof(struct file));
 	if (!f) {
 		inode_put(ino);
 		return ERR_PTR(-ENOMEM);
@@ -185,7 +203,7 @@ SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mo
 	if(IS_ERR_VALUE(len)){
 		return len;
 	}
-	
+
 	struct file* f = vfs_open(kpath, flags, mode);
 	if(IS_ERR(f)){
 		return PTR_ERR(f);
