@@ -1,12 +1,10 @@
 #include <kernel/sched.h>
-#include <kernel/panic.h>
-#include <kernel/printk.h>
 #include <kernel/stacktrace.h>
+#include <kernel/kallsyms.h>
 #include <mm/page.h>
 #include <mm/kmap.h>
 #include <mm/vma.h>
 #include <def/errno.h>
-#include <def/linker.h>
 #include <lib/string.h>
 #include <lib/assert.h>
 #include <asm/idt.h>
@@ -54,9 +52,13 @@ void dump_regs(struct registers* regs){
 		regs->si, regs->di, regs->sp, regs->bp
 	);
 
+	const char* name = NULL;
+	uintptr_t offset = 0;
+	kallsyms_lookup_symbol(regs->ip, &name, &offset);
+
 	printk(
-		"ip %#010lX cs %#010lX ss %#010lX\n",
-		regs->ip, regs->cs, regs->ss
+		"ip %#010lX (%s+%#lx) cs %#010lX ss %#010lX\n",
+		regs->ip, name ? name : "???", offset, regs->cs, regs->ss
 	);
 
 	printk(
@@ -94,7 +96,7 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 		memset(kernel_virt, 0x0, PAGE_SIZE);
 		vfs_lseek(region->file, file_offset, SEEK_SET);
 		int n = vfs_read(region->file, kernel_virt, PAGE_SIZE);
-		kunmap(kernel_virt);
+		kunmap(page);
 
 		if (n < 0) {
 			page_free(page);
@@ -112,10 +114,10 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 	return SUCCESS;
 }
 
-static int vm_handle_stack(struct vm_region* region, uintptr_t addr) {
+static int vm_handle_anon(struct vm_region* region, uintptr_t addr) {
 	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
-	
-	struct page* page = page_alloc(1, 0x0);
+
+	struct page* page = page_alloc(0, 0x0);
 	if (!page) return -ENOMEM;
 
 	void* kernel_virt = kmap(page);
@@ -125,7 +127,32 @@ static int vm_handle_stack(struct vm_region* region, uintptr_t addr) {
 	}
 
 	memset(kernel_virt, 0x0, PAGE_SIZE);
-	kunmap(kernel_virt);
+	kunmap(page);
+
+	int res = mmu_mmap(current->mm->ctx, page_to_phys(page), page_addr, PAGE_SIZE, region->mem_flags);
+	if (IS_ERR_VALUE(res)) {
+		page_free(page);
+		return res;
+	}
+
+	mmu_invlpg(current->mm->ctx, page_addr);
+	return SUCCESS;
+}
+
+static int vm_handle_stack(struct vm_region* region, uintptr_t addr) {
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+	
+	struct page* page = page_alloc(0, 0x0);
+	if (!page) return -ENOMEM;
+
+	void* kernel_virt = kmap(page);
+	if (!kernel_virt) {
+		page_free(page);
+		return -ENOMEM;
+	}
+
+	memset(kernel_virt, 0x0, PAGE_SIZE);
+	kunmap(page);
 
 	int res = mmu_mmap(current->mm->ctx, page_to_phys(page), page_addr, PAGE_SIZE, region->mem_flags);
 	if (IS_ERR_VALUE(res)) {
@@ -155,7 +182,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr) {
 		return SUCCESS;
 	}
 
-	struct page* new_page = page_alloc(1, 0x0);
+	struct page* new_page = page_alloc(0, 0x0);
 	if (!new_page) return -ENOMEM;
 
 	void* new_virt = kmap(new_page);
@@ -172,8 +199,8 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr) {
 
 	memcpy(new_virt, old_virt, PAGE_SIZE);
 
-	kunmap(old_virt);
-	kunmap(new_virt);
+	kunmap(page);
+	kunmap(new_page);
 
 	res = mmu_mmap(current->mm->ctx, page_to_phys(new_page), page_addr, PAGE_SIZE, region->mem_flags);
 	if (IS_ERR_VALUE(res)) {
@@ -186,7 +213,7 @@ static int vm_handle_cow(struct vm_region* region, uintptr_t addr) {
 	return SUCCESS;
 
 err_unmap_new:
-	kunmap(new_virt);
+	kunmap(new_page);
 err_free_new:
 	page_free(new_page);
 	return res;
@@ -218,23 +245,21 @@ static int fixup_page_fault(pf_info_t* pf){
 		return -EFAULT;
 	}
 
-	if(region->mem_flags & MEM_GROWSDOWN){
+	if(region->mem_flags & MEM_GROWSDOWN) {
 		handle_res = vm_handle_stack(region, pf->addr);
-	}
-	else if(region->file){
+	} else if(region->file) {
 		handle_res = vm_handle_file(region, pf->addr);
-	}else{
-		//TODO: handle anonymous pages
+	} else {
+		handle_res = vm_handle_anon(region, pf->addr);
 	}
 
 check_res:
 	if(handle_res != 0){
-		printk("page_fault_handler: failed with status \"%d\"!\n", handle_res);
+		printk("fixup_page_fault: failed with status \"%d\"!\n", handle_res);
 	}
 
 	return handle_res;
 }
-	
 
 void page_fault_handler(struct registers* regs){
 	pf_info_t pf = pf_decode(regs->err_code, cr2());
@@ -245,10 +270,9 @@ void page_fault_handler(struct registers* regs){
 			int res = fixup_page_fault(&pf);
 			if(IS_ERR_VALUE(res)){
 				regs->ip = e->fixup; 
-				return;
 			}
 
-			return; // continue where the fault accured
+			return;
 		}
 
 		show_pf_info(&pf);
