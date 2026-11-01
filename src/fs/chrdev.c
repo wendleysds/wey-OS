@@ -154,8 +154,6 @@ static const struct chrdev* chrdev_lookup(unsigned int major, unsigned int minor
 		if(entry->major == major){
 			if(minor < entry->first_minor + entry->minors_total)
 				return entry;
-			else
-				return NULL;
 		}
 
 		current = &entry->next;
