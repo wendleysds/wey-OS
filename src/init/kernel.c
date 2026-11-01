@@ -25,6 +25,9 @@ extern void setup_arch();
 extern struct task* init_task;
 extern struct mount *root_mount;
 
+static const char *argv_init[] = { NULL, NULL };
+static const char *envp_init[] = { "HOME=/", NULL };
+
 static inline void module_load(const char* module_name, int (*func)(void)){
 	int res = func();
 
@@ -65,6 +68,32 @@ static __init void do_initcalls(){
 	}
 }
 
+static void print_args(const char** args){
+	for (const char *const *p = args; *p; p++){
+		printk("Init:    [%d]=\"%s\"\n", p - args, *p);
+	}
+}
+
+static int run_init_process(const char *pathname) {
+	argv_init[0] = pathname;
+	printk("Init: Run %s as init process\n", pathname);
+	printk("Init: - with arguments:\n");
+	print_args(argv_init);
+
+	printk("Init: - with environment:\n");
+	print_args(envp_init);
+
+	return kernel_exec(pathname, argv_init, envp_init);
+}
+
+static void try_to_run_init_process(const char *pathname) {
+	int ret = run_init_process(pathname);
+
+	if (ret && ret != -ENOENT) {
+		printk("init(%s): failed to execute!(%d)\n", pathname, ret);
+	}
+}
+
 static __no_return void init(void){
 	buddy_add_memory(
 		__va(EARLY_STACK_BOTTOM),
@@ -75,8 +104,10 @@ static __no_return void init(void){
 		(uintptr_t)(__init_begin),
 		(size_t)(__init_end - __init_begin)
 	);
-	
-	kernel_exec("/init", 0x0, 0x0);
+
+	try_to_run_init_process("/init");
+	try_to_run_init_process("/bin/init");
+	try_to_run_init_process("/bin/sh");
 
 	unreachable();
 }
@@ -86,15 +117,25 @@ static __init int rest_init(void* unused){
 
 	do_initcalls();
 
-	vfs_mknod("/tty0", 00755 | S_IFCHR, MKDEV(4, 0));
-	struct file* tty = vfs_open("/tty0", 0x0, 0x0);
+	int res = vfs_mknod("/tty", 00755 | S_IFCHR, MKDEV(4, 0));
+	if(res) return res;
+
+	struct file* tty = vfs_open("/tty", O_RDWR, 00);
+	if(IS_ERR(tty)){
+		return PTR_ERR(tty);
+	}
 
 	current->cwd.dentry = dentry_get(root_mount->mnt_root);
 	current->cwd.mount = root_mount;
 
-	task_add_file(current, tty); // stdin   0
-	task_add_file(current, tty); // stdout  1
-	task_add_file(current, tty); // stderr  2
+	res = task_add_file(current, tty); // stdin   0
+	if(res < 0) return res;
+
+	res = task_add_file(current, tty); // stdout  1
+	if(res < 0) return res;
+
+	res = task_add_file(current, tty); // stderr  2
+	if(res < 0) return res;
 
 	file_put(tty); // file_table now holds a reference, so we can release ours
 
