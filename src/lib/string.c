@@ -62,6 +62,18 @@ void* memmove(void *dest, const void *src, unsigned long n){
 	return dest;
 }
 
+void* memchr(const void *s, int c, unsigned long n){
+	const unsigned char *p = s;
+
+	while (n--) {
+		if (*p == (unsigned char)c)
+			return (void *)p;
+		p++;
+	}
+
+	return NULL;
+}
+
 int strlen(const char *s){
 	const char *p;
 	for (p = s; *p; ++p);

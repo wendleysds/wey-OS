@@ -258,6 +258,6 @@ static inline void file_put(struct file* file){
 	}
 }
 
-int kernel_exec(const char* pathname, const char* argv[], const char* envp[]);
+int kernel_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 
 #endif

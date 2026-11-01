@@ -11,6 +11,9 @@ struct file;
 struct binprm{
 	int argc, envc;
 
+	struct mm_struct* mm;
+	struct mm_struct *old_mm;
+
 	void* entryPoint;
 
 	uintptr_t curMemTop;
@@ -19,12 +22,6 @@ struct binprm{
 	struct file* file;
 
 	const char* filename;
-	const char* interp;
-	const char* fdpath;
-
-	int execfd;
-
-	struct mm_struct* mm;
 
 	char buff[BINPRM_BUFF_SIZE];
 }__attribute__((packed));
