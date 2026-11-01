@@ -51,7 +51,7 @@ static const keymap_entry_t qwerty_us_map[NR_KEYS] = {
 	[KEY_SPACE]     = {' ', ' '},
 	[KEY_ENTER]     = {'\n', '\n'},
 	[KEY_TAB]       = {'\t', '\t'},
-	[KEY_BACKSPACE] = {'\b', '\b'},
+	[KEY_BACKSPACE] = {0x7F, 0x7F},
 
 	// Numpad (NumLock=true)
 	[KEY_KP_0]        = {'0', '0'}, [KEY_KP_1] = {'1', '1'},
