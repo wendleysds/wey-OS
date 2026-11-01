@@ -1,7 +1,7 @@
 #include <kernel/printk.h>
 #include <def/config.h>
-#include <lib/serial.h>
 #include <lib/stdio.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -14,7 +14,6 @@ static uint64_t printk_cursor = 0;
 static inline void printk_write_char(char c, void* ctx){
 	printk_circular_buffer[printk_cursor % PRINTK_BUFFER_SIZE] = c;
 	printk_cursor++;
-	serial_putchar(c);
 }
 
 void printk_show_buffer(){
