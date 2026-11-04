@@ -3,8 +3,6 @@
 
 static struct tm global_tm_buffer;
 
-extern uint32_t do_div_32(uint64_t *n, uint32_t base);
-
 static const int __mon_yday[2][12] = {
     {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
     {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335}
@@ -19,20 +17,16 @@ struct tm *gmtime_r(const time_t *timer, struct tm *result) {
 
     uint64_t t = (uint64_t)*timer;
     
-    // do_div_32 divide 't' por 86400 e retorna o resto (segundos do dia)
-    uint32_t day_seconds = do_div_32(&t, 86400);
-    uint32_t days_32 = (uint32_t)t; // Quantidade de dias cabe em 32-bit
+    uint32_t day_seconds = (uint32_t)(t % 86400);
+    uint32_t days_32 = (uint32_t)(t / 86400);
 
-    // Decomposição de segundos no dia usando divisão simples de 32-bit
     result->tm_sec = day_seconds % 60;
     result->tm_min = (day_seconds / 60) % 60;
     result->tm_hour = day_seconds / 3600;
 
-    // Dia da semana: Epoch (1970-01-01) foi Quinta-feira (4)
     result->tm_wday = (int)((days_32 + 4) % 7);
 
-    // Algoritmo de Calendário Civil de Hinnant
-    long days = (long)days_32 + 719468; // Shift até 0000-03-01
+    long days = (long)days_32 + 719468;
     long era = (days >= 0 ? days : days - 146096) / 146097;
     unsigned long doe = (unsigned long)(days - era * 146097);
     unsigned long yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
@@ -55,7 +49,6 @@ struct tm *gmtime_r(const time_t *timer, struct tm *result) {
     return result;
 }
 
-/* --- gmtime --- */
 struct tm *gmtime(const time_t *timer) {
     return gmtime_r(timer, &global_tm_buffer);
 }

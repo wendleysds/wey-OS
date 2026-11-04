@@ -20,36 +20,7 @@ static int skip_stoi(const char **s) {
     return i;
 }
 
-static uint32_t do_div_32(uint64_t *n, uint32_t base) {
-    uint32_t rem;
-    
-    #if defined(__i386__) || defined(__i686__)
-    uint32_t high = (uint32_t)(*n >> 32);
-    uint32_t low = (uint32_t)(*n);
-
-    if (high == 0) {
-        asm("divl %4"
-            : "=a"(low), "=d"(rem)
-            : "a"(low), "d"(0), "r"(base));
-        *n = low;
-    } else {
-        asm("divl %4"
-            : "=a"(high), "=d"(rem)
-            : "a"(high), "d"(0), "r"(base));
-
-        asm("divl %4"
-            : "=a"(low), "=d"(rem)
-            : "a"(low), "d"(rem), "r"(base));
-
-        *n = ((uint64_t)high << 32) | low;
-    }
-    #else
-    rem = (uint32_t)(*n % base);
-    *n = *n / base;
-    #endif
-
-    return rem;
-}
+extern uint32_t do_div_32(uint64_t *n, uint32_t base);
 
 #define EMIT(c) do { putc((c), ctx); count++; } while(0)
 
@@ -102,7 +73,7 @@ static int print_float(void (*putc)(char c, void *ctx), void *ctx,
     } else if (fmt_char == 'e' || fmt_char == 'E') {
         use_e = true;
         if (precision == -1) precision = 6;
-    } else { // 'f' ou 'F'
+    } else {
         if (precision == -1) precision = 6;
     }
     

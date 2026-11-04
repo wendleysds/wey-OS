@@ -3,16 +3,8 @@
 div_t div(int numer, int denom) {
     div_t result;
 
-#if defined(__i386__) || defined(__i686__)
-    asm("cltd\n\t"
-        "idivl %2"
-        : "=a"(result.quot), "=d"(result.rem)
-        : "r"(denom), "a"(numer)
-        : "cc");
-#else
     result.quot = numer / denom;
     result.rem  = numer % denom;
-#endif
 
     return result;
 }

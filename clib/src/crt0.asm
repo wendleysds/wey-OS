@@ -8,8 +8,8 @@ _start:
 	xor ebp, ebp
 
 	mov ecx, [esp]               ; ECX = argc
-    lea edx, [esp + 4]           ; EDX = argv
-    lea esi, [edx + ecx * 4 + 4] ; ESI = envp
+	lea edx, [esp + 4]           ; EDX = argv
+	lea esi, [edx + ecx * 4 + 4] ; ESI = envp
 
 	and esp, -16
 
