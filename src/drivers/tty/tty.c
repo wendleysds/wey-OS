@@ -55,7 +55,7 @@ struct tty_driver* tty_alloc_driver(){
 struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index){
 	struct tty_struct* tty = driver->ttys[index];
 	if(!tty){
-		tty = kmalloc(sizeof(struct tty_struct));
+		tty = kzalloc(sizeof(struct tty_struct));
 		if(!tty){
 			return ERR_PTR(-ENOMEM);
 		}
