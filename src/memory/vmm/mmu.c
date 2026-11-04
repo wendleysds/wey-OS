@@ -191,7 +191,7 @@ static int walk_to(struct paging_ctx *ctx, uintptr_t va, struct walk_level *leve
 }
 
 #ifdef USE_GENERIC_WALKER
-static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t create, uint8_t user_table, uint8_t leaf_order) {
+static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t create, uint8_t user_table, uint8_t leaf_order, uint8_t* out_level) {
 	const struct paging_format *restrict fmt = ctx->fmt;
 	const struct paging_ops *restrict ops = ctx->ops;
 
@@ -207,7 +207,7 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 		const pte_t pte_val = *entry;
 
 		if (i == stop_level || (pte_present(pte_val) && pte_leaf(pte_val, i))) {
-			return entry;
+			goto out;
 		}
 
 		if (likely(pte_present(pte_val))) {
@@ -216,11 +216,24 @@ static pte_t* __generic_walker(const struct paging_ctx *restrict ctx, uintptr_t 
 		else if (create) {
 			table = ensure_table(ctx, entry, user_table, 0);
 
-			if (unlikely(!table)) return NULL;
+			if (unlikely(!table)){
+				entry = NULL;
+				goto out;
+			};
 		}
 		else {
-			return NULL;
+			entry = NULL;
+			goto out;
 		}
+
+		continue;
+	
+out:
+		if(out_level){
+			*out_level = i;	
+		}
+
+		return entry;
 	}
 
 	unreachable();
@@ -438,11 +451,16 @@ static void* clone_level(
 }
 
 static inline pte_t* walk_create(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t page_order, uint8_t user_table) {
-	return walker(ctx, vaddr, stop_level, 1, user_table, page_order);
+	return walker(ctx, vaddr, stop_level, 1, user_table, page_order, NULL);
 }
 
+static inline pte_t* walk_level(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level, uint8_t* out_level) {
+	return walker(ctx, vaddr, stop_level, 0, 0, 0, out_level);
+}
+
+
 static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr, uint8_t stop_level) {
-	return walker(ctx, vaddr, stop_level, 0, 0, 0);
+	return walker(ctx, vaddr, stop_level, 0, 0, 0, NULL);
 }
 
 int __init mmu_init(){
@@ -534,9 +552,19 @@ void mmu_munmap(struct paging_ctx *ctx, uintptr_t vaddr, size_t size) {
 }
 
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr){
-	pte_t* pte = walk(ctx, vaddr, ctx->fmt->levels);
-	if(pte){
-		return ctx->ops->pte_phys(*pte);
+	if (vaddr >= KERNEL_DIRECTMAP_START && (vaddr + PAGE_SIZE) <= KERNEL_DIRECTMAP_END) {
+		return __pa(vaddr);
+	}
+
+	uint8_t level = 0;
+	pte_t* pte = walk_level(ctx, vaddr, ctx->fmt->levels - 1, &level);
+
+	if(pte && ctx->ops->pte_present(*pte)){
+		uint8_t shift = ctx->fmt->lvl[level].shift;
+		uintptr_t page_mask = (1ULL << shift) - 1;
+		uintptr_t base_phys = ctx->ops->pte_phys(*pte) & ~page_mask;
+
+		return base_phys | (vaddr & page_mask);
 	}
 
 	return 0;
@@ -594,17 +622,16 @@ struct paging_ctx* mmu_clone_context(struct paging_ctx *src) {
 }
 
 int mmu_context_switch(struct paging_ctx *ctx){
-	if(!ctx){
+	if(!ctx || !ctx->root){
 		return -EINVAL;
 	}
 
-	uintptr_t target_phys = mmu_translate(ctx, (uintptr_t)ctx->root);
+	const uintptr_t target_phys = mmu_translate(ctx, (uintptr_t)ctx->root);
 	if (target_phys & (PAGE_SIZE - 1)) {
 		return -EINVAL;
 	}
 
-	uintptr_t curr_phys = paging_current_table_phys();
-
+	const uintptr_t curr_phys = paging_current_table_phys();
 	if(target_phys == curr_phys){
 		return OK;
 	}
