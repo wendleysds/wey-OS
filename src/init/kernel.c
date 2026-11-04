@@ -1,5 +1,6 @@
 #include <kernel/syscall.h>
 #include <kernel/interrupt.h>
+#include <kernel/kallsyms.h>
 #include <kernel/device.h>
 #include <kernel/sched.h>
 #include <kernel/clock.h>
@@ -52,10 +53,20 @@ static initcall_entry_t* initcall_levels[] __initdata = {
 
 static __init void _do_initcall_level(int level){
 	for(initcall_entry_t* fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++){
-		int res = initcall_from_entry(fn)();
+		initcall_t initcall = initcall_from_entry(fn);
+
+		int res = initcall();
 		if(IS_ERR_VALUE(res)){
-			panic("initcall '%#x' returned status %d\n", 
-				initcall_from_entry(fn), 
+			const char* name = NULL;
+			kallsyms_lookup_symbol(
+				(uintptr_t)initcall, 
+				&name, 
+				NULL
+			);
+
+			panic("initcall<%d>(%s): failed \"%d\"\n", 
+				level,
+				name ? name : "???",
 				res
 			);
 		}

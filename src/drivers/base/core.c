@@ -1,5 +1,6 @@
 #include <kernel/device.h>
 #include <kernel/resource.h>
+#include <kernel/printk.h>
 #include <kernel/init.h>
 #include <mm/kheap.h>
 #include <lib/string.h>
@@ -80,6 +81,7 @@ void driver_register(struct device_driver *drv){
 				dev->driver = drv;
 				int ret = drv->probe(dev);
 				if (ret != 0) {
+					printk("driver(%s): prob device(%s) fail %d\n", drv->name, dev->name, ret);
 					dev->driver = NULL;
 				}
 			}
