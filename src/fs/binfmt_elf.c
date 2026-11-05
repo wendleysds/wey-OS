@@ -54,6 +54,8 @@ static int load_elf_binarie(struct binprm *bprm){
 		return res;
 	}
 
+	uintptr_t load_end = 0;
+
 	for (int i = 0; i < ehdr->e_phnum; i++) {
 		struct Elf32_Phdr* phdr = &phdrs[i];
 		if (phdr->p_type != PT_LOAD){
@@ -78,9 +80,18 @@ static int load_elf_binarie(struct binprm *bprm){
 			vma_clean(bprm->mm);
 			return PTR_ERR(region);
 		}
+
+		uintptr_t seg_end = phdr->p_vaddr + phdr->p_memsz;
+		if (seg_end > load_end)
+			load_end = seg_end;
 	}
 
 	bprm->entryPoint = (void*)ehdr->e_entry;
+
+	/* Set brk_start just past the last loaded segment, page-aligned */
+	uintptr_t brk_base = (load_end + 0xFFF) & ~0xFFFU;
+	bprm->mm->brk_start = brk_base;
+	bprm->mm->brk       = brk_base;
 
 	return SUCCESS;
 }
