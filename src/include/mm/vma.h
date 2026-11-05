@@ -44,6 +44,7 @@ struct vm_region* vma_add(
 );
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
+int vma_remove_range(struct mm_struct* mm, uintptr_t start, uintptr_t end);
 void vma_clean(struct mm_struct* mm);
 void vma_destroy(struct mm_struct* mm);
 struct mm_struct* vma_dup(struct mm_struct* mm);

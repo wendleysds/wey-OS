@@ -135,6 +135,98 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr){
 	return -ENOENT;
 }
 
+int vma_remove_range(struct mm_struct* mm, uintptr_t start, uintptr_t end) {
+	if(!mm || start >= end)
+		return -EINVAL;
+
+	if(start & (PAGE_SIZE - 1))
+		return -EINVAL;
+
+	end = ALIGN_UP(end, PAGE_SIZE);
+	if(end <= start)
+		return -EINVAL;
+
+	struct vm_region* spare = kzalloc(sizeof(struct vm_region));
+	if(!spare)
+		return -ENOMEM;
+
+	struct vm_region* dead = NULL;
+
+	spin_lock(&mm->spinlock);
+
+	struct vm_region* prev = NULL;
+	struct vm_region* curr = mm->vma;
+
+	while(curr && curr->start < end){
+		struct vm_region* next = curr->next;
+
+		if(curr->end <= start){
+			prev = curr;
+			curr = next;
+			continue;
+		}
+
+		if(start <= curr->start && end >= curr->end){
+			if(prev)
+				prev->next = next;
+			else
+				mm->vma = next;
+
+			curr->next = dead;
+			dead = curr;
+
+			curr = next;
+			continue;
+		}
+
+		if(start <= curr->start){
+			if(curr->file)
+				curr->file_offset += (off_t)(end - curr->start);
+
+			curr->start = end;
+		}else if(end >= curr->end){
+			curr->end = start;
+		}else{
+			spare->start      = end;
+			spare->end        = curr->end;
+			spare->mem_flags  = curr->mem_flags;
+			spare->prot_flags = curr->prot_flags;
+			spare->file       = curr->file;
+
+			if(curr->file){
+				spare->file_offset = curr->file_offset + (off_t)(end - curr->start);
+				file_get(curr->file);
+			}
+
+			spare->next = next;
+			curr->end   = start;
+			curr->next  = spare;
+
+			spare = NULL;
+		}
+
+		prev = curr;
+		curr = next;
+	}
+
+	spin_unlock(&mm->spinlock);
+
+	while(dead){
+		struct vm_region* n = dead->next;
+
+		if(dead->file)
+			file_put(dead->file);
+
+		kfree(dead);
+		dead = n;
+	}
+
+	if(spare)
+		kfree(spare);
+
+	return SUCCESS;
+}
+
 void vma_clean(struct mm_struct* mm){
 	struct vm_region* region = mm->vma;
 	while (region) {
