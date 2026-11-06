@@ -30,8 +30,8 @@ static void task_destroy_mm(struct task* task){
 	if(!task->mm){
 		return;
 	}
-
-	vma_put(task->mm);
+	
+	mm_put(task->mm);
 	task->mm = NULL;
 }
 
