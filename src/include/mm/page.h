@@ -14,6 +14,7 @@
 #define PG_BAD        (1U << 2)
 // Ownership
 #define PG_KERNEL     (1U << 3)
+#define PG_USER       (0)
 // Type
 #define PG_SLAB       (1U << 4)
 #define PG_TABLE      (1U << 5)

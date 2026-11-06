@@ -37,7 +37,7 @@ static struct task *copy_process() {
 	child->kstack = new_kstack;
 	copy_thread(cur, child, 0x0, 0x0);
 
-	struct mm_struct *c_mm = vma_dup(cur->mm);
+	struct mm_struct *c_mm = mm_dup(cur->mm);
 	if (!c_mm) {
 		file_table_destroy(child->files);
 		kfree(new_kstack);

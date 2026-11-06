@@ -62,7 +62,7 @@ static struct binprm* bprm_alloc(const char* filename){
 		return ERR_PTR(-ENOMEM);
 	}
 
-	struct mm_struct* mm = vma_alloc();
+	struct mm_struct* mm = mm_alloc();
 	if(!mm){
 		kfree(bprm);
 		return ERR_PTR(-ENOMEM);
@@ -70,14 +70,14 @@ static struct binprm* bprm_alloc(const char* filename){
 
 	char* kfilename = strdup(filename);
 	if(!kfilename){
-		vma_destroy(mm);
+		mm_destroy(mm);
 		kfree(bprm);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	struct file* file = vfs_open(filename, O_RDONLY, 0x0);
 	if(IS_ERR_VALUE(file)){
-		vma_destroy(mm);
+		mm_destroy(mm);
 		kfree(bprm);
 		kfree(kfilename);
 		return ERR_CAST(file);
@@ -85,7 +85,7 @@ static struct binprm* bprm_alloc(const char* filename){
 
 	struct paging_ctx* ctx = mmu_create_context();
 	if(!ctx){
-		vma_destroy(mm);
+		mm_destroy(mm);
 		vfs_close(file);
 		kfree(kfilename);
 		kfree(bprm);
@@ -115,7 +115,7 @@ static void bprm_free(struct binprm* bprm){
 
 static void bprm_destroy(struct binprm* bprm){
 	if(bprm->mm){
-		vma_destroy(bprm->mm);
+		mm_destroy(bprm->mm);
 	}
 
 	BUG_ON(bprm->old_mm);
@@ -320,7 +320,7 @@ static __no_return void exec_binprm(struct binprm* bprm){
 	struct task* cur = current;
 
 	if(bprm->old_mm){
-		vma_destroy(bprm->old_mm);
+		mm_destroy(bprm->old_mm);
 	}
 
 	start_thread_user(

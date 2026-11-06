@@ -22,8 +22,6 @@ struct vm_region {
 	off_t file_offset;
 
 	struct vm_region *next;
-
-	atomic_t refcount;
 };
 
 struct mm_struct {
@@ -32,10 +30,10 @@ struct mm_struct {
 	uintptr_t brk_start;
 	uintptr_t brk;
 	atomic_t refcount;
-	spinlock_t spinlock;
+	spinlock_t lock;
 };
 
-struct mm_struct* vma_alloc(void);
+// vm region operations
 struct vm_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr);
 struct vm_region* vma_add(
 	struct mm_struct* mm, uintptr_t start, uintptr_t end,
@@ -45,18 +43,22 @@ struct vm_region* vma_add(
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
 int vma_remove_range(struct mm_struct* mm, uintptr_t start, uintptr_t end);
-void vma_clean(struct mm_struct* mm);
-void vma_destroy(struct mm_struct* mm);
-struct mm_struct* vma_dup(struct mm_struct* mm);
 
-static inline void vma_put(struct mm_struct* mm){
+// mm struct operations
+struct mm_struct* mm_alloc(void);
+void mm_clean(struct mm_struct* mm);
+void mm_destroy(struct mm_struct* mm);
+struct mm_struct* mm_dup(struct mm_struct* mm);
+
+static inline void mm_put(struct mm_struct* mm){
 	if(atomic_dec_and_test(&mm->refcount)){
-		vma_destroy(mm);
+		mm_destroy(mm);
 	}
 }
 
-static inline void vma_get(struct mm_struct* mm){
-	atomic_inc(&mm->refcount);
+static inline struct mm_struct* mm_get(struct mm_struct* mm){
+	if(mm) atomic_inc(&mm->refcount);
+	return mm;
 }
 
 #endif

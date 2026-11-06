@@ -77,7 +77,7 @@ static int load_elf_binarie(struct binprm *bprm){
 		);
 
 		if(IS_ERR_VALUE(region)){
-			vma_clean(bprm->mm);
+			mm_clean(bprm->mm);
 			return PTR_ERR(region);
 		}
 
