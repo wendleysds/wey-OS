@@ -1,27 +1,25 @@
 #ifndef _STRING_H
 #define _STRING_H
 
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
+#include <stddef.h>
 
-void* memset(void*, int, unsigned long);
-void* memcpy(void* dest, const void* src, unsigned long length);
-int memcmp(const void *s1, const void *s2, int count);
-void* memmove(void *dest, const void *src, unsigned long n);
-void *memchr(const void *s, int c, unsigned long n);
+void* memset(void* d, int c, size_t m);
+void* memcpy(void* d, const void* s, size_t n);
+int memcmp(const void *s1, const void *s2, size_t n);
+void* memmove(void *d, const void *s, size_t n);
+void *memchr(const void *s, int c, size_t n);
 
-int strlen(const char *s);
-int strnlen(const char *s, int maxlen);
-char *strcpy(char *restrict dst, const char *restrict src);
-char *strncpy(char *restrict dst, const char *restrict src, int maxlen);
-char *strcat(char *restrict dst, const char *restrict src);
+size_t strlen(const char *s);
+size_t strnlen(const char *s, size_t n);
+char *strcpy(char *restrict d, const char *restrict s);
+char *strncpy(char *restrict d, const char *restrict s, size_t n);
+char *strcat(char *restrict d, const char *restrict s);
 char *strchr(const char *s, int c);
 char *strrchr(const char *s, int c);
 char *strbrk(const char *s, const char *accept);
 char *strtok(char *restrict str, const char *restrict delim);
 int strcmp(const char *s1, const char *s2);
-int strncmp(const char *s1, const char *s2, int maxlen);
+int strncmp(const char *s1, const char *s2, size_t n);
 char* strdup(const char *s);
 
 #endif

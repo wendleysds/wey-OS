@@ -1,47 +1,37 @@
 #include <mm/kheap.h>
+#include <lib/string.h>
 
-void* memset(void* ptr, int c, unsigned long size){
+void* memset(void* ptr, int c, size_t size){
 	char* temp = (char*) ptr;
 
-	for(unsigned long i = 0; i < size; i++){
-		temp[i] = (char) c;
+	for(size_t i = 0; i < size; i++){
+		temp[i] = (char)c;
 	}
 
 	return ptr;
 }
 
-void* memcpy(void* dest, const void* src, unsigned long length){
-	char *d = (char*)dest;
-	const char *s = (const char*)src;
+void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
 
-	if(d < s){
-		while(length--){
-			*d++ = *s++;
-		}
-	}
-	else{
-		while(length--){
-			*(d + length) = *(s + length);
-		}
-	}
+    while(n--){
+        *d++ = *s++;
+    }
 
-	return d;
+    return dest;
 }
 
-int memcmp(const void* s1, const void* s2, int count){
-	char* c1 = (char*) s1;
-	char* c2 = (char*) s2;
-
-	while(count-- > 0){
-		if(*c1++ != *c2++){
-			return c1[-1] < c2[-1] ? -1 : 1;
-		}
+int memcmp(const void *a, const void *b, size_t n) {
+	const unsigned char *pa = a, *pb = b;
+	while (n--) {
+		if (*pa != *pb) return *pa - *pb;
+		pa++; pb++;
 	}
-
 	return 0;
 }
 
-void* memmove(void *dest, const void *src, unsigned long n){
+void* memmove(void *dest, const void *src, size_t n){
 	char *d = (char *)dest;
 	const char *s = (const char *)src;
 
@@ -62,7 +52,7 @@ void* memmove(void *dest, const void *src, unsigned long n){
 	return dest;
 }
 
-void* memchr(const void *s, int c, unsigned long n){
+void* memchr(const void *s, int c, size_t n){
 	const unsigned char *p = s;
 
 	while (n--) {
@@ -74,14 +64,14 @@ void* memchr(const void *s, int c, unsigned long n){
 	return NULL;
 }
 
-int strlen(const char *s){
+size_t strlen(const char *s){
 	const char *p;
 	for (p = s; *p; ++p);
 	return (p - s);
 }
 
-int strnlen(const char *s, int maxlen){
-	int i = 0;
+size_t strnlen(const char *s, size_t maxlen){
+	size_t i = 0;
 	for(; i < maxlen; i++){
 		if(!s[i]) break;
 	}
@@ -97,21 +87,15 @@ char* strcpy(char *restrict dst, const char *restrict src){
 	return dst;
 }
 
-char* strncpy(char *restrict dst, const char *restrict src, int maxlen){
-	for(int i = 0; i < maxlen - 1; i++)
-	{
-		if(!*src) break;
-
-		*dst = *src;
-		src++;
-		dst++;
-	}
-
-	return dst;
+char *strncpy(char *d, const char *s, size_t n){
+	size_t i = 0;
+	for (; i < n && s[i]; i++) d[i] = s[i];
+	for (; i < n; i++) d[i] = '\0';
+	return d;
 }
 
 char* strcat(char *restrict dst, const char *restrict src){
-	strcpy(dst + sizeof(dst), src);
+	strcpy(dst + strlen(dst), src);
 	return dst;
 }
 
@@ -120,18 +104,9 @@ int strcmp(const char *s1, const char *s2){
 	return (*s1 > *s2) - (*s2  > *s1);
 }
 
-int strncmp(const char *s1, const char *s2, int maxlen){
-	while (maxlen && *s1 && (*s1 == *s2))
-  {
-		++s1;
-		++s2;
-		--maxlen;
-	}
-
-	if (maxlen == 0)
-		return 0;
-	else
-		return (*(unsigned char *)s1 - *(unsigned char *)s2);
+int strncmp(const char *a, const char *b, size_t n){
+	while (n && *a && *a == *b) { a++; b++; n--; }
+	return n ? (unsigned char)*a - (unsigned char)*b : 0;
 }
 
 char *strchr(const char *s, int c){
@@ -190,15 +165,24 @@ char* strtok(char *restrict s, const char *restrict delim){
 }
 
 char* strdup(const char *s) {
-	if (!s) return NULL;
-	if (*s == '\0') return NULL; // Handle empty string case
+	char *copy;
+	size_t len;
 
-	long len = strlen(s);
-	char *copy = (char *)kmalloc(len + 1);
-	if (!copy) return NULL; // Memory allocation failed
+	if (!s || *s == '\0') {
+		copy = (char *)kmalloc(1);
+		if (!copy) return NULL;
+		*copy = '\0';
+		return copy; 
+	}
+	
+	if (*s == '\0') return NULL;
+
+	len = strlen(s);
+	copy = (char *)kmalloc(len + 1);
+	if (!copy) return NULL;
 
 	memcpy(copy, s, len);
-	copy[len] = '\0'; // Null-terminate the string
+	copy[len] = '\0';
 	return copy;
 }
 

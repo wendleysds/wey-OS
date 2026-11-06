@@ -1,10 +1,8 @@
 #include <string.h>
 
-char* strncpy(char* dest, const char* src, size_t n){
-    char* d = dest;
-
-    while(n-- && (*d++ = *src++));
-    while(n--) *d++ = '\0';
-
-    return dest;
+char *strncpy(char *d, const char *s, size_t n){
+    size_t i = 0;
+    for (; i < n && s[i]; i++) d[i] = s[i];
+    for (; i < n; i++) d[i] = '\0';
+    return d;
 }
