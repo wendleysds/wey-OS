@@ -172,8 +172,6 @@ __no_return __init void kmain(){
 
 	module_load("Scheduler", scheduler_init);
 
-	pid_init();
-
 	kernel_thread(rest_init, "init", NULL);
 
 	scheduler_start();

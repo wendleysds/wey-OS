@@ -6,9 +6,10 @@
 #define PID_FREE 0
 #define PID_ALLOC 1
 
-static pid_t pids[PROC_MAX];
-static pid_t next_free_pid;
-static spinlock_t pid_spinlock;
+static pid_t pids[PROC_MAX] = { [0] = PID_ALLOC };
+static pid_t next_free_pid = 1;
+
+static DEFINE_SPINLOCK(pid_spinlock);
 
 pid_t pid_alloc(){
 	spin_lock(&pid_spinlock);
@@ -30,18 +31,14 @@ pid_t pid_alloc(){
 }
 
 void pid_free(pid_t pid){
-	pids[pid] = PID_FREE;
-	next_free_pid = pid;
-}
-
-void __init pid_init(void){
-	for(pid_t i = 0; i < PROC_MAX; i++){
-		pids[i] = PID_FREE;
+	if(pid <= 0 || pid >= PROC_MAX){
+		return;
 	}
 
-	next_free_pid = pids[0] = PID_ALLOC; // reserved init
-
-	spinlock_init(&pid_spinlock);
+	spin_lock(&pid_spinlock);
+	pids[pid] = PID_FREE;
+	next_free_pid = pid;
+	spin_unlock(&pid_spinlock);
 }
 
 SYSCALL_DEFINE0(getpid){
