@@ -14,6 +14,7 @@ RANLIB  = $(CROSS_COMPILE)ranlib
 # CFLAGS
 CFLAGS := -m32 \
     -Iinclude \
+    -I../src/include/uapi \
     -std=gnu11 \
     -ffreestanding \
     -nostdlib \

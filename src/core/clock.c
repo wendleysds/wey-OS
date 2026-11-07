@@ -9,7 +9,7 @@
 #include <sync/spinlock.h>
 #include <def/config.h>
 
-#include <uapi/clock/time.h>
+#include <sys/time.h>
 
 extern int arch_setup_clock(void);
 
