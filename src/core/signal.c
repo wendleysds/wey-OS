@@ -1,0 +1,125 @@
+#include <kernel/sched.h>
+#include <kernel/signal.h>
+#include <kernel/syscall.h>
+#include <kernel/uaccess.h>
+#include <def/errno.h>
+#include <lib/assert.h>
+
+static bool default_is_ignore(int sig) {
+    switch(sig){
+        case SIGCHLD:
+        case SIGURG:
+        case SIGWINCH:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool default_is_core_dump(int sig){
+    switch(sig){
+        case SIGBUS:
+        case SIGABRT:
+        case SIGILL:
+        case SIGQUIT:
+        case SIGSEGV:
+        case SIGSYS: // or SIGUNUSED
+        case SIGTRAP:
+        case SIGXCPU:
+        case SIGXFSZ:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool default_is_stop(int sig){
+    switch(sig){
+        case SIGSTOP:
+        case SIGTSTP:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static int setup_signal_frame(int sig, struct sigaction *act, struct registers *regs){
+    uintptr_t sp = regs_get_user_stack_pointer(regs);
+    sp -= sizeof(struct sigframe);
+    sp &= -16;
+
+    struct task* cur = current;
+
+    struct sigframe frame;
+    frame.restore = act->sa_restorer;
+    frame.sig = sig;
+    frame.saved_regs = *regs;
+    frame.old_mask = cur->sig_blocked;
+
+    if (copy_to_user((void*)sp, &frame, sizeof(frame)) != 0) {
+        return -EFAULT;
+    }
+
+    regs_set_user_stack_pointer(regs, sp);
+    regs_set_instruction_pointer(regs, (uintptr_t)act->sa_handler);
+
+    cur->sig_blocked |= act->sa_mask;
+    if (!(act->sa_flags & SA_NODEFER)) {
+        cur->sig_blocked |= SIGMASK(sig);
+    }
+
+    return 0;
+}
+
+asmlinkage void do_signal(struct registers *regs) {
+    if(!regs_is_user_mode(regs)) return;
+    struct task* cur = current;
+
+    int status = 0;
+    bool core_dump = false;
+
+    sigset_t ready = cur->sig_pending & ~cur->sig_blocked;
+    if (!ready) return;
+
+    for (int bit = 0; bit < 31; bit++) {
+        if (BIT_CHECK(ready, bit)) {
+            cur->sig_pending = BIT_CLEAR(cur->sig_pending, bit);
+            int signo = bit + 1;
+
+            struct sigaction *act = &cur->sig_actions[signo];
+            if (act->sa_handler == SIG_IGN) return;
+
+            if (act->sa_handler == SIG_DFL) {
+                if (cur->pid == 1 || default_is_ignore(signo)) continue;
+                status = signo;
+                goto exit_task;
+            }
+
+            if (setup_signal_frame(signo, act, regs) < 0) {
+                status = SIGSEGV;
+                goto exit_task;
+            }
+            return;
+        }
+    }
+
+exit_task:
+    task_exit(cur, TASK_STATUS_ENCODE_SIGNAL(status, core_dump));
+    schedule();
+    unreachable();
+}
+
+int send_signal(struct task *task, int sig) {
+    if (sig < 0 || sig >= NSIG) return -EINVAL;
+    if (sig == 0 || task->state == TASK_ZOMBIE) return 0;
+
+	sighandler_t handler = task->sig_actions[sig].sa_handler;
+	if (sig != SIGKILL && (handler == SIG_IGN || (handler == SIG_DFL && default_is_ignore(sig))))
+		return 0;
+
+	task->sig_pending |= SIGMASK(sig);
+	if (task->state == TASK_INTERRUPTIBLE && !(task->sig_blocked & SIGMASK(sig)))
+		task_wakeup(task);
+
+	return 0;
+}

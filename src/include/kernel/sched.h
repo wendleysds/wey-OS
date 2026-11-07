@@ -4,10 +4,26 @@
 #include <asm/ptrace.h>
 #include <asm/process.h>
 #include <kernel/pid.h>
+#include <kernel/signal.h>
 #include <def/config.h>
 #include <kernel/init.h>
 #include <lib/list.h>
 #include <fs/vfs.h>
+
+#define TASK_EXIT_CODE_SIGNAL_MASK 0x007F
+#define TASK_EXIT_CODE_CORE_MASK   0x0080
+#define TASK_EXIT_CODE_STATUS_MASK 0xFF00
+#define TASK_EXIT_CODE_STOPPED_MASK 0xFF00
+
+#define TASK_STATUS_ENCODE_EXIT(exit_code) \
+    (((uint16_t)((exit_code) & 0xFF)) << 8)
+
+#define TASK_STATUS_ENCODE_SIGNAL(signal, core) \
+    ((uint16_t)(((signal) & TASK_EXIT_CODE_SIGNAL_MASK) | ((core) ? TASK_EXIT_CODE_CORE_MASK : 0)))
+
+#define TASK_STATUS_ENCODE_STOPPED(signal) \
+    (((uint16_t)((signal) & 0xFF)) << 8)
+
 
 struct mm_struct;
 struct wait_queue_entry;
@@ -19,6 +35,7 @@ typedef enum {
 	TASK_READY,
 	TASK_RUNNING,
 	TASK_ZOMBIE,
+	TASK_INTERRUPTIBLE,
 	TASK_BLOCKED,
 } task_state_t;
 
@@ -40,6 +57,10 @@ struct task {
 	task_state_t state;
 	int priority;
 	int exit_code;
+
+	sigset_t sig_pending;
+	sigset_t sig_blocked;
+	struct sigaction sig_actions[NSIG];
 
 	struct task* parent;
 

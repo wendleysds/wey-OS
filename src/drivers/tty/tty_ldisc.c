@@ -3,6 +3,7 @@
 #include <def/config.h>
 #include <kernel/sched.h>
 #include <kernel/printk.h>
+#include <kernel/signal.h>
 #include <mm/kheap.h>
 #include <stdbool.h>
 
@@ -317,6 +318,37 @@ static int tty_ldisc_canonical_process(
 	return 0;
 }
 
+static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state, u8 ch){
+	const struct termios *t = &tty->termios;
+	int sig = -1;
+
+	if (t->c_cc[VINTR] && ch == t->c_cc[VINTR]) {
+		sig = SIGINT;
+	}
+
+	if (t->c_cc[VQUIT] && ch == t->c_cc[VQUIT]) {
+		sig = SIGQUIT;
+	}
+
+	if (t->c_cc[VSUSP] && ch == t->c_cc[VSUSP]) {
+		sig = SIGTSTP;
+	}
+
+	/*if (t->c_cc[VSTART] && ch == t->c_cc[VSTART]) {
+		
+	}
+
+	if (t->c_cc[VSTOP] && ch == t->c_cc[VSTOP]) {
+		
+	}*/
+
+	if(sig > 0){
+		send_signal(current, sig);
+	}
+
+	return 0;
+}
+
 static void tty_ldisc_echo(struct tty_struct *tty,
                            struct tty_ldisc_data *state,
                            unsigned char ch)
@@ -334,6 +366,14 @@ static void tty_ldisc_echo(struct tty_struct *tty,
 			tty->ops->write(tty, &ch, 1);
 		}
 	}
+
+	if ((t->c_lflag & ECHOCTL) && (ch < ' ') && (ch > 0)) {
+        u8 caret_seq[2];
+        caret_seq[0] = '^';
+        caret_seq[1] = ch + '@';
+
+        tty->ops->write(tty, caret_seq, 2);
+    }
 }
 
 static int tty_ldisc_store_char(struct tty_struct* tty, struct tty_ldisc_data* state, unsigned char ch){
@@ -419,7 +459,12 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 		tty_ldisc_echo(tty, state, ch);
 
 		/*
-		* 5. Wake readers if this character completes
+		* 5. Signal
+		*/
+		tty_ldisc_signal(tty, state, ch);
+
+		/*
+		* 6. Wake readers if this character completes
 		*    something they can consume.
 		*/
 

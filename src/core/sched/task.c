@@ -1,5 +1,6 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
+#include <kernel/signal.h>
 #include <kernel/wait.h>
 #include <lib/assert.h>
 #include <lib/string.h>
@@ -11,9 +12,8 @@
 struct task* init_task;
 
 struct task* task_create(const char* name, int priority){ 
-	struct task* new_task = kmalloc(sizeof(struct task)); 
+	struct task* new_task = kzalloc(sizeof(struct task)); 
 	if(likely(new_task)){ 
-		memset(new_task, 0, sizeof(struct task)); 
 		strncpy(new_task->name, name, PROC_NAME_MAX); 
 		new_task->priority = priority; 
 		new_task->state = TASK_NEW;
@@ -70,7 +70,7 @@ void task_reparent_children(struct task* task, struct task* new_parent){
 
 void task_exit(struct task* task, int status){
 	if(unlikely(task->pid == 1)){
-		panic("Attempting to exit init process");
+		panic("Attempting to exit init process! (%d)", status);
 	}
 
 	task->exit_code = status;
@@ -188,7 +188,7 @@ struct task* task_find_zombie_child(struct task* parent){
 }
 
 SYSCALL_DEFINE1(exit, int, status){
-	task_exit(current, status);
+	task_exit(current, status % 0xFF);
 	schedule();
 	unreachable();
 }

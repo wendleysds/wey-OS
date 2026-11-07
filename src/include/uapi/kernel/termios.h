@@ -70,6 +70,7 @@ struct termios {
 #define NOFLSH  BIT(6)
 #define TOSTOP  BIT(7)
 #define IEXTEN  BIT(8)
+#define ECHOCTL BIT(9)
 
 // Legacy aliases
 #define LFLAG_ECHO   ECHO

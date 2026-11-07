@@ -10,6 +10,7 @@ extern arch_handle_irq
 extern interrupt_eoi
 extern schedule
 extern sys_exit
+extern do_signal
 
 ; vars
 extern need_resched
@@ -88,6 +89,14 @@ _ret_from_intr:
 	mov ebp, esp
 
 .restore:
+	test dword [ebp+44], 3
+	jz .no_signal
+
+	push ebp
+	call do_signal
+	add esp, 4
+
+.no_signal:
 	popad       ; restore all registers
 	add esp, 8  ; clear err_code and int_no
 	iret        ; kachow

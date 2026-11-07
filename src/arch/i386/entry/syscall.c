@@ -2,6 +2,7 @@
 #include <kernel/sched.h>
 #include <asm/idt.h>
 #include <def/errno.h>
+#include <def/compile.h>
 
 #define ARG(x) long arg##x
 
@@ -56,6 +57,10 @@ void isr80h_handler(struct registers* regs){
 
 	*regs = current->regs;
 	regs->ax = res;
+
+	if(regs_is_user_mode(regs)){
+		do_signal(regs);
+	}
 }
 
 arch_initcall(syscalls_init);

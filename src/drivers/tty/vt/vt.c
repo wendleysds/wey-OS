@@ -213,9 +213,18 @@ static void vt_putc(struct vt_data *vt, char ch){
 		return;
 	}
 
+	if ((unsigned char)ch < 32) {
+		if (ch != 7 && ch != 8 && ch != 9 && ch != 10 && ch != 13) {
+			return;
+		}
+	}
+
 	unsigned int pos = 0;
 
 	switch (ch) {
+		case '\a':
+			break;
+
 		case '\n':
 			vt->state.x = 0;
 			vt->state.y++;
