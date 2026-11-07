@@ -73,13 +73,6 @@ struct sigaction {
 	sigrestore_t sa_restorer;
 };
 
-struct sigframe {
-    sigrestore_t restore;
-    int sig;
-    struct registers saved_regs;
-    sigset_t old_mask;
-};
-
 asmlinkage void do_signal(struct registers *regs);
 int send_signal(struct task *task, int sig);
 

@@ -31,6 +31,10 @@
 #define SYS_clock_getres 28
 #define SYS_clock_settime 29
 #define SYS_nanosleep 30
+#define SYS_dup2 31
+#define SYS_rename 32
+#define SYS_sigaction 33
+#define SYS_sigreturn 34
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 

@@ -10,8 +10,8 @@
 9 i386 waitpid sys_waitpid
 10 i386 getpid sys_getpid
 #11 i386 brk sys_brk
-#12 i386 mmap sys_mmap
-#13 i386 munmap sys_munmap
+12 i386 mmap sys_mmap
+13 i386 munmap sys_munmap
 #14 i386 getdents sys_getdents
 15 i386 chdir sys_chdir
 16 i386 getcwd sys_getcwd
@@ -31,6 +31,8 @@
 #30 i386 nanosleep sys_nanoslee
 #31 i386 dup2 sys_dup2
 #32 i386 rename sys_rename
+33 i386 sigaction sys_sigaction
+34 i386 sigreturn sys_sigreturn
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write
