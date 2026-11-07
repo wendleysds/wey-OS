@@ -69,8 +69,11 @@ struct task {
 };
 
 struct task* task_create(const char* name, int priority);
+struct task* task_search(pid_t pid);
 void task_exit(struct task* task, int status);
 void task_destroy(struct task* task);
+
+void task_global_list_add(struct task* task);
 
 int task_add_file(struct task* task, struct file* file);
 int task_remove_file(struct task* task, int fd);

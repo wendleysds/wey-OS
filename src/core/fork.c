@@ -15,34 +15,27 @@ static struct task *copy_process() {
 
 	child->files = file_table_clone(cur->files);
 	if(!child->files){
-		kfree(child);
+		task_destroy(child);
 		return ERR_PTR(-ENOMEM);
 	}
 
-	pid_t child_pid = pid_alloc();
-	if(child_pid < 0){
-		file_table_destroy(child->files);
-		kfree(child);
+	child->pid = pid_alloc();
+	if(child->pid < 0){
+		task_destroy(child);
 		return ERR_PTR(-ENOENT);
 	}
 
-	void *new_kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
-	if (!new_kstack) {
-		file_table_destroy(child->files);
-		pid_free(child_pid);
-		kfree(child);
+	child->kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
+	if (!child->kstack) {
+		task_destroy(child);
 		return ERR_PTR(-ENOMEM);
 	}
 
-	child->kstack = new_kstack;
 	copy_thread(cur, child, 0x0, 0x0);
 
 	struct mm_struct *c_mm = mm_dup(cur->mm);
 	if (!c_mm) {
-		file_table_destroy(child->files);
-		kfree(new_kstack);
-		pid_free(child_pid);
-		kfree(child);
+		task_destroy(child);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -50,11 +43,10 @@ static struct task *copy_process() {
 	child->parent = cur;
 	list_add(&child->sibling, &cur->children);
 
-	child->pid = child_pid;
-
 	child->cwd.dentry = dentry_get(cur->cwd.dentry);
 	child->cwd.mount = cur->cwd.mount;
 
+	task_global_list_add(child);
 	return child;
 }
 
@@ -64,21 +56,20 @@ pid_t kernel_thread(int (*fn)(void*), const char* name, void* args){
 		return -ENOMEM;
 	}
 
-	char* ksp = kmalloc(PROC_KERNEL_STACK_SIZE);
-	if(!ksp){
-		kfree(task);
+	task->kstack = kmalloc(PROC_KERNEL_STACK_SIZE);
+	if(!task->kstack){
+		task_destroy(task);
 		return -ENOMEM;
 	}
 
 	task->pid = pid_alloc();
-	if(task->pid == -1){
-		kfree(ksp);
-		kfree(task);
+	if(task->pid < 0){
+		task_destroy(task);
 		return -ENOENT;
 	}
 
-	task->kstack = ksp;
 	copy_thread(0x0, task, fn, args);
+	task_global_list_add(task);
 
 	task->state = TASK_READY;
 	scheduler_add(task);

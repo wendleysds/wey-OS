@@ -11,6 +11,51 @@
 
 struct task* init_task;
 
+static LIST_HEAD(tasks_global);
+static DEFINE_SPINLOCK(tasks_lock);
+
+void task_global_list_add(struct task *t) {
+	spin_lock(&tasks_lock);
+	struct task *tmp;
+	list_for_each_entry(tmp, &tasks_global, tasks) {
+		if (tmp->pid > t->pid) {
+			list_add_tail(&t->tasks, &tmp->tasks);
+			goto out;
+		}
+	}
+	list_add_tail(&t->tasks, &tasks_global);
+
+out:
+	spin_unlock(&tasks_lock);
+}
+
+static void task_list_remove(struct task *t) {
+	spin_lock(&tasks_lock);
+	list_remove(&t->tasks);
+	spin_unlock(&tasks_lock);
+}
+
+struct task* task_search(pid_t pid) {
+    struct task *tmp;
+    struct task *found = NULL;
+
+    spin_lock(&tasks_lock);
+    
+    list_for_each_entry(tmp, &tasks_global, tasks) {
+        if (tmp->pid == pid) {
+            found = tmp;
+            break;
+        }
+
+        if (tmp->pid > pid) {
+            break;
+        }
+    }
+    
+    spin_unlock(&tasks_lock);
+    return found;
+}
+
 struct task* task_create(const char* name, int priority){ 
 	struct task* new_task = kzalloc(sizeof(struct task)); 
 	if(likely(new_task)){ 
@@ -19,8 +64,8 @@ struct task* task_create(const char* name, int priority){
 		new_task->state = TASK_NEW;
 		INIT_LIST_HEAD(&new_task->tasks); 
 		INIT_LIST_HEAD(&new_task->queue); 
-		INIT_LIST_HEAD(&new_task->children); 
-		INIT_LIST_HEAD(&new_task->sibling); 
+		INIT_LIST_HEAD(&new_task->children);
+		INIT_LIST_HEAD(&new_task->sibling);
 	} 
 
 	return new_task; 
@@ -107,30 +152,33 @@ int task_remove_file(struct task* task, int fd){
 }
 
 void task_destroy(struct task* task){
-	if(task->state != TASK_ZOMBIE){
+	if(task->state != TASK_ZOMBIE && task->state != TASK_NEW){
 		panic("Attempting to destroy a non-zombie task (pid: %d, name: %s)", task->pid, task->name);
 	}
 
 	if(task->cwd.dentry){
 		dentry_put(task->cwd.dentry);
-		task->cwd.dentry = NULL;
 	}
 
 	if(task->kstack){
 		kfree(task->kstack);
-		task->kstack = NULL;
 	}
 
 	if(task->mm){
 		task_destroy_mm(task);
-		task->mm = NULL;
 	}
 
-	file_table_destroy(task->files);
+	if(task->files){
+		file_table_destroy(task->files);
+	}
 
-	list_remove(&task->tasks);
+	if(task->pid > 0){
+		pid_free(task->pid);
+	}
+
+	task_list_remove(task);
+
 	list_remove(&task->sibling);
-	pid_free(task->pid);
 	kfree(task);
 }
 
