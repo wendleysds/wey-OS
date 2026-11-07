@@ -240,3 +240,41 @@ SYSCALL_DEFINE1(exit, int, status){
 	schedule();
 	unreachable();
 }
+
+SYSCALL_DEFINE2(kill, pid_t, pid, int, signum){
+    if (pid > 0) {
+		struct task* target = task_search(pid);
+		if(!target){
+			return -ESRCH;
+		}
+
+        return send_signal(target, signum);
+    }
+
+	if(pid == -1){
+		struct task *tmp;
+		spin_lock(&tasks_lock);
+		list_for_each_entry(tmp, &tasks_global, tasks){
+			if(tmp->pid == 1){
+				continue;
+			}
+
+			send_signal(tmp, signum);
+		}
+		spin_unlock(&tasks_lock);
+		return 0;
+	}
+
+	/*
+	
+	If pid equals 0, then sig is sent to every process in the process group
+    of the calling process.
+
+	If pid is less than -1, then sig is sent to every process in the process
+	group whose ID is -pid.
+	
+	*/
+	
+	// Kernel dont support process groups yet.
+	return -EINVAL;
+}

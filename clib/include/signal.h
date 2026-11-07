@@ -68,6 +68,7 @@ struct sigaction {
 	sigrestore_t sa_restorer;
 };
 
+int kill(pid_t pid, int signum);
 sighandler_t signal(int signum, sighandler_t handler);
 int sigaction(int signum, const struct sigaction *restrict act, struct sigaction *restrict old);
 

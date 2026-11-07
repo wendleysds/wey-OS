@@ -35,6 +35,7 @@
 #define SYS_rename 32
 #define SYS_sigaction 33
 #define SYS_sigreturn 34
+#define SYS_kill 35
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 

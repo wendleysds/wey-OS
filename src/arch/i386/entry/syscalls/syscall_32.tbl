@@ -33,6 +33,7 @@
 #32 i386 rename sys_rename
 33 i386 sigaction sys_sigaction
 34 i386 sigreturn sys_sigreturn
+35 i386 kill sys_kill
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write
