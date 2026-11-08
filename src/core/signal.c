@@ -44,6 +44,10 @@ static bool default_is_stop(int sig){
     }
 }
 
+bool has_signal_pending(struct task *task){
+	return task->sig_pending & ~task->sig_blocked;
+}
+
 asmlinkage void do_signal(struct registers *regs) {
     if(!regs_is_user_mode(regs)) return;
     struct task* cur = current;

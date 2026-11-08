@@ -4,6 +4,7 @@
 #include <def/bits.h>
 #include <sys/types.h>
 #include <asm/ptrace.h>
+#include <stdbool.h>
 
 struct task;
 
@@ -74,6 +75,7 @@ struct sigaction {
 };
 
 asmlinkage void do_signal(struct registers *regs);
+bool has_signal_pending(struct task *task);
 int send_signal(struct task *task, int sig);
 
 #endif /* _KERNEL_SIGNAL_H */
