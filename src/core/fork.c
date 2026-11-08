@@ -5,6 +5,15 @@
 #include <mm/vma.h>
 #include <fs/dcache.h>
 
+static void copy_signals(struct task* to, const struct task *restrict from){
+	for(int i = 0; i < NSIG; i++){
+		to->sig_actions[i] = from->sig_actions[i];
+	}
+
+	to->sig_blocked = from->sig_blocked;
+	to->sig_pending = from->sig_pending;
+}
+
 static struct task *copy_process() {
 	struct task *cur = current;
 
@@ -31,13 +40,16 @@ static struct task *copy_process() {
 		return ERR_PTR(-ENOMEM);
 	}
 
-	copy_thread(cur, child, 0x0, 0x0);
+	copy_thread(cur, child, NULL, NULL);
 
 	struct mm_struct *c_mm = mm_dup(cur->mm);
 	if (!c_mm) {
 		task_destroy(child);
 		return ERR_PTR(-ENOMEM);
 	}
+
+	copy_signals(child, cur);
+	child->sig_pending = 0;
 
 	child->mm = c_mm;
 	child->parent = cur;

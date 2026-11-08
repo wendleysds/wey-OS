@@ -329,12 +329,24 @@ static __no_return void exec_binprm(struct binprm* bprm){
 		(void*)bprm->curMemTop
 	);
 
+	// Set name
 	const char *slash = strrchr(bprm->filename, '/');
 	const char *binname = slash ? slash + 1 : bprm->filename;
 	
 	memset(cur->name, 0x0, sizeof(cur->name));
 	strncpy(cur->name, binname, sizeof(cur->name) - 1);
 
+	// reset signals (only caught handlers)
+	for (int i = 1; i < NSIG; i++) {
+		struct sigaction *a = &cur->sig_actions[i];
+
+		if (a->sa_handler == SIG_IGN)
+			continue;
+
+		memset(a, 0, sizeof(*a));
+	}
+
+	// Free tmp resources and run
 	bprm_free(bprm);
 	ret_from_registers(&cur->regs);
 
