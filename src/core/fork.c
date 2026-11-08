@@ -94,6 +94,7 @@ SYSCALL_DEFINE0(fork){
 		return PTR_ERR(child);
 	}
 
+	child->state = TASK_READY;
 	scheduler_add(child);
 	return child->pid;
 }

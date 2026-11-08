@@ -89,10 +89,13 @@ asmlinkage void task_sleep_interruptible(struct task* task){
 }
 
 asmlinkage void task_wakeup(struct task* task){
-	if(task->state > TASK_ZOMBIE){
+	if (task->state == TASK_INTERRUPTIBLE || task->state == TASK_BLOCKED) {
 		task->state = TASK_READY;
 		scheduler_add(task);
+		return;
 	}
+
+	BUG_MSG(task->state >= TASK_ZOMBIE, "Impossible state: %d\n", task->state);
 }
 
 int task_default_wakeup(struct wait_queue_entry* entry){

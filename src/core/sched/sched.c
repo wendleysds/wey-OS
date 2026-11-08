@@ -6,6 +6,8 @@
 #include <lib/string.h>
 #include <mm/kheap.h>
 
+#include <lib/assert.h>
+
 static LIST_HEAD(_readyQueue);
 static LIST_HEAD(_terminateQueue);
 
@@ -31,6 +33,8 @@ static struct task* _next(){
 	if(likely(!list_empty(&_readyQueue))){
 		next_task = list_entry(_readyQueue.next, struct task, queue);
 		list_remove(&next_task->queue);
+
+		BUG_MSG(next_task->state >= TASK_ZOMBIE, "Impossible state: %d\n", next_task->state);
 	}
 
 	spin_unlock(&scheduler_spinlock);
@@ -95,6 +99,9 @@ void __init scheduler_start(){
 }
 
 void scheduler_add(struct task* task){
+	BUG_ON(!list_empty(&task->queue));
+	BUG_ON(task->state != TASK_READY);
+
 	spin_lock(&scheduler_spinlock);
 	list_add_tail(&task->queue, &_readyQueue);
 	spin_unlock(&scheduler_spinlock);

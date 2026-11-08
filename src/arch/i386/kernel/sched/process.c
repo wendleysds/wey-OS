@@ -64,16 +64,30 @@ out:
 	return;
 }
 
+#undef current
+
 void context_switch(struct task* prev, struct task* to){
-	#undef current
 	struct cpu* cpu = get_cpu();
 
 	if(prev == to || to == cpu->current){
 		return;
 	}
 
-	printk("Switching to \"[%d:%s]\"\n", to->pid, to->name);
+/*	printk("Switching");
 
+	if(prev){
+		printk(" from \"[%d:%s S:%d]\"",
+			prev->pid, prev->name, prev->state
+		);
+	}
+
+	if(to){
+		printk(" to \"[%d:%s S:%d]\"",
+			to->pid, to->name, to->state
+		);
+	}
+
+	printk("\n"); */
 
 	// TODO: do some checks here, like if the tasks are valid or permissions
 
@@ -81,12 +95,12 @@ void context_switch(struct task* prev, struct task* to){
 		mmu_context_switch(to->mm->ctx);
 	}
 
+	to->state = TASK_RUNNING;
 	_switch_to(prev, to);
 }
 
 void asmlinkage cpu_update_current_task(struct task* cur){
 	struct cpu* cpu = get_cpu();
 	cpu->current = cur;
-	cpu->current->state = TASK_RUNNING;
 	cpu->tss.esp0 = (unsigned long)(cur->kstack + PROC_KERNEL_STACK_SIZE);
 }
