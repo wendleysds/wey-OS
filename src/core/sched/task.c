@@ -80,12 +80,16 @@ static void task_destroy_mm(struct task* task){
 	task->mm = NULL;
 }
 
-asmlinkage void task_sleep(struct task* task){
+asmlinkage void task_sleep_uninterruptible(struct task* task){
 	task->state = TASK_BLOCKED;
 }
 
+asmlinkage void task_sleep_interruptible(struct task* task){
+	task->state = TASK_INTERRUPTIBLE;
+}
+
 asmlinkage void task_wakeup(struct task* task){
-	if(task->state == TASK_BLOCKED){
+	if(task->state > TASK_ZOMBIE){
 		task->state = TASK_READY;
 		scheduler_add(task);
 	}
@@ -93,7 +97,7 @@ asmlinkage void task_wakeup(struct task* task){
 
 int task_default_wakeup(struct wait_queue_entry* entry){
 	struct task* task = entry->private;
-	if(task->state != TASK_BLOCKED){
+	if(task->state < TASK_INTERRUPTIBLE){
 		return 0;
 	}
 

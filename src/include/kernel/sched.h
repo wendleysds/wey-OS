@@ -82,7 +82,8 @@ struct task* task_get_child(struct task* parent, pid_t pid);
 struct task* task_find_zombie_child(struct task* parent);
 void task_reparent_children(struct task* task, struct task* new_parent);
 
-asmlinkage void task_sleep(struct task* task);
+asmlinkage void task_sleep_uninterruptible(struct task* task);
+asmlinkage void task_sleep_interruptible(struct task* task);
 asmlinkage void task_wakeup(struct task* task);
 
 int task_default_wakeup(struct wait_queue_entry* entry);
@@ -94,8 +95,13 @@ void __init scheduler_start();
 void scheduler_add(struct task* task);
 void scheduler_remove(struct task* task);
 
-static inline void sleep_current(){
-	task_sleep(current);
+static inline void sleep_uninterruptible(){
+	task_sleep_uninterruptible(current);
+	schedule();
+}
+
+static inline void sleep_interruptible(){
+	task_sleep_interruptible(current);
 	schedule();
 }
 

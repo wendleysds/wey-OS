@@ -74,6 +74,6 @@ SYSCALL_DEFINE3(waitpid, pid_t, pid, int*, wstatus, int, options){
 			return 0;
 		}
 
-		sleep_current();
+		sleep_uninterruptible();
 	}
 }

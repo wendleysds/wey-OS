@@ -108,7 +108,8 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 			if(bytes_read > 0){
 				break;
 			}
-			sleep_current();
+
+			sleep_uninterruptible();
 			continue;
 		}
 
