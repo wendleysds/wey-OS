@@ -37,49 +37,67 @@ not a production system.
 
 ## Implemented Features
 
-- A custom two-stage BIOS bootloader loads the kernel from a FAT filesystem without
-  relying on GRUB or other third-party bootloaders.
-- Protected mode setup, GDT, IDT, PIC, exception handlers and interrupt entry.
-- Early architecture setup with E820 memory discovery and paging.
-- Kernel virtual memory support with paging helpers and page tables.
-- Physical memory management with `memblock`, `struct page` metadata and page
-  allocation.
-- Kernel heap allocators, including page allocation, slab allocation and
-  `kmalloc`/`kzalloc` style APIs.
-- Virtual memory areas and per-task MMU context switching for loaded programs.
-- Basic scheduler with kernel tasks, context switching, idle task and timer
-  driven reschedule requests.
-- PID management, `fork`, `waitpid`, `getpid` and `exit` system-call support.
-- Initcall levels inspired by Linux-style subsystem initialization.
-- Virtual filesystem layer with inodes, files, superblocks, mount points and
-  path walking.
-- Root `ramfs` mounted at `/`.
-- Initramfs support using embedded CPIO archives.
-- Executable loading through binary-format handlers.
-- ELF executable loader and script format loader.
-- Basic syscall entry path for i386.
-- Character-device registration layer.
-- Block-device layer with request queues, BIOs, simple elevator and partition
-  scanning.
-- ATA/IDE PIO driver with device probing, read/write requests and IRQ support.
-- VGA text output, terminal/VT support and keyboard driver.
-- Kernel logging, panic/assert helpers and internal C utility library.
-- Small user-space C library under `clib/` with startup code and syscall
-  wrappers.
-- FAT/VFAT filesystem implementation and FAT image tooling are present in the
-  tree, with integration still in progress.
+### Architecture & Hardware Discovery
+- **Bootloader**: Custom two-stage BIOS bootloader loads the kernel from a FAT-formatted partition without external bootloaders.
+- **CPU & Architecture**: Protected mode setup, GDT, IDT, PIC, CPU feature detection (CPUID), and interrupt handling.
+- **Exception Tables (`extable`)**: Kernel exception fixup tables with dedicated fault handlers for safe user-space memory access.
+- **APIC & HPET**: Local APIC (LAPIC) support, I/O APIC (IOAPIC) driver, and APIC timer calibration utilizing the High Precision Event Timer (HPET).
+- **ACPI Subsystem**:
+  - Early ACPI detection and table walking.
+  - Table parsing for RSDT, MADT, and FADT.
+  - DSDT support with an embedded static AML namespace parser.
+  - ACPI hardware power control (reboot and shutdown).
+
+### Device Model & Drivers
+- **Bus & Driver Abstraction**: Unified Linux-inspired `bus` and `driver` subsystem.
+- **PCI Subsystem**: PCI bus enumeration and PCI-to-PCI bridge discovery.
+- **Serial (UART)**: Standard 16550A UART serial driver.
+- **Input Subsystem**: Generic input event layer and PS/2 keyboard driver with scan code translation.
+- **TTY & Terminals**: TTY core, virtual terminal (VT) integration, line discipline (`ldisc`) write handling, and initial `termios` support.
+- **Storage**: ATA/IDE PIO driver with device probing, request queues, BIOs, partition scanning, and interrupt handling.
+
+### Memory Management
+- **Physical Memory Management**: E820 memory map discovery, `memblock` early allocator, page frame tracking (`struct page`), and buddy page allocator.
+- **Virtual Memory & MMU**: Kernel paging, per-process page directories, page tables, and **Huge Pages (4 MiB PSE)** support.
+- **Kernel Heap & Slabs**: Slab allocator with caches and `kmalloc`/`kzalloc` memory allocation APIs.
+- **Virtual Memory Areas (VMAs)**: Per-task user memory tracking, anonymous mmap handling, and memory layout configuration.
+
+### Virtual Filesystem (VFS) & Storage
+- **VFS Core**: Inodes, open file descriptions, superblocks, and filesystem type registration.
+- **Directory Cache (`dcache`)**: High-performance dentry cache for path lookups.
+- **Path Resolution**: Hierarchical path walking with full support for relative paths and working directory manipulation (`chdir`, `getcwd`).
+- **File & Directory Operations**: Syscall and VFS implementations for `open`, `close`, `read`, `write`, `lseek`, `mkdir`, and `rmdir`.
+- **Filesystems**: Root `ramfs` in-memory filesystem, embedded CPIO initramfs extraction, and ongoing FAT/VFAT filesystem driver integration.
+
+### Process Management, Scheduler & Signals
+- **Tasks & Scheduling**: Preemptive scheduler, kernel and user tasks, idle task, sleep queues (`sleep_on`, `sleep_interruptible`), and context switching.
+- **Process Creation & Execution**: `fork` task cloning, PID allocation, and `execve` supporting ELF binaries with full `argv` and `envp` parameter passing.
+- **Signal Handling**: POSIX signal support including `sigaction`, `sigreturn`, `kill`, pending signal checking, and signal state inheritance across `fork` and `execve`.
+- **Process Termination**: `exit` and `waitpid` handling with child reparenting.
+
+### Clocks & Timekeeping
+- **Clocks**: Monotonic and real-time clock infrastructure with `clock_gettime`, `clock_getres`, and `clock_settime` system calls.
+
+### User-space C Library (`clib`) & Userspace
+- **First-party Libc**: User-space C standard library under `clib/` offering standard headers, startup runtime (`crt0`), standard I/O, string operations, and syscall wrappers.
+- **Math Routines**: Efficient 64-bit integer division and multiplication implemented via Donald Knuth's multi-precision algorithm.
+- **Real-world Applications**: Fully capable of compiling and running complex user programs, highlighted by running unmodified **Lua 5.5.1** in Ring 3 as `/init`.
+
+### Build System & Diagnostics
+- **Symbol Generation**: Multi-pass kernel symbol generation (`gen_kallsyms.py`) to embed symbol tables for backtraces and debugging.
+- **KBuild**: Modular, recursive Makefile build system with initcall-based subsystem initialization.
 
 ## Highlights
 
-- Custom BIOS bootloader
-- ELF executable loader
-- Linux-inspired VFS architecture
-- Linux-inspired KBuild
-- Slab allocator
-- Per-process virtual address spaces
-- Initcall-based subsystem initialization
-- ATA PIO driver with interrupt support
-- Embedded initramfs support
+- **Unmodified Lua 5.5.1 in Ring 3**: Successfully compiles and executes vanilla Lua 5.5.1 without code changes, linked against WeyOS's custom user-space C library (`clib`) and running in Ring 3 user mode as the `/init` process.
+- **Modern Hardware & ACPI Platform Support**: ACPI table discovery (RSDT, MADT, FADT, DSDT with a static AML namespace parser), ACPI reboot/shutdown, LAPIC, IOAPIC, and HPET calibration for APIC timers.
+- **POSIX Signals & Process Execution**: Full `execve` support with `argv` and `envp` parameter passing, `fork`, `waitpid`, and complete signal delivery infrastructure (`sigaction`, `sigreturn`, `kill`).
+- **Device Model & PCI Bus**: Linux-inspired `bus` and `driver` abstractions, PCI enumeration with PCI-to-PCI bridge discovery, and 16550A UART serial driver.
+- **TTY & Virtual Terminal Subsystem**: Complete terminal pipeline featuring line discipline (`ldisc`), keyboard event handling, initial `termios` control, and VT integration.
+- **Advanced VFS & Path Resolution**: Directory caching (`dcache`), relative path resolution, directory operations (`mkdir`, `rmdir`), and standard POSIX file I/O (`open`, `close`, `read`, `write`, `lseek`).
+- **Memory Management & Huge Pages**: 4 MiB Huge Pages (PSE), slab allocator, buddy allocator, and per-process virtual address spaces.
+- **Exception Tables (`extable`)**: Linux-style exception table handlers for safe, fault-tolerant memory access across the kernel/user boundary.
+- **Custom User-space C Library (`clib`)**: Standalone C standard library with syscall wrappers, startup runtime, and Knuth 64-bit arithmetic routines.
 
 ## Repository Layout
 
@@ -88,21 +106,19 @@ not a production system.
 ├── Makefile                 # Top-level kernel build
 ├── README.md
 ├── build/                   # Generated objects, binaries and images
-├── clib/                    # Small user-space C library
-├── scripts/                 # Build helpers and image generation scripts
-├── tools/
-|   ├── boot/embed/          # Bootloader/image installer tooling
-|   └── fs/fat/              # FAT image manipulation tools
+├── clib/                    # Standalone user-space C standard library
+├── scripts/                 # Build helpers, kallsyms generator and disk scripts
 └── src/
-    ├── arch/i386/           # x86-specific boot, entry, MMU and kernel code
-    ├── block/               # Block-device core, queues and partitions
-    ├── core/                # Kernel init, scheduler, syscalls, fork, clock
-    ├── drivers/             # VGA, terminal, ATA, device core
-    ├── fs/                  # VFS, ramfs, exec and filesystem code
-    ├── include/             # Kernel headers
-    ├── lib/                 # Kernel utility library
-    ├── memory/              # PMM, VMM, heap, slab and memblock
-    └── usr/                 # Embedded initramfs object
+    ├── arch/i386/           # x86-specific boot, entry, MMU, APIC and exceptions
+    ├── block/               # Block-device core, request queues and partitions
+    ├── core/                # Sched, tasks, signals, clock, IRQ subsystem
+    ├── drivers/             # ACPI, PCI, serial, input, TTY, VT, ATA, video
+    ├── fs/                  # VFS, dcache, path walk, ramfs, execve handlers
+    ├── include/             # Kernel and UAPI headers
+    ├── init/                # Kernel entry, initcalls and init process launcher
+    ├── lib/                 # Kernel utility and string library
+    ├── memory/              # PMM, VMM, huge pages, heap, slab and memblock
+    └── usr/                 # Embedded initramfs payload
 ```
 
 ## Design Principles
@@ -115,16 +131,15 @@ not a production system.
 
 ## Build Requirements
 
-The default toolchain prefix is `i686-elf-`.
-
 Required tools:
 
 - `make`
 - `nasm`
-- `i686-elf-gcc`
-- `i686-elf-ld`
-- `i686-elf-objcopy`
-- `i686-elf-nm`
+- `gcc`
+- `ld`
+- `objcopy`
+- `nm`
+- `as`
 - standard Unix shell utilities used by the build scripts (`sh`, `sed`, `dd`,
   `cat`, `find`)
 - `python3` for the image tooling
@@ -192,49 +207,59 @@ with your emulator of choice, for example QEMU, after generating `build/hdimage`
 2. BIOS helpers collect early platform information such as memory and video
    data.
 3. The kernel switches to protected mode and enters the 32-bit startup path.
-4. Architecture setup initializes descriptor tables, interrupts, paging and
-   memory discovery.
-5. Core kernel modules initialize memory, terminal, scheduler and registered
-   initcalls.
-6. `ramfs` is mounted as `/`, the optional initramfs is unpacked, and the kernel
-   attempts to execute `/bash`.
+4. Architecture setup initializes descriptor tables (GDT, IDT), exception handlers,
+   interrupt routing (PIC, LAPIC, IOAPIC), ACPI table discovery, and paging.
+5. Core kernel modules initialize physical/virtual memory allocators, device buses
+   (PCI, platform drivers), peripherals (TTY, UART 16550A, ATA, HPET), scheduler,
+   and registered initcalls.
+6. `ramfs` is mounted as `/`, the embedded initramfs archive is unpacked, `/tty` is
+   initialized, and the kernel switches to Ring 3 to launch the user-space init
+   process (trying `/init`, `/bin/init`, or `/bin/sh`).
 
 ## System Calls
 
-The syscall table currently enables:
+WeyOS provides a growing POSIX-like system call interface exposed via `int 0x80`:
 
-- `exit`
-- `fork`
-- `waitpid`
-- `getpid`
-- temporary terminal write syscall used by the current user-space library
-
-Several common syscall slots are already reserved in the table but are not
-enabled yet, including `read`, `write`, `open`, `close`, `execve`, `brk`,
-`mmap`, directory operations and reboot.
+| Syscall | Number | Description |
+|---|:---:|---|
+| `sys_exit` | 1 | Terminates the calling process with status code |
+| `sys_read` | 2 | Reads bytes from an open file descriptor |
+| `sys_write` | 3 | Writes bytes to an open file descriptor |
+| `sys_open` | 4 | Opens or creates a file with pathname and flags |
+| `sys_close` | 5 | Closes an open file descriptor |
+| `sys_lseek` | 6 | Repositions read/write file offset |
+| `sys_execve` | 7 | Executes an ELF binary with `argv` and `envp` |
+| `sys_fork` | 8 | Creates a child process by duplicating the calling process |
+| `sys_waitpid` | 9 | Waits for child process state changes or termination |
+| `sys_getpid` | 10 | Returns the process ID of the calling process |
+| `sys_chdir` | 15 | Changes the current working directory |
+| `sys_getcwd` | 16 | Gets the current working directory pathname |
+| `sys_mkdir` | 18 | Creates a new directory |
+| `sys_rmdir` | 19 | Removes an empty directory |
+| `sys_clock_gettime` | 27 | Retrieves the time of the specified clock |
+| `sys_clock_getres` | 28 | Retrieves the resolution of the specified clock |
+| `sys_clock_settime` | 29 | Sets the time of the specified clock |
+| `sys_sigaction` | 33 | Examines and changes a signal action |
+| `sys_sigreturn` | 34 | Returns from a signal handler and restores task context |
+| `sys_kill` | 35 | Sends a signal to a process |
+| `sys_tmp_vt_write` | 100 | Diagnostic virtual terminal write |
 
 ## In Progress
 
-- Completing and hardening the user/kernel boundary and user-mode execution
-  model.
-- Expanding syscall coverage for normal file and process operations.
-- Wiring FAT/VFAT fully into the default filesystem build and mount path.
-- Hardening the VFS and block layers.
-- Improving process address spaces and memory isolation.
-- Adding a maintained emulator run target.
-- Growing user-space programs and the small C library.
+- Completing dynamic memory allocation syscalls for user space (`brk`, `mmap`, `munmap`).
+- Implementing directory listing syscalls (`getdents`) and filesystem unlinking/renaming.
+- Hardening user/kernel memory isolation and access validations.
+- Wiring FAT/VFAT fully into the default filesystem mount path.
+- Adding pipe (`pipe`) and descriptor duplicating (`dup`, `dup2`) support.
+- Expanding user-space utilities and the standard C library (`clib`).
 
 ## Known Limitations
 
-- The kernel is experimental and all core code still runs with high privilege.
-- Ring 3 execution exists, but the user/kernel boundary is not complete yet.
-- Process address spaces exist, but isolation and validation are still limited.
-- The scheduler is basic and intended for experimentation.
-- Many drivers are synchronous or minimal.
-- Filesystem and block-device code are young and should be treated as unsafe.
-- FAT/VFAT code exists, but it is not fully integrated into the default build.
-- The syscall surface is intentionally incomplete.
-- There is no stable ABI or API compatibility guarantee.
+- The kernel is experimental and designed for educational and research purposes.
+- User/kernel memory isolation is actively improving, but page-level protections and fault handling continue to evolve.
+- The scheduler is a basic cooperative/preemptive model intended for experimentation.
+- Filesystem and block-device code are under active development and not yet battle-tested.
+- There is no stable ABI or backward compatibility guarantee.
 
 ## License
 
