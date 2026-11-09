@@ -222,11 +222,5 @@ SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mo
 }
 
 SYSCALL_DEFINE1(close, int, fd){
-	int res = task_remove_file(current, fd);
-
-	if(IS_ERR_VALUE(res)){
-		return res;
-	}
-
-	return SUCCESS;
+	return task_remove_file(current, fd);
 }

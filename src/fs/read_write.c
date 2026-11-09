@@ -6,25 +6,6 @@
 #include <def/config.h>
 #include <def/errno.h>
 
-static int get_proc_file(int fd, struct file **out){
-	struct file_table *table = current->files;
-	spin_lock(&table->lock);
-
-	if(fd < 0 || fd > table->capacity || !out){
-		spin_unlock(&table->lock);
-		return -EBADF;
-	}
-
-	*out = table->files[fd];
-	if(!*out){
-		spin_unlock(&table->lock);
-		return -EBADF;
-	}
-
-	spin_unlock(&table->lock);
-	return 0;
-}
-
 static int validate_file(const struct file *file){
 	return (!file || !file->f_op) ? -EIO : 0;
 }
@@ -92,17 +73,18 @@ off_t vfs_lseek(struct file *file, off_t offset, int whence){
 }
 
 SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
-	struct file *file;
-	int ret = get_proc_file(fd, &file);
-	if(ret){
-		return ret;
+	struct file *file = file_table_get_file(current->files, fd);
+	if(!file){
+		return -EBADF;
 	}
 
 	if((unsigned long)(buffer + count) > USER_SPACE_END){
+		file_put(file);
 		return -EFAULT;
 	}
 
 	if(!file->f_op || !file->f_op->write){
+		file_put(file);
 		return -ENOSYS;
 	}
 
@@ -115,6 +97,7 @@ SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
 		int remaining = copy_from_user(tmp, buffer + total_written, to_copy);
 		if(remaining){
 			if(total_written == 0 && remaining == to_copy){
+				file_put(file);
 				return -EFAULT;
 			}
 
@@ -124,6 +107,7 @@ SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
 
 		int ret = vfs_write(file, tmp, to_copy);
 		if(ret < 0){
+			file_put(file);
 			return ret;
 		}
 
@@ -140,21 +124,23 @@ SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
 		count -= to_copy;
 	}
 
+	file_put(file);
 	return total_written;
 }
 
 SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
-	struct file *file;
-	int ret = get_proc_file(fd, &file);
-	if(ret){
-		return ret;
+	struct file *file = file_table_get_file(current->files, fd);
+	if(!file){
+		return -EBADF;
 	}
 
 	if(!buffer || (unsigned long)(buffer + count) > USER_SPACE_END){
+		file_put(file);
 		return -EFAULT;
 	}
 
 	if(!file->f_op || !file->f_op->read){
+		file_put(file);
 		return -ENOSYS;
 	}
 
@@ -165,6 +151,7 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 		size_t to_read = (count > sizeof(tmp)) ? sizeof(tmp) : count;
 		int readed = vfs_read(file, tmp, to_read);
 		if(readed < 0){
+			file_put(file);
 			return readed;
 		}
 
@@ -175,6 +162,7 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 		int remaining = copy_to_user(buffer + total_read, tmp, readed);
 		if(remaining){
 			if(total_read == 0 && remaining == readed){
+				file_put(file);
 				return -EFAULT;
 			}
 
@@ -190,15 +178,18 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 		}
 	}
 
+	file_put(file);
 	return total_read;
 }
 
 SYSCALL_DEFINE3(lseek, int, fd, int, offset, int, whence){
-	struct file *file;
-	int ret = get_proc_file(fd, &file);
-	if(ret){
-		return ret;
+	struct file *file = file_table_get_file(current->files, fd);
+	if(!file){
+		return -EBADF;
 	}
 
-	return vfs_lseek(file, offset, whence);
+	int res = vfs_lseek(file, offset, whence);
+	file_put(file);
+
+	return res;
 }

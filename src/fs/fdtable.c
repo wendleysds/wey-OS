@@ -184,3 +184,17 @@ void file_table_destroy(struct file_table* table) {
 	spin_unlock(&table->lock);
 	kfree(table);
 }
+
+struct file *file_table_get_file(struct file_table* table, int fd){
+	if (!table) return NULL;
+
+	struct file* found = NULL;
+	spin_lock(&table->lock);
+	if(fd < 0 || fd > table->capacity) goto out;
+
+	found = table->files[fd];
+
+out:
+	spin_unlock(&table->lock);
+	return file_get(found);
+}
