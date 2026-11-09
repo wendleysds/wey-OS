@@ -29,7 +29,7 @@ static int validate_file(const struct file *file){
 	return (!file || !file->f_op) ? -EIO : 0;
 }
 
-int vfs_read(struct file *file, void *buffer, uint32_t size){
+ssize_t vfs_read(struct file *file, void *buffer, size_t size){
 	int ret = validate_file(file);
 	if(ret){
 		return ret;
@@ -39,10 +39,24 @@ int vfs_read(struct file *file, void *buffer, uint32_t size){
 		return -ENOSYS;
 	}
 	
-	return file->f_op->read(file, buffer, size);
+	return file->f_op->read(file, buffer, size, &file->pos);
 }
 
-int vfs_write(struct file *file, const void *buffer, uint32_t size){
+ssize_t vfs_pread(struct file *file, void *buffer, size_t count, off_t offset){
+	int ret = validate_file(file);
+	if(ret){
+		return ret;
+	}
+	
+	if(!file->f_op->read){
+		return -ENOSYS;
+	}
+	
+	off_t local_offset = offset;
+	return file->f_op->read(file, buffer, count, &local_offset);
+}
+
+ssize_t vfs_write(struct file *file, const void *buffer, size_t size){
 	int ret = validate_file(file);
 	if(ret){
 		return ret;
@@ -52,10 +66,24 @@ int vfs_write(struct file *file, const void *buffer, uint32_t size){
 		return -ENOSYS;
 	}
 	
-	return file->f_op->write(file, buffer, size);
+	return file->f_op->write(file, buffer, size, &file->pos);
 }
 
-int vfs_lseek(struct file *file, int offset, int whence){
+ssize_t vfs_pwrite(struct file *file, const void *buffer, size_t count, off_t offset){
+	int ret = validate_file(file);
+	if(ret){
+		return ret;
+	}
+
+	if(!file->f_op->write){
+		return -ENOSYS;
+	}
+	
+	off_t local_offset = offset;
+	return file->f_op->write(file, buffer, count, &local_offset);
+}
+
+off_t vfs_lseek(struct file *file, off_t offset, int whence){
 	if(!file || !file->f_op || !file->f_op->lseek){
 		return -ENOSYS;
 	}

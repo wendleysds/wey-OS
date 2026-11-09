@@ -34,7 +34,7 @@ static int tty_file_open(struct inode* ino, struct file* file){
 	return SUCCESS;
 }
 
-static int tty_file_write(struct file* file, const void* buffer, uint32_t count){
+static ssize_t tty_file_write(struct file* file, const void* buffer, size_t count, off_t* offset){
 	if(!buffer){
 		return -EINVAL;
 	}
@@ -50,7 +50,7 @@ static int tty_file_write(struct file* file, const void* buffer, uint32_t count)
 	return tty->ldisc->ops->write(tty, buffer, count);
 }
 
-static int tty_file_read(struct file *file, void *buffer, uint32_t count){
+static ssize_t tty_file_read(struct file *file, void *buffer, size_t count, off_t* offset){
 	if(!buffer){
 		return -EINVAL;
 	}

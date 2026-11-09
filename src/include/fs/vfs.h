@@ -108,8 +108,8 @@ struct qstr {
 };
 
 struct file_operations {
-	int (*read)(struct file *file, void *buffer, uint32_t count);
-	int (*write)(struct file *file, const void *buffer, uint32_t count);
+	ssize_t (*read)(struct file *file, void *buffer, size_t count, off_t *offset);
+	ssize_t (*write)(struct file *file, const void *buffer, size_t count, off_t *offset);
 	off_t (*lseek)(struct file *file, off_t offset, int whence);
 	int (*open) (struct inode *ino, struct file *file);
 	int (*close)(struct file *file);
@@ -198,9 +198,11 @@ int vfs_unlink(const char *restrict path);
 int vfs_mkdir(const char *restrict path, umode_t mode);
 int vfs_rmdir(const char *restrict path);
 
-int vfs_read(struct file *file, void *buffer, uint32_t size);
-int vfs_lseek(struct file *file, int offset, int whence);
-int vfs_write(struct file *file, const void *buffer, uint32_t size);
+ssize_t vfs_read(struct file *file, void *buffer, size_t size);
+ssize_t vfs_pread(struct file *file, void *buffer, size_t count, off_t offset);
+ssize_t vfs_write(struct file *file, const void *buffer, size_t count);
+ssize_t vfs_pwrite(struct file *file, const void *buffer, size_t count, off_t offset);
+off_t vfs_lseek(struct file *file, off_t offset, int whence);
 int vfs_close(struct file *file);
 int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
@@ -240,8 +242,9 @@ static inline void super_put(struct super_block* sb){
 	}
 }
 
-static inline void file_get(struct file* file){
-	atomic_inc(&file->refcount);
+static struct file *file_get(struct file* file){
+	if(file) atomic_inc(&file->refcount);
+	return file;
 }
 
 static inline void file_put(struct file* file){
