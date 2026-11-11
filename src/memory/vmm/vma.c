@@ -7,6 +7,51 @@
 #define ALIGN_DOWN(v,a) ((v) & ~((a)-1))
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 
+struct vm_region *vma_alloc(mem_flags_t mem_flags, prot_flags_t prot_flags,
+                            struct file *file, off_t file_offset)
+{
+	struct vm_region *r = kzalloc(sizeof(struct vm_region));
+	if (!r)
+		return NULL;
+
+	r->mem_flags   = mem_flags;
+	r->prot_flags  = prot_flags;
+	r->file        = file;        /* a referência é tomada em __vma_insert */
+	r->file_offset = file_offset;
+	return r;
+}
+
+int __vma_insert(struct mm_struct *mm, struct vm_region *region)
+{
+	if (region->start >= region->end ||
+	    (region->start & (PAGE_SIZE - 1)) ||
+	    (region->end   & (PAGE_SIZE - 1)))
+		return -EINVAL;
+
+	struct vm_region *prev = NULL;
+	struct vm_region *curr = mm->vma;
+
+	while (curr && curr->start < region->start) {
+		prev = curr;
+		curr = curr->next;
+	}
+
+	if ((curr && region->end > curr->start) ||
+	    (prev && region->start < prev->end))
+		return -EINVAL;
+
+	region->next = curr;
+	if (prev)
+		prev->next = region;
+	else
+		mm->vma = region;
+
+	if (region->file)
+		file_get(region->file);
+
+	return SUCCESS;
+}
+
 static struct vm_region* vma_lookup_locked(struct mm_struct* mm, uintptr_t addr){
 	struct vm_region* region = mm->vma;
 
@@ -25,64 +70,40 @@ static struct vm_region* vma_lookup_locked(struct mm_struct* mm, uintptr_t addr)
 	return NULL;
 }
 
-struct vm_region* vma_add(
-	struct mm_struct* mm,
+struct vm_region *vma_add(
+	struct mm_struct *mm,
 	uintptr_t start,
 	uintptr_t end,
 	mem_flags_t mem_flags,
 	prot_flags_t prot_flags,
-	struct file* file,
+	struct file *file,
 	off_t file_offset
 ) {
-	if (!mm || start >= end) return ERR_PTR(-EINVAL);
+	if (!mm || start >= end)
+		return ERR_PTR(-EINVAL);
 
-	uintptr_t aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
-	uintptr_t aligned_end   = ALIGN_UP(end, PAGE_SIZE);
-	
-	off_t aligned_offset = file ? file_offset - (start - aligned_start) : 0;
+	const uintptr_t aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
+	const uintptr_t aligned_end   = ALIGN_UP(end, PAGE_SIZE);
+	const off_t aligned_offset    = file ? file_offset - (start - aligned_start) : 0;
 
-	struct vm_region* new_region = kzalloc(sizeof(struct vm_region));
-	if (!new_region) return ERR_PTR(-ENOMEM);
+	struct vm_region *region = vma_alloc(mem_flags, prot_flags, file, aligned_offset);
+	if (!region)
+		return ERR_PTR(-ENOMEM);
 
-	new_region->start = aligned_start;
-	new_region->end = aligned_end;
-	new_region->mem_flags = mem_flags;
-	new_region->prot_flags = prot_flags;
-	new_region->file = file;
-	new_region->file_offset = aligned_offset;
+	region->start = aligned_start;
+	region->end   = aligned_end;
 
 	spin_lock(&mm->lock);
-
-	struct vm_region *prev = NULL;
-	struct vm_region *curr = mm->vma;
-
-	while (curr && curr->start < aligned_start) {
-		prev = curr;
-		curr = curr->next;
-	}
-
-	if ((curr && aligned_end > curr->start) || 
-		(prev && aligned_start < prev->end)) {
-		spin_unlock(&mm->lock);
-		kfree(new_region);
-		return ERR_PTR(-EINVAL);
-	}
-
-	new_region->next = curr;
-	if (prev) {
-		prev->next = new_region;
-	} else {
-		mm->vma = new_region;
-	}
-
-	if (file) {
-		file_get(file);
-	}
-
+	int res = __vma_insert(mm, region);
 	spin_unlock(&mm->lock);
-	return new_region;
-}
 
+	if (res) {
+		kfree(region);
+		return ERR_PTR(res);
+	}
+
+	return region;
+}
 
 struct vm_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr) {
 	if (!mm) return NULL;
@@ -128,9 +149,9 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr) {
 int vma_resize(struct mm_struct* mm, uintptr_t start_addr, size_t new_size) {
 	if (!mm || new_size == 0) return -EINVAL;
 
-	uintptr_t aligned_start = ALIGN_DOWN(start_addr, PAGE_SIZE);
-	size_t aligned_size = ALIGN_UP(new_size, PAGE_SIZE);
-	uintptr_t new_end = aligned_start + aligned_size;
+	const uintptr_t aligned_start = ALIGN_DOWN(start_addr, PAGE_SIZE);
+	const size_t aligned_size = ALIGN_UP(new_size, PAGE_SIZE);
+	const uintptr_t new_end = aligned_start + aligned_size;
 
 	spin_lock(&mm->lock);
 
@@ -155,85 +176,102 @@ int vma_resize(struct mm_struct* mm, uintptr_t start_addr, size_t new_size) {
 }
 
 
-int vma_remove_range(struct mm_struct* mm, uintptr_t start, uintptr_t end) {
-	if(!mm || start >= end) return -EINVAL;
-	if(start & (PAGE_SIZE - 1)) return -EINVAL;
+int __vma_unlink_range(struct mm_struct *mm, uintptr_t start, uintptr_t end,
+                       struct vm_region **spare, struct vm_region **dead)
+{
+	struct vm_region *prev = NULL;
+	struct vm_region *curr = mm->vma;
 
-	end = ALIGN_UP(end, PAGE_SIZE);
-	if(end <= start) return -EINVAL;
+	while (curr && curr->start < end) {
+		struct vm_region *next = curr->next;
 
-	struct vm_region* spare = kzalloc(sizeof(struct vm_region));
-	if(!spare) return -ENOMEM;
-
-	struct vm_region* dead = NULL;
-	struct vm_region* prev = NULL;
-
-	spin_lock(&mm->lock);
-	
-	struct vm_region* curr = mm->vma;
-
-	while(curr && curr->start < end) {
-		struct vm_region* next = curr->next;
-
-		if(curr->end <= start) {
+		if (curr->end <= start) {
 			prev = curr;
 			curr = next;
 			continue;
 		}
 
-		if(start <= curr->start && end >= curr->end) {
-			if(prev) prev->next = next;
-			else mm->vma = next;
+		if (start <= curr->start && end >= curr->end) {
+			if (prev) prev->next = next;
+			else      mm->vma = next;
 
-			curr->next = dead;
-			dead = curr;
+			curr->next = *dead;
+			*dead = curr;
 			curr = next;
 			continue;
 		}
 
-		if(start <= curr->start) {
-			if(curr->file) {
+		if (start <= curr->start) {
+			if (curr->file)
 				curr->file_offset += (off_t)(end - curr->start);
-			}
 			curr->start = end;
-		} 
-		else if(end >= curr->end) {
+		} else if (end >= curr->end) {
 			curr->end = start;
-		} 
-		else {
-			spare->start      = end;
-			spare->end        = curr->end;
-			spare->mem_flags  = curr->mem_flags;
-			spare->prot_flags = curr->prot_flags;
-			spare->file       = curr->file;
+		} else {
+			struct vm_region *tail = *spare;
+			if (!tail)
+				return -ENOMEM;
 
-			if(curr->file) {
-				spare->file_offset = curr->file_offset + (off_t)(end - curr->start);
+			tail->start      = end;
+			tail->end        = curr->end;
+			tail->mem_flags  = curr->mem_flags;
+			tail->prot_flags = curr->prot_flags;
+			tail->file       = curr->file;
+
+			if (curr->file) {
+				tail->file_offset = curr->file_offset + (off_t)(end - curr->start);
 				file_get(curr->file);
 			}
 
-			spare->next = next;
-			curr->end   = start;
-			curr->next  = spare;
-			
-			spare = NULL; // Consumed
+			tail->next = next;
+			curr->end  = start;
+			curr->next = tail;
+			*spare = NULL;
 		}
 
 		prev = curr;
 		curr = next;
 	}
 
+	return SUCCESS;
+}
+
+void __vma_free_list(struct vm_region *list)
+{
+	while (list) {
+		struct vm_region *next = list->next;
+		if (list->file)
+			file_put(list->file);
+		kfree(list);
+		list = next;
+	}
+}
+
+int vma_remove_range(struct mm_struct *mm, uintptr_t start, uintptr_t end)
+{
+	if (!mm || start >= end)
+		return -EINVAL;
+	if (start & (PAGE_SIZE - 1))
+		return -EINVAL;
+
+	end = ALIGN_UP(end, PAGE_SIZE);
+	if (end <= start)
+		return -EINVAL;
+
+	struct vm_region *spare = kzalloc(sizeof(struct vm_region));
+	struct vm_region *dead  = NULL;
+	if (!spare)
+		return -ENOMEM;
+
+	spin_lock(&mm->lock);
+	int res = __vma_unlink_range(mm, start, end, &spare, &dead);
 	spin_unlock(&mm->lock);
 
-	while(dead) {
-		struct vm_region* n = dead->next;
-		if(dead->file) file_put(dead->file);
-		kfree(dead);
-		dead = n;
-	}
+	__vma_free_list(dead);
+	if (spare)
+		kfree(spare);
 
-	if(spare) kfree(spare);
-	return SUCCESS;
+	return res;
 }
 
 struct mm_struct* mm_alloc(void){
@@ -249,16 +287,7 @@ struct mm_struct* mm_alloc(void){
 
 void mm_clean(struct mm_struct* mm){
 	struct vm_region* region = mm->vma;
-	while (region) {
-		struct vm_region* next = region->next;
-		if(region->file){
-			file_put(region->file);
-		}
-
-		kfree(region);
-		region = next;
-	}
-
+	__vma_free_list(region);
 	mm->vma = NULL;
 }
 

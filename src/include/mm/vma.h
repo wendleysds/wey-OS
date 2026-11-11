@@ -34,6 +34,11 @@ struct mm_struct {
 };
 
 // vm region operations
+struct vm_region *vma_alloc(
+	mem_flags_t mem_flags, prot_flags_t prot_flags,
+	struct file *file, off_t file_offset
+);
+
 struct vm_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr);
 struct vm_region* vma_add(
 	struct mm_struct* mm, uintptr_t start, uintptr_t end,
@@ -43,6 +48,14 @@ struct vm_region* vma_add(
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);
 int vma_remove_range(struct mm_struct* mm, uintptr_t start, uintptr_t end);
+
+// Expect caller to hold the lock
+void __vma_free_list(struct vm_region *list);
+int __vma_insert(struct mm_struct *mm, struct vm_region *region);
+int __vma_unlink_range(
+	struct mm_struct *mm, uintptr_t start, uintptr_t end,
+	struct vm_region **spare, struct vm_region **dead
+);
 
 // mm struct operations
 struct mm_struct* mm_alloc(void);

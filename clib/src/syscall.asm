@@ -26,12 +26,10 @@ do_syscall:
 	pop edi
 	pop ebp
 
-	cmp eax, 0
-	jge .positive
-
+	cmp eax, -4095
+	jb .ok
 	neg eax
 	mov dword [errno], eax
 	mov eax, -1
-
-.positive:
+.ok:
 	ret

@@ -552,10 +552,6 @@ void mmu_munmap(struct paging_ctx *ctx, uintptr_t vaddr, size_t size) {
 }
 
 uintptr_t mmu_translate(struct paging_ctx *ctx, uintptr_t vaddr){
-	if (vaddr >= KERNEL_DIRECTMAP_START && (vaddr + PAGE_SIZE) <= KERNEL_DIRECTMAP_END) {
-		return __pa(vaddr);
-	}
-
 	uint8_t level = 0;
 	pte_t* pte = walk_level(ctx, vaddr, ctx->fmt->levels - 1, &level);
 
@@ -626,9 +622,12 @@ int mmu_context_switch(struct paging_ctx *ctx){
 		return -EINVAL;
 	}
 
-	const uintptr_t target_phys = mmu_translate(ctx, (uintptr_t)ctx->root);
-	if (target_phys & (PAGE_SIZE - 1)) {
-		return -EINVAL;
+	uintptr_t target_phys;
+	const uintptr_t root_vaddr = (uintptr_t)ctx->root;
+	if (root_vaddr >= KERNEL_DIRECTMAP_START && (root_vaddr + PAGE_SIZE) <= KERNEL_DIRECTMAP_END) {
+		target_phys = __pa(root_vaddr);
+	}else{
+		target_phys = mmu_translate(ctx, root_vaddr);
 	}
 
 	const uintptr_t curr_phys = paging_current_table_phys();
