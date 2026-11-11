@@ -94,8 +94,7 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 		}
 
 		memset(kernel_virt, 0x0, PAGE_SIZE);
-		vfs_lseek(region->file, file_offset, SEEK_SET);
-		int n = vfs_read(region->file, kernel_virt, PAGE_SIZE);
+		int n = vfs_pread(region->file, kernel_virt, PAGE_SIZE, file_offset);
 		kunmap(page);
 
 		if (n < 0) {

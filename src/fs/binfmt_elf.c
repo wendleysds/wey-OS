@@ -40,9 +40,7 @@ static int load_elf_binarie(struct binprm *bprm){
 
 	int res = SUCCESS;
 
-	vfs_lseek(bprm->file, 0, SEEK_SET);
-	res = vfs_read(bprm->file, bprm->buff, sizeof(bprm->buff));
-
+	res = vfs_pread(bprm->file, bprm->buff, sizeof(bprm->buff), 0);
 	if(IS_ERR_VALUE(res)){
 		return res;
 	}
