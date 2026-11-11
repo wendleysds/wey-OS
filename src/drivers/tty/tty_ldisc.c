@@ -109,7 +109,12 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 				break;
 			}
 
-			sleep_uninterruptible();
+			if(has_signal_pending(current)){
+				wait_queue_remove(&tty->read_waiters, &wait);
+				return -EINTR;
+			}
+
+			sleep_interruptible();
 			continue;
 		}
 
@@ -316,13 +321,31 @@ static int tty_ldisc_canonical_process(
 		return 1;
 	}
 
+	if ((ch == '\n' || ch == '\r' || (t->c_cc[VEOL] && ch == t->c_cc[VEOL]) || (t->c_cc[VEOL2] && ch == t->c_cc[VEOL2]))) {
+		state->lines++;
+	}
+
 	return 0;
+}
+
+static int signal_process_group(struct task *parent, int sig) {
+	int n = 0;
+	struct task *c;
+	list_for_each_entry(c, &parent->children, sibling) {
+		n += signal_process_group(c, sig);
+		if (c->state != TASK_ZOMBIE) { send_signal(c, sig); n++; }
+	}
+	return n;
 }
 
 static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state, u8 ch){
 	const struct termios *t = &tty->termios;
-	int sig = -1;
 
+	if (!(t->c_lflag & ISIG)) {
+		return 0;
+	}
+
+	int sig = 0;
 	if (t->c_cc[VINTR] && ch == t->c_cc[VINTR]) {
 		sig = SIGINT;
 	}
@@ -335,19 +358,22 @@ static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state
 		sig = SIGTSTP;
 	}
 
-	/*if (t->c_cc[VSTART] && ch == t->c_cc[VSTART]) {
-		
+	if (t->c_cc[VSTART] && ch == t->c_cc[VSTART]) {
+		sig = SIGCONT;
 	}
 
 	if (t->c_cc[VSTOP] && ch == t->c_cc[VSTOP]) {
-		
-	}*/
-
-	if(sig > 0){
-		send_signal(current, sig);
+		sig = SIGSTOP;
 	}
 
-	return 0;
+	if(sig > 0){
+		struct task *owner = task_search(tty->owner_pid);
+		if (owner && !signal_process_group(owner, sig))
+			send_signal(owner, sig);
+		return 1;
+	}
+
+	return sig > 0;
 }
 
 static void tty_ldisc_echo(struct tty_struct *tty,
@@ -368,7 +394,7 @@ static void tty_ldisc_echo(struct tty_struct *tty,
 		}
 	}
 
-	if ((t->c_lflag & ECHOCTL) && (ch < ' ') && (ch > 0)) {
+	if ((t->c_lflag & ECHOCTL) && ch > 0 && ch < ' ' && ch != '\n' && ch != '\t') {
         u8 caret_seq[2];
         caret_seq[0] = '^';
         caret_seq[1] = ch + '@';
@@ -379,7 +405,7 @@ static void tty_ldisc_echo(struct tty_struct *tty,
 
 static int tty_ldisc_store_char(struct tty_struct* tty, struct tty_ldisc_data* state, unsigned char ch){
 	if(state->count == TTY_BUFFER_LDISC_SIZE){
-		return -EAGAIN;
+		return 1;
 	}
 
 	state->buffer[state->head] = ch;
@@ -398,76 +424,34 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len){
 		return -ENODEV;
 	}
 
-	unsigned long flags;
-	bool wake_up = false;
-	int ret = 0;
-
 	struct tty_ldisc_data* state = tty->ldisc_data;
-
+	bool wake_up = false;
+	
+	unsigned long flags;
 	spin_lock_irqsave(&state->lock, &flags);
 
 	for(size_t i = 0; i < len; i++){
 		unsigned char ch = data[i];
 
-		/*
-		* 1. Input processing
-		*/
-		ret = tty_ldisc_input_process(tty, state, &ch);
-
-		if (ret < 0){
-			spin_unlock_irqrestore(&state->lock, &flags);
-			return ret;
-		}
-
-		if (ret > 0)
+		if (tty_ldisc_input_process(tty, state, &ch)){
 			continue;
-
-		/*
-		* 2. Canonical editing
-		*/
-		ret = tty_ldisc_canonical_process(tty, state, ch);
-
-		if (ret < 0){
-			spin_unlock_irqrestore(&state->lock, &flags);
-			return ret;
 		}
 
-		if (ret > 0) {
+		if (tty_ldisc_canonical_process(tty, state, ch)){
 			goto check_wake_up;
 		}
 
-		/*
-		* 3. Store the character for userspace.
-		*/
-		ret = tty_ldisc_store_char(tty, state, ch);
+		if(tty_ldisc_signal(tty, state, ch)){
+			goto skip_store;
+		}
 
-		if (ret < 0){
+		if (tty_ldisc_store_char(tty, state, ch)){
 			spin_unlock_irqrestore(&state->lock, &flags);
-			return ret;
+			return -EAGAIN;
 		}
 
-		const struct termios *t = &tty->termios;
-		if ((t->c_lflag & ICANON) &&
-		    (ch == '\n' || ch == '\r' ||
-		     (t->c_cc[VEOL] && ch == t->c_cc[VEOL]) ||
-		     (t->c_cc[VEOL2] && ch == t->c_cc[VEOL2]))) {
-			state->lines++;
-		}
-
-		/*
-		* 4. Echo
-		*/
+skip_store:
 		tty_ldisc_echo(tty, state, ch);
-
-		/*
-		* 5. Signal
-		*/
-		tty_ldisc_signal(tty, state, ch);
-
-		/*
-		* 6. Wake readers if this character completes
-		*    something they can consume.
-		*/
 
 check_wake_up:
 		if (tty_ldisc_should_wake_readers(tty, state, ch)) {

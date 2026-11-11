@@ -74,6 +74,10 @@ SYSCALL_DEFINE3(waitpid, pid_t, pid, int*, wstatus, int, options){
 			return 0;
 		}
 
-		sleep_uninterruptible();
+		if(has_signal_pending(current)){
+			return -EINTR;
+		}
+
+		sleep_interruptible();
 	}
 }

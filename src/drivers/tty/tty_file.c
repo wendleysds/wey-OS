@@ -4,6 +4,7 @@
 #include <def/errno.h>
 #include <fs/stat.h>
 #include <fs/vfs.h>
+#include <kernel/sched.h>
 
 static int tty_file_open(struct inode* ino, struct file* file){
 	if(!S_ISCHR(ino->mode) || ino->dev == 0){
@@ -21,6 +22,10 @@ static int tty_file_open(struct inode* ino, struct file* file){
 	struct tty_struct* tty = tty_ensure_created(driver, index);
 	if(IS_ERR(tty)){
 		return PTR_ERR(tty);
+	}
+
+	if(tty->owner_pid == 0){
+		tty->owner_pid = current->pid;
 	}
 
 	file->private_data = tty;
