@@ -80,6 +80,8 @@ struct tty_struct {
 	struct tty_bufhead buffer;
 
 	pid_t fg_pgrp;
+	pid_t session_sid;
+
 	struct wait_queue_head read_waiters;
 	spinlock_t lock;
 };

@@ -126,6 +126,7 @@ static __no_return void init(void){
 static __init int rest_init(void* unused){
 	init_task = current;
 	init_task->pgid = 1;
+	init_task->sid = 1;
 
 	do_initcalls();
 

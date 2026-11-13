@@ -54,6 +54,7 @@ static struct task *copy_process() {
 	child->mm = c_mm;
 	child->parent = cur;
 	child->pgid = cur->pgid;
+	child->sid = cur->sid;
 	list_add(&child->sibling, &cur->children);
 
 	child->cwd.dentry = dentry_get(cur->cwd.dentry);

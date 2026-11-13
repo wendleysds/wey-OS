@@ -64,13 +64,17 @@ struct task {
 
 	struct task* parent;
 	pid_t pgid;
+	pid_t sid;
 
 	struct list_head children;
 	struct list_head sibling;
 };
 
 struct task* task_create(const char* name, int priority);
+
 struct task* task_search(pid_t pid);
+struct task *task_find_first_with_pgid(pid_t pgid);
+
 void task_exit(struct task* task, int status);
 void task_destroy(struct task* task);
 

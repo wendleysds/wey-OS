@@ -28,6 +28,10 @@ static int tty_file_open(struct inode* ino, struct file* file){
 		tty->fg_pgrp = current->pgid;
 	}
 
+	if(tty->session_sid == 0){
+		tty->session_sid = current->sid;
+	}
+
 	file->private_data = tty;
 	if(driver->ops->open){
 		int res = driver->ops->open(tty, file);
