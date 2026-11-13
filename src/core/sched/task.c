@@ -262,6 +262,19 @@ size_t send_signal_to_process_group(pid_t pgid, int sig) {
 	return count;
 }
 
+struct task *task_find_first_with_pgid(pid_t pgid){
+	struct task *task;
+	spin_lock(&tasks_lock);
+	list_for_each_entry(task, &tasks_global, tasks) {
+		if (task->pgid == pgid) {
+			spin_unlock(&tasks_lock);
+			return task;
+		}
+	}
+	spin_unlock(&tasks_lock);
+	return NULL;
+}
+
 SYSCALL_DEFINE2(kill, pid_t, pid, int, signum){
 	bool sended = false;
 
