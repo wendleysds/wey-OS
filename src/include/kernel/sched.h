@@ -63,6 +63,7 @@ struct task {
 	struct sigaction sig_actions[NSIG];
 
 	struct task* parent;
+	pid_t pgid;
 
 	struct list_head children;
 	struct list_head sibling;

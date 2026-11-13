@@ -248,7 +248,23 @@ SYSCALL_DEFINE1(exit, int, status){
 	unreachable();
 }
 
+size_t send_signal_to_process_group(pid_t pgid, int sig) {
+	size_t count = 0;
+	struct task *task;
+	spin_lock(&tasks_lock);
+	list_for_each_entry(task, &tasks_global, tasks) {
+		if (task->pgid == pgid) {
+			send_signal(task, sig);
+			count++;
+		}
+	}
+	spin_unlock(&tasks_lock);
+	return count;
+}
+
 SYSCALL_DEFINE2(kill, pid_t, pid, int, signum){
+	bool sended = false;
+
     if (pid > 0) {
 		struct task* target = task_search(pid);
 		if(!target){
@@ -262,26 +278,19 @@ SYSCALL_DEFINE2(kill, pid_t, pid, int, signum){
 		struct task *tmp;
 		spin_lock(&tasks_lock);
 		list_for_each_entry(tmp, &tasks_global, tasks){
-			if(tmp->pid == 1){
-				continue;
-			}
-
 			send_signal(tmp, signum);
+			sended = true;
 		}
 		spin_unlock(&tasks_lock);
-		return 0;
 	}
 
-	/*
-	
-	If pid equals 0, then sig is sent to every process in the process group
-    of the calling process.
+	if(pid == 0){
+		sended = send_signal_to_process_group(current->pgid, signum) > 0;
+	}
 
-	If pid is less than -1, then sig is sent to every process in the process
-	group whose ID is -pid.
+	if(pid < -1){
+		sended = send_signal_to_process_group(-pid, signum) > 0;
+	}
 	
-	*/
-	
-	// Kernel dont support process groups yet.
-	return -EINVAL;
+	return sended ? 0 : -ESRCH;
 }

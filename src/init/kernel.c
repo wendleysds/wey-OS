@@ -101,7 +101,7 @@ static void try_to_run_init_process(const char *pathname) {
 	int ret = run_init_process(pathname);
 
 	if (ret && ret != -ENOENT) {
-		printk("init(%s): failed to execute!(%d)\n", pathname, ret);
+		printk("init(%s): failed to execute! (%d)\n", pathname, ret);
 	}
 }
 
@@ -125,6 +125,7 @@ static __no_return void init(void){
 
 static __init int rest_init(void* unused){
 	init_task = current;
+	init_task->pgid = 1;
 
 	do_initcalls();
 

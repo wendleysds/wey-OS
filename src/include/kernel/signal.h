@@ -77,5 +77,6 @@ struct sigaction {
 asmlinkage void do_signal(struct registers *regs);
 bool has_signal_pending(struct task *task);
 int send_signal(struct task *task, int sig);
+size_t send_signal_to_process_group(pid_t pgid, int sig);
 
 #endif /* _KERNEL_SIGNAL_H */

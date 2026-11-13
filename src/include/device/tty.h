@@ -79,7 +79,7 @@ struct tty_struct {
 
 	struct tty_bufhead buffer;
 
-	pid_t owner_pid;
+	pid_t fg_pgrp;
 	struct wait_queue_head read_waiters;
 	spinlock_t lock;
 };

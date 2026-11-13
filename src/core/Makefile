@@ -1,4 +1,4 @@
-obj-y += panic.o printk.o pid.o signal.o
+obj-y += panic.o printk.o pid.o signal.o sys.o
 obj-y += clock.o
 obj-y += fork.o
 obj-y += extable.o

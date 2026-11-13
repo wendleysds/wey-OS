@@ -367,9 +367,7 @@ static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state
 	}
 
 	if(sig > 0){
-		struct task *owner = task_search(tty->owner_pid);
-		if (owner && !signal_process_group(owner, sig))
-			send_signal(owner, sig);
+		send_signal_to_process_group(tty->fg_pgrp, sig);
 		return 1;
 	}
 

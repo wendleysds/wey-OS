@@ -24,8 +24,8 @@ static int tty_file_open(struct inode* ino, struct file* file){
 		return PTR_ERR(tty);
 	}
 
-	if(tty->owner_pid == 0){
-		tty->owner_pid = current->pid;
+	if(tty->fg_pgrp == 0){
+		tty->fg_pgrp = current->pgid;
 	}
 
 	file->private_data = tty;
