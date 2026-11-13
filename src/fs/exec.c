@@ -329,6 +329,8 @@ static __no_return void exec_binprm(struct binprm* bprm){
 		(void*)bprm->curMemTop
 	);
 
+	cur->did_exec = true;
+
 	// Set name
 	const char *slash = strrchr(bprm->filename, '/');
 	const char *binname = slash ? slash + 1 : bprm->filename;

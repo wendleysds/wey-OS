@@ -35,7 +35,7 @@
 34 i386 sigreturn sys_sigreturn
 35 i386 kill sys_kill
 36 i386 setpgid sys_setpgid
-37 i386 getpgrp sys_getpgrp
+37 i386 getpgid sys_getpgid
 38 i386 setsid sys_setsid
 39 i386 getsid sys_getsid
 

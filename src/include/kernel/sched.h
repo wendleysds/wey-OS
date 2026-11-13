@@ -65,6 +65,7 @@ struct task {
 	struct task* parent;
 	pid_t pgid;
 	pid_t sid;
+	bool did_exec;
 
 	struct list_head children;
 	struct list_head sibling;

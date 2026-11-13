@@ -249,6 +249,8 @@ SYSCALL_DEFINE1(exit, int, status){
 }
 
 size_t send_signal_to_process_group(pid_t pgid, int sig) {
+	if (pgid <= 0) return 0;
+
 	size_t count = 0;
 	struct task *task;
 	spin_lock(&tasks_lock);

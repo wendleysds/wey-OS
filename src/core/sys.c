@@ -6,6 +6,9 @@ SYSCALL_DEFINE0(setsid){
     if (current->pgid == current->pid)
         return -EPERM;
 
+    if (current->pgid == current->pid || task_find_first_with_pgid(current->pid))
+        return -EPERM;
+
     current->sid = current->pid;
     current->pgid = current->pid;
 
@@ -13,20 +16,12 @@ SYSCALL_DEFINE0(setsid){
 }
 
 SYSCALL_DEFINE1(getsid, pid_t, pid){
-    if(pid == 0){
-        return current->sid;
-    }
+    if(pid == 0) return current->sid;
 
     const struct task *task = task_search(pid);
-    if(!task){
-        return -ESRCH;
-    }
+    if(!task) return -ESRCH;
 
-    if(task->sid == current->sid){
-        return task->pgid;
-    }
-
-    return -EPERM;
+    return task->sid;
 }
 
 SYSCALL_DEFINE2(setpgid, pid_t, pid, pid_t, pgid){
@@ -54,6 +49,12 @@ SYSCALL_DEFINE2(setpgid, pid_t, pid, pid_t, pgid){
     if (task->sid != current->sid)
         return -EPERM;
 
+    if (task->sid == task->pid)
+        return -EPERM;
+
+    if (task != current && task->did_exec) 
+        return -EACCES;
+
     group = task_find_first_with_pgid(pgid);
     if (!group) {
         if (pgid != task->pid)
@@ -68,6 +69,11 @@ SYSCALL_DEFINE2(setpgid, pid_t, pid, pid_t, pgid){
     return 0;
 }
 
-SYSCALL_DEFINE0(getpgrp){
-    return current->pgid;
+SYSCALL_DEFINE1(getpgid, pid_t, pid){
+    if (pid == 0) return current->pgid;
+
+    const struct task *task = task_search(pid);
+    if (!task) return -ESRCH;
+
+    return task->pgid;
 }
