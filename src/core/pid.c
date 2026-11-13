@@ -2,6 +2,7 @@
 #include <kernel/sched.h>
 #include <sync/spinlock.h>
 #include <def/errno.h>
+#include <uapi/sys/wait.h>
 
 #define PID_FREE 0
 #define PID_ALLOC 1

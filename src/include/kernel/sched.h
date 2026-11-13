@@ -22,7 +22,7 @@
     ((uint16_t)(((signal) & TASK_EXIT_CODE_SIGNAL_MASK) | ((core) ? TASK_EXIT_CODE_CORE_MASK : 0)))
 
 #define TASK_STATUS_ENCODE_STOPPED(signal) \
-    (((uint16_t)((signal) & 0xFF)) << 8)
+    ((((uint16_t)(signal) & 0xFF) << 8) | TASK_EXIT_CODE_SIGNAL_MASK)
 
 
 struct mm_struct;
