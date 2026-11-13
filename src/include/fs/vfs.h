@@ -114,6 +114,7 @@ struct file_operations {
 	int (*open) (struct inode *ino, struct file *file);
 	int (*close)(struct file *file);
 	int (*release) (struct inode *ino, struct file *file);
+	int (*ioctl) (struct file *file, unsigned int cmd, unsigned long arg);
 };
 
 struct inode_operations {
