@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 
 int putc(int c, FILE* stream){
     if (stream == NULL) return EOF;

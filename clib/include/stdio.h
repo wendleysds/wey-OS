@@ -1,7 +1,7 @@
 #ifndef _CLIB_STDIO_H
 #define _CLIB_STDIO_H
 
-#include <stddef.h>
+#include <sys/types.h>
 #include <stdarg.h>
 
 #define SEEK_SET    (0)
@@ -438,5 +438,26 @@ int remove(const char *pathname);
  * @return 0 if successful, or EOF if an error occurred.
  */
 int rename(const char *old, const char *new);
+
+/**
+ * @brief Reads a line from a file until a delimiter is found or end-of-file is reached.
+ * 
+ * @param lineptr A pointer to a buffer to store the line.
+ * @param n The size of the buffer.
+ * @param stream A pointer to the FILE object to read from.
+ * @param delimiter The delimiter character.
+ * @return The number of characters read, or EOF if an error occurred.
+ */
+ssize_t getdelim(char **restrict lineptr, size_t *restrict n, int delimiter, FILE *restrict stream);
+
+/**
+ * @brief Reads a line from a file.
+ * 
+ * @param lineptr A pointer to a buffer to store the line.
+ * @param n The size of the buffer.
+ * @param stream A pointer to the FILE object to read from.
+ * @return The number of characters read, or EOF if an error occurred.
+ */
+ssize_t getline(char **restrict lineptr, size_t *restrict n, FILE *restrict stream);
 
 #endif /* _CLIB_STDIO_H */

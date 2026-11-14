@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 
 char *fgets(char *restrict str, int size, FILE *restrict stream) {
     if (!str || size <= 0 || !stream) {
