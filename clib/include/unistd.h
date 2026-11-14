@@ -107,6 +107,25 @@ pid_t getsid(pid_t);
  */
 pid_t setsid(void);
 
+/**
+ * @brief Truncate a file to a specified length.
+ * 
+ * @param fd The file descriptor to truncate.
+ * @param length The new length of the file.
+ * @return 0 on success, -1 on error.
+ */
+int ftruncate(int fd, off_t length);
+
+/**
+ * @brief Truncate a file to a specified length.
+ * 
+ * @param filename The name of the file to truncate.
+ * @param length The new length of the file.
+ * @return 0 on success, -1 on error.
+ */
+int truncate(const char* filename, off_t length);
+
+
 /* man 0p unistd.h
 int          access(const char *, int);
 unsigned     alarm(unsigned);
@@ -130,7 +149,6 @@ int          fdatasync(int);
 int          fexecve(int, char *const [], char *const []);
 long         fpathconf(int, int);
 int          fsync(int);
-int          ftruncate(int, off_t);
 char        *getcwd(char *, size_t);
 gid_t        getegid(void);
 uid_t        geteuid(void);
@@ -173,7 +191,6 @@ void         sync(void);
 long         sysconf(int);
 pid_t        tcgetpgrp(int);
 int          tcsetpgrp(int, pid_t);
-int          truncate(const char *, off_t);
 char        *ttyname(int);
 int          ttyname_r(int, char *, size_t);
 int          unlink(const char *);

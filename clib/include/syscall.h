@@ -40,7 +40,8 @@
 #define SYS_getpgid 37
 #define SYS_setsid 38
 #define SYS_getsid 39
-
+#define SYS_truncate 40
+#define SYS_ftruncate 41
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 
