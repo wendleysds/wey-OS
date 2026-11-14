@@ -7,6 +7,8 @@
 #include <mm/kheap.h>
 #include <stdbool.h>
 
+#include <uapi/bits/termios-c_lflags.h>
+
 struct tty_ldisc_data {
 	spinlock_t lock;
 	size_t head;
@@ -326,16 +328,6 @@ static int tty_ldisc_canonical_process(
 	}
 
 	return 0;
-}
-
-static int signal_process_group(struct task *parent, int sig) {
-	int n = 0;
-	struct task *c;
-	list_for_each_entry(c, &parent->children, sibling) {
-		n += signal_process_group(c, sig);
-		if (c->state != TASK_ZOMBIE) { send_signal(c, sig); n++; }
-	}
-	return n;
 }
 
 static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state, u8 ch){

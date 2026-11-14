@@ -1,6 +1,5 @@
 #include <device/tty.h>
 #include <kernel/init.h>
-#include <kernel/sched.h>
 #include <kernel/printk.h>
 #include <kernel/device.h>
 #include <device/chrdev.h>
@@ -8,8 +7,8 @@
 #include <def/errno.h>
 #include <lib/string.h>
 #include <lib/stdio.h>
-#include <fs/vfs.h>
-#include <fs/stat.h>
+
+#include <uapi/bits/termios-c_lflags.h>
 
 #define TTY_MAX_NAME 32
 

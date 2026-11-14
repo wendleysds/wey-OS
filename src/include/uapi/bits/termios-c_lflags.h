@@ -1,23 +1,11 @@
-#ifndef _UAPI_TERMIOS_H
-#define _UAPI_TERMIOS_H
+#ifndef _UAPI_BITS_TERMIOS_C_LFLAGS_H
+#define _UAPI_BITS_TERMIOS_C_LFLAGS_H
 
-#include <stdint.h>
-#include <def/bits.h>
+#ifndef BIT
+#define BIT(n) (1U << (n))
+#endif
 
-#define NCCS 31
-
-typedef uint32_t tcflag_t;
-typedef uint8_t cc_t;
-
-struct termios {
-	tcflag_t c_iflag;
-	tcflag_t c_oflag;
-	tcflag_t c_cflag;
-	tcflag_t c_lflag;
-	cc_t c_line;
-	cc_t c_cc[NCCS];
-};
-
+// c_iflags
 #define IGNBRK  BIT(0)
 #define BRKINT  BIT(1)
 #define IGNPAR  BIT(2)
@@ -33,6 +21,7 @@ struct termios {
 // Legacy aliases
 #define INPCAP_IGNBRK IGNBRK
 
+// c_oflags
 #define OPOST   BIT(0)
 #define ONLCR   BIT(1)
 #define OCRNL   BIT(2)
@@ -42,6 +31,7 @@ struct termios {
 // Legacy aliases
 #define OFLAG_OPOST OPOST
 
+// c_cflags
 #define CS5     BIT(0)
 #define CS6     BIT(1)
 #define CS7     BIT(2)
@@ -61,6 +51,7 @@ struct termios {
 #define CFLAG_CS7   CS7
 #define CFLAG_CS8   CS8
 
+// c_lflags
 #define ISIG    BIT(0)
 #define ICANON  BIT(1)
 #define ECHO    BIT(2)
@@ -76,6 +67,7 @@ struct termios {
 #define LFLAG_ECHO   ECHO
 #define LFLAG_ICRNOC BIT(9)
 
+// c_cc
 #define VINTR    0
 #define VQUIT    1
 #define VERASE   2
@@ -94,4 +86,4 @@ struct termios {
 #define VLNEXT   15
 #define VEOL2    16
 
-#endif
+#endif /* _UAPI_BITS_TERMIOS_C_LFLAGS_H */
