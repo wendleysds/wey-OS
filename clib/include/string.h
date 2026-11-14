@@ -201,4 +201,12 @@ size_t strspn(const char *str, const char *reject);
  */
 int strcoll(const char *str, const char *str2);
 
+/**
+ * @brief Duplicates the string s.
+ * 
+ * @param s The string to duplicate.
+ * @return Pointer to the duplicated string, or NULL if insufficient memory was available.
+ */
+char* strdup(const char *s);
+
 #endif
