@@ -20,6 +20,15 @@
 #define FADT_FLAG_ARB_SUPPORT      BIT(6)
 #define FADT_FLAG_RTC_AVAILABLE    BIT(7)
 
+// Boot Architecture Flags
+#define FADT_BOOT_LEGACY_DEVICES          BIT(0)
+#define FADT_BOOT_8042                    BIT(1)
+#define FADT_BOOT_VGA_NOT_PRESENT         BIT(2)
+#define FADT_BOOT_MSI_NOT_SUPPORTED       BIT(3)
+#define FADT_BOOT_NO_ASPM                 BIT(4)
+#define FADT_BOOT_CMOS_RTC_NOT_PRESENT    BIT(5)
+#define FADT_BOOT_ARCH_RESERVED_MASK 0xFFC0U
+
 // PM1a_CNT and PM1b_CNT Field Offsets
 #define PM1_CNT_OFFSET 0x04
 #define PM1_CNT_SIZE   2
@@ -103,6 +112,14 @@ struct acpi_fadt {
     struct acpi_generic_address x_gpe0_block;
     struct acpi_generic_address x_gpe1_block;
 } __packed;
+
+static inline uint16_t fadt_get_boot_arch_flags(const struct acpi_fadt *fadt) {
+	if(!fadt) return 0;
+	if (fadt->header.revision < 2) {
+		return FADT_BOOT_LEGACY_DEVICES | FADT_BOOT_8042;
+	}
+	return fadt->boot_architecture_flags;
+}
 
 void acpi_parse_fadt(struct acpi_fadt *ptr);
 

@@ -47,52 +47,6 @@ static struct gdt_descriptor gdt_descriptor;
 extern void fault_init();
 extern uint8_t supports_pse;
 
-/*
-#include <arch/i386/pic.h>
-
-static int pit_clockevent_start(void* data, uint32_t hz){
-	pic_init(hz);
-	return 0;
-}
-
-static void pit_clockevent_stop(void* data){
-	pic_disable();
-}
-
-static const struct clockevent pit_clockevent = {
-	.name = "pit",
-	.start_periodic = pit_clockevent_start,
-	.stop = pit_clockevent_stop,
-	.data = 0x0,
-};
-
-static void __init setup_clock(void){
-	struct rtc_time tm = {0};
-
-	if(clock_init(TIMER_FREQUENCY_HZ) != 0){
-		panic("Setup: clock init failed!");
-	}
-
-	if(rtc_read(&tm) == 0){
-		clock_set_realtime_ns(rtc_time_to_unix_ns(&tm));
-		printk(
-			"Setup: RTC sync %04u-%02u-%02u %02u:%02u:%02u\n",
-			tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second
-		);
-	}else{
-		printk("Setup: RTC sync failed, keeping monotonic clock at boot zero.\n");
-	}
-
-	if(clockevent_register(&pit_clockevent) != 0){
-		panic("Setup: clockevent register failed!");
-	}
-
-	if(clockevent_start_periodic(TIMER_FREQUENCY_HZ) != 0){
-		panic("Setup: clockevent start failed!");
-	}
-}
-*/
-
 static inline void gdt_set_tss(int cpu, struct tss *tss){
 	int idx = GDT_TSS_BASE_INDEX + cpu;
 
