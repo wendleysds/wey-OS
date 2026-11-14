@@ -68,9 +68,41 @@ struct sigaction {
 	sigrestore_t sa_restorer;
 };
 
+/**
+ * @brief Send a signal to a process.
+ * 
+ * @param pid The process ID to send the signal to.
+ * @param signum The signal number to send.
+ * @return int Returns 0 on success, -1 on failure.
+ */
 int kill(pid_t pid, int signum);
+
+/**
+ * @brief Send a signal to a process.
+ * 
+ * @param pid The process ID to send the signal to.
+ * @param signum The signal number to send.
+ * @return int Returns 0 on success, -1 on failure.
+ */
 sighandler_t signal(int signum, sighandler_t handler);
+
+/**
+ * @brief Set a signal handler.
+ * 
+ * @param signum The signal number to set the handler for.
+ * @param act The signal handler to set.
+ * @param old The old signal handler to save.
+ * @return int Returns 0 on success, -1 on failure.
+ */
 int sigaction(int signum, const struct sigaction *restrict act, struct sigaction *restrict old);
+
+/**
+ * @brief Clear a signal set.
+ * 
+ * @param set The signal set to clear.
+ * @return int Returns 0 on success, -1 on failure.
+ */
+int sigemptyset(sigset_t *set);
 
 // sighs and signals:
 //     kill      send a signal to a process (or group of processes)
@@ -114,7 +146,6 @@ int sigaction(int, const struct sigaction *restrict, struct sigaction *restrict)
 int sigaddset(sigset_t *, int);
 int sigaltstack(const stack_t *restrict, stack_t *restrict);
 int sigdelset(sigset_t *, int);
-int sigemptyset(sigset_t *);
 int sigfillset(sigset_t *);
 int sighold(int);
 int sigignore(int);
