@@ -3,6 +3,7 @@ bits 32
 global _start
 
 extern main
+extern exit
 
 _start:
 	xor ebp, ebp
@@ -19,6 +20,9 @@ _start:
 
 	call main
 
-	mov ebx, eax
+	push eax
+	call exit
+
+	pop ebx
 	mov eax, 1
 	int 0x80

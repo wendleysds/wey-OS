@@ -3,14 +3,14 @@
 #include <unistd.h>
 
 extern void file_close_all(void);
+extern void atexit_run(void);
 
 void __attribute__((noreturn)) _Exit(int status) {
     _exit(status);
 }
 
 void __attribute__((noreturn)) exit(int status) {
-
-    // call atexit functions
+    atexit_run();
 
     fflush(stdout);
     fflush(stderr);
