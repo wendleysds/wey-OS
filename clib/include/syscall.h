@@ -36,6 +36,11 @@
 #define SYS_sigaction 33
 #define SYS_sigreturn 34
 #define SYS_kill 35
+#define SYS_setpgid 36
+#define SYS_getpgid 37
+#define SYS_setsid 38
+#define SYS_getsid 39
+
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 

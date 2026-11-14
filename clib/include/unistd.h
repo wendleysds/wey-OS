@@ -76,6 +76,36 @@ int execve(const char *filename, char *const argv[], char *const envp[]);
  */     
 void _exit(int status) __attribute__((noreturn));
 
+/**
+ * @brief Get the Process Group ID (PGID) of a process.
+ * @param pid The process ID.
+ * @return The process group ID of the process, or -1 on error.
+ */
+pid_t getpgid(pid_t);
+
+/**
+ * @brief Set the Process Group ID (PGID) of a process.
+ * 
+ * @param pid The process ID.
+ * @param pgid The process group ID to set.
+ * @return The process group ID of the process, or -1 on error.
+ */
+int setpgid(pid_t, pid_t);
+
+/**
+ * @brief Get the Session ID (SID) of a process.
+ * 
+ * @param pid The process ID.
+ * @return The session ID of the process, or -1 on error.
+ */
+pid_t getsid(pid_t);
+
+/**
+ * @brief Create a new session.
+ * 
+ * @return The session ID of the new session, or -1 on error.
+ */
+pid_t setsid(void);
 
 /* man 0p unistd.h
 int          access(const char *, int);
@@ -111,10 +141,8 @@ int          gethostname(char *, size_t);
 char        *getlogin(void);
 int          getlogin_r(char *, size_t);
 int          getopt(int, char * const [], const char *);
-pid_t        getpgid(pid_t);
 pid_t        getpgrp(void);
 pid_t        getppid(void);
-pid_t        getsid(pid_t);
 uid_t        getuid(void);
 int          isatty(int);
 int          lchown(const char *, uid_t, gid_t);
@@ -133,11 +161,9 @@ int          rmdir(const char *);
 int          setegid(gid_t);
 int          seteuid(uid_t);
 int          setgid(gid_t);
-int          setpgid(pid_t, pid_t);
 pid_t        setpgrp(void);
 int          setregid(gid_t, gid_t);
 int          setreuid(uid_t, uid_t);
-pid_t        setsid(void);
 int          setuid(uid_t);
 unsigned     sleep(unsigned);
 void         swab(const void *restrict, void *restrict, ssize_t);
