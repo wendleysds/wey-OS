@@ -184,6 +184,36 @@ int vfs_close(struct file *file){
 	return res;
 }
 
+static int truncate_inode(struct inode *ino, off_t length){
+	if(length < 0){
+		return -EINVAL;
+	}
+
+	if(S_ISDIR(ino->mode)){
+		return -EISDIR;
+	}
+
+	if(!ino->i_op || !ino->i_op->setattr){
+		return -ENOSYS;
+	}
+
+	struct iattr attr = {
+		.valid = ATTR_SIZE,
+		.stat.size = length,
+	};
+
+	int ret = ino->i_op->setattr(ino, &attr);
+	if(ret < 0){
+		return ret;
+	}
+
+	return SUCCESS;
+}
+
+int vfs_ftruncate(struct file *file, off_t length){
+	return truncate_inode(file->inode, length);
+}
+
 static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
 	for(size_t i = 0; i < maxlen; i++){
 		if(copy_from_user(kpath + i, upath + i, 1)){
@@ -223,4 +253,37 @@ SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mo
 
 SYSCALL_DEFINE1(close, int, fd){
 	return task_remove_file(current, fd);
+}
+
+SYSCALL_DEFINE2(ftruncate, int, fd, off_t, length){
+	struct file* f = file_table_get_file(current->files, fd);
+	if(!f){
+		return -EBADF;
+	}
+
+	if(!(f->flags & (O_WRONLY | O_RDWR))){
+		return -EINVAL;
+	}
+
+	int ret = vfs_ftruncate(f, length);
+	file_put(f);
+	return ret;
+}
+
+SYSCALL_DEFINE2(truncate, __user const char *restrict, path, off_t, length){
+	char kpath[PATH_MAX];
+	size_t len = path_copy(kpath, path, PATH_MAX);
+	if(IS_ERR_VALUE(len)){
+		return len;
+	}
+
+	struct dentry *dentry = vfs_walk(kpath);
+	if(IS_ERR(dentry)){
+		return PTR_ERR(dentry);
+	}
+
+	int ret = truncate_inode(dentry->inode, length);
+
+	dentry_put(dentry);
+	return ret;
 }

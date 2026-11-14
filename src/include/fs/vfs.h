@@ -204,6 +204,7 @@ ssize_t vfs_pread(struct file *file, void *buffer, size_t count, off_t offset);
 ssize_t vfs_write(struct file *file, const void *buffer, size_t count);
 ssize_t vfs_pwrite(struct file *file, const void *buffer, size_t count, off_t offset);
 off_t vfs_lseek(struct file *file, off_t offset, int whence);
+int vfs_ftruncate(struct file *file, off_t length);
 int vfs_close(struct file *file);
 int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
@@ -223,8 +224,10 @@ struct inode* inode_new(struct super_block *sb);
 void inode_init_special(struct inode* inode, umode_t mode, dev_t dev);
 void inode_destroy(struct inode*);
 
-static inline void inode_get(struct inode* ino){
-	atomic_inc(&ino->refcount);
+static inline struct inode* inode_get(struct inode* ino){
+	if(ino)
+		atomic_inc(&ino->refcount);
+	return ino;
 }
 
 static inline void inode_put(struct inode* ino){

@@ -38,6 +38,8 @@
 37 i386 getpgid sys_getpgid
 38 i386 setsid sys_setsid
 39 i386 getsid sys_getsid
+40 i386 truncate sys_truncate
+41 i386 ftruncate sys_ftruncate
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write
