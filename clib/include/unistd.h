@@ -125,6 +125,22 @@ int ftruncate(int fd, off_t length);
  */
 int truncate(const char* filename, off_t length);
 
+/**
+ * @brief Get the controlling terminal process group ID (PGID) of a terminal.
+ * 
+ * @param fd The file descriptor of the terminal.
+ * @return The process group ID of the controlling terminal, or -1 on error.
+ */
+pid_t tcgetpgrp(int fd);
+
+/**
+ * @brief Set the controlling terminal process group ID (PGID) of a terminal.
+ * 
+ * @param fd The file descriptor of the terminal.
+ * @param pgrp The process group ID to set.
+ * @return 0 on success, -1 on error.
+ */
+int tcsetpgrp(int fd, pid_t pgrp);
 
 /* man 0p unistd.h
 int          access(const char *, int);
@@ -189,8 +205,6 @@ int          symlink(const char *, const char *);
 int          symlinkat(const char *, int, const char *);
 void         sync(void);
 long         sysconf(int);
-pid_t        tcgetpgrp(int);
-int          tcsetpgrp(int, pid_t);
 char        *ttyname(int);
 int          ttyname_r(int, char *, size_t);
 int          unlink(const char *);
