@@ -6,7 +6,7 @@
 #include <lib/list.h>
 #include <stddef.h>
 
-#include <uapi/kernel/termios.h>
+#include <uapi/bits/termios.h>
 
 struct tty_struct;
 struct tty_driver;
@@ -74,6 +74,7 @@ struct tty_struct {
 	void* ldisc_data;
 
 	struct termios termios;
+	struct winsize winsize;
 
 	void* private;
 
@@ -82,6 +83,7 @@ struct tty_struct {
 	pid_t fg_pgrp;
 	pid_t session_sid;
 
+	struct list_head session_node;
 	struct wait_queue_head read_waiters;
 	spinlock_t lock;
 };
@@ -95,5 +97,6 @@ int tty_ldisc_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
 
 int tty_bufhead_init(struct tty_bufhead* bufhead);
 int tty_receive_buf(struct tty_struct* tty, const u8* data, size_t len);
+struct tty_struct* tty_find_with_session(pid_t sid, struct tty_struct *exclude);
 
 #endif

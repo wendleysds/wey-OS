@@ -16,6 +16,7 @@ extern const struct tty_ldisc_ops tty_ldisc_ops;
 extern const struct file_operations tty_file_ops;
 
 static LIST_HEAD(drivers);
+static LIST_HEAD(sessions);
 
 static const struct termios termios_default = { 
 	.c_iflag = ICRNL,
@@ -63,6 +64,7 @@ struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index
 		tty->index = index;
 		spinlock_init(&tty->lock);
 		wait_queue_head_init(&tty->read_waiters);
+		INIT_LIST_HEAD(&tty->session_node);
 		tty->termios = termios_default;
 
 		int res = driver->ops->install(driver, tty);
@@ -86,6 +88,7 @@ struct tty_struct* tty_ensure_created(struct tty_driver* driver, const int index
 
 		driver->ttys[index] = tty;
 		tty->ops = tty->driver->ops;
+		list_add(&tty->session_node, &sessions);
 	}
 
 	return tty;
@@ -189,6 +192,21 @@ free_all:
 	kfree(ttys);
 
 	return res;
+}
+
+struct tty_struct* tty_find_with_session(pid_t sid, struct tty_struct *exclude){
+	struct list_head* current;
+	
+	list_for_each(current, &sessions){
+		struct tty_struct* tty = list_entry(current, struct tty_struct, session_node);
+		if(tty->session_sid == sid){
+			if(tty == exclude) continue;
+
+			return tty;
+		}
+	}
+
+	return NULL;
 }
 
 static int __init tty_init(void){
