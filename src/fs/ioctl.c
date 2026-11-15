@@ -5,17 +5,28 @@
 #include <fs/vfs.h>
 #include <def/errno.h>
 
+static int check_file_ioctl(struct file *file, unsigned int fd, unsigned int cmd, unsigned long arg) {
+    switch (cmd) {
+        default:
+            if (S_ISREG(file->inode->mode)) {
+            }
+            break;
+    }
+
+    return -ENOIOCTLCMD;
+}
+
 int vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
-    const struct inode *inode = file->inode;
-    if(!S_ISREG(inode->mode)){
+    if (!file->f_op || !file->f_op->ioctl) {
         return -ENOTTY;
     }
 
-    if(!file->f_op || !file->f_op->ioctl){
+    int error = file->f_op->ioctl(file, cmd, arg);
+    if (error == -ENOIOCTLCMD) {
         return -ENOTTY;
     }
 
-	return file->f_op->ioctl(file, cmd, arg);
+    return error;
 }
 
 SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg){
@@ -24,8 +35,9 @@ SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg){
         return -EBADF;
     }
 
-    int ret = vfs_ioctl(file, cmd, arg);
-    file_put(file);
+    int ret = check_file_ioctl(file, fd, cmd, arg);
+	if (ret == -ENOIOCTLCMD)
+		ret = vfs_ioctl(file, cmd, arg);
 
     return ret;
 }

@@ -36,4 +36,7 @@ static inline void* __must_check ERR_CAST(const void *ptr){
 #define OK 0
 #define SUCCESS OK
 
+// internal
+#define ENOIOCTLCMD 134
+
 #endif
