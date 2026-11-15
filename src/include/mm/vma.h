@@ -20,6 +20,7 @@ struct vm_region {
 
 	struct file* file;
 	off_t file_offset;
+	size_t file_size;
 
 	struct vm_region *next;
 };
@@ -36,14 +37,14 @@ struct mm_struct {
 // vm region operations
 struct vm_region *vma_alloc(
 	mem_flags_t mem_flags, prot_flags_t prot_flags,
-	struct file *file, off_t file_offset
+	struct file *file, off_t file_offset, size_t file_size
 );
 
 struct vm_region* vma_lookup(struct mm_struct* mm, uintptr_t virtaddr);
 struct vm_region* vma_add(
 	struct mm_struct* mm, uintptr_t start, uintptr_t end,
 	mem_flags_t mem_flags, prot_flags_t prot_flags,
-	struct file* file, off_t file_offset
+	struct file* file, off_t file_offset, size_t file_size
 );
 
 int vma_remove(struct mm_struct* mm, uintptr_t virtaddr);

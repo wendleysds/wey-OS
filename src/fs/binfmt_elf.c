@@ -3,7 +3,10 @@
 #include <exec/elf.h>
 #include <mm/vma.h>
 #include <def/errno.h>
+#include <def/config.h>
 #include <lib/string.h>
+
+#define ALIGN_UP(v, a) (((v) + (a) - 1) & ~((a) - 1))
 
 static int _validade_elf_ehdr(struct Elf32_Ehdr* ehdr) {
 	if (!ehdr) {
@@ -64,19 +67,60 @@ static int load_elf_binarie(struct binprm *bprm){
 		if (phdr->p_flags & PF_W) flags |= MEM_WRITE;
 		if (phdr->p_flags & PF_X) flags |= MEM_EXEC;
 
-		struct vm_region* region = vma_add(
-			bprm->mm,
-			phdr->p_vaddr,
-			phdr->p_vaddr + phdr->p_memsz,
-			flags,
-			PROT_MAP_PRIVATE,
-			bprm->file,
-			phdr->p_offset
-		);
+		struct vm_region* region = NULL;
 
-		if(IS_ERR_VALUE(region)){
-			mm_clean(bprm->mm);
-			return PTR_ERR(region);
+		if (phdr->p_filesz == 0) {
+			region = vma_add(
+				bprm->mm,
+				phdr->p_vaddr,
+				phdr->p_vaddr + phdr->p_memsz,
+				flags,
+				PROT_MAP_PRIVATE | PROT_MAP_ANONYMOUS,
+				NULL,
+				0,
+				0
+			);
+			if (IS_ERR_VALUE(region)) {
+				mm_clean(bprm->mm);
+				return PTR_ERR(region);
+			}
+		} else {
+			uintptr_t file_end = phdr->p_vaddr + phdr->p_filesz;
+			uintptr_t mem_end  = phdr->p_vaddr + phdr->p_memsz;
+			uintptr_t file_page_end = ALIGN_UP(file_end, PAGE_SIZE);
+			uintptr_t file_seg_end = (file_page_end < mem_end) ? file_page_end : mem_end;
+
+			region = vma_add(
+				bprm->mm,
+				phdr->p_vaddr,
+				file_seg_end,
+				flags,
+				PROT_MAP_PRIVATE,
+				bprm->file,
+				phdr->p_offset,
+				phdr->p_filesz
+			);
+			if (IS_ERR_VALUE(region)) {
+				mm_clean(bprm->mm);
+				return PTR_ERR(region);
+			}
+
+			if (mem_end > file_page_end) {
+				struct vm_region* bss_region = vma_add(
+					bprm->mm,
+					file_page_end,
+					mem_end,
+					flags,
+					PROT_MAP_PRIVATE | PROT_MAP_ANONYMOUS,
+					NULL,
+					0,
+					0
+				);
+				if (IS_ERR_VALUE(bss_region)) {
+					mm_clean(bprm->mm);
+					return PTR_ERR(bss_region);
+				}
+			}
 		}
 
 		uintptr_t seg_end = phdr->p_vaddr + phdr->p_memsz;

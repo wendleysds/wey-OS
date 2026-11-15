@@ -94,13 +94,22 @@ static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 		}
 
 		memset(kernel_virt, 0x0, PAGE_SIZE);
-		int n = vfs_pread(region->file, kernel_virt, PAGE_SIZE, file_offset);
-		kunmap(page);
 
-		if (n < 0) {
-			page_free(page);
-			return n;
+		size_t page_offset = page_addr - region->start;
+		if (page_offset < region->file_size) {
+			size_t to_read = region->file_size - page_offset;
+			if (to_read > PAGE_SIZE)
+				to_read = PAGE_SIZE;
+
+			int n = vfs_pread(region->file, kernel_virt, to_read, file_offset);
+			if (n < 0) {
+				kunmap(page);
+				page_free(page);
+				return n;
+			}
 		}
+
+		kunmap(page);
 	}
 
 	int res = mmu_mmap(current->mm->ctx, page_to_phys(page), page_addr, PAGE_SIZE, region->mem_flags);

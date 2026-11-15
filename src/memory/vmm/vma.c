@@ -8,7 +8,7 @@
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 
 struct vm_region *vma_alloc(mem_flags_t mem_flags, prot_flags_t prot_flags,
-                            struct file *file, off_t file_offset)
+                            struct file *file, off_t file_offset, size_t file_size)
 {
 	struct vm_region *r = kzalloc(sizeof(struct vm_region));
 	if (!r)
@@ -18,6 +18,7 @@ struct vm_region *vma_alloc(mem_flags_t mem_flags, prot_flags_t prot_flags,
 	r->prot_flags  = prot_flags;
 	r->file        = file;        /* a referência é tomada em __vma_insert */
 	r->file_offset = file_offset;
+	r->file_size   = file_size;
 	return r;
 }
 
@@ -77,7 +78,8 @@ struct vm_region *vma_add(
 	mem_flags_t mem_flags,
 	prot_flags_t prot_flags,
 	struct file *file,
-	off_t file_offset
+	off_t file_offset,
+	size_t file_size
 ) {
 	if (!mm || start >= end)
 		return ERR_PTR(-EINVAL);
@@ -85,8 +87,11 @@ struct vm_region *vma_add(
 	const uintptr_t aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
 	const uintptr_t aligned_end   = ALIGN_UP(end, PAGE_SIZE);
 	const off_t aligned_offset    = file ? file_offset - (start - aligned_start) : 0;
+	size_t aligned_file_size      = file ? file_size + (start - aligned_start) : 0;
+	if (aligned_file_size > (aligned_end - aligned_start))
+		aligned_file_size = aligned_end - aligned_start;
 
-	struct vm_region *region = vma_alloc(mem_flags, prot_flags, file, aligned_offset);
+	struct vm_region *region = vma_alloc(mem_flags, prot_flags, file, aligned_offset, aligned_file_size);
 	if (!region)
 		return ERR_PTR(-ENOMEM);
 
@@ -313,7 +318,8 @@ struct mm_struct* mm_dup(struct mm_struct* mm){
 			cur->mem_flags,
 			cur->prot_flags,
 			cur->file,
-			cur->file_offset
+			cur->file_offset,
+			cur->file_size
 		);
 
 		if(IS_ERR_VALUE(region)){

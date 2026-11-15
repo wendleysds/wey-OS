@@ -153,12 +153,19 @@ static int do_mmap_populate(struct mm_struct *mm, struct vm_region *region)
 		memset(kvirt, 0, PAGE_SIZE);
 
 		if (region->file) {
-			int n = vfs_pread(region->file, kvirt, PAGE_SIZE, file_offset);
-			if (n < 0) {
-				kunmap(page);
-				page_free(page);
-				err = n;
-				goto rollback;
+			size_t page_offset = addr - region->start;
+			if (page_offset < region->file_size) {
+				size_t to_read = region->file_size - page_offset;
+				if (to_read > PAGE_SIZE)
+					to_read = PAGE_SIZE;
+
+				int n = vfs_pread(region->file, kvirt, to_read, file_offset);
+				if (n < 0) {
+					kunmap(page);
+					page_free(page);
+					err = n;
+					goto rollback;
+				}
 			}
 			file_offset += PAGE_SIZE;
 		}
@@ -218,7 +225,7 @@ SYSCALL_DEFINE6(mmap,
 			goto out;
 	}
 
-	region = vma_alloc(prot_to_mem_flags(prot), map_to_prot_flags(flags), file, offset);
+	region = vma_alloc(prot_to_mem_flags(prot), map_to_prot_flags(flags), file, offset, file ? len : 0);
 	spare  = kzalloc(sizeof(struct vm_region));
 	if (!region || !spare) {
 		err = -ENOMEM;
