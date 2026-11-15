@@ -19,7 +19,6 @@ static int vga_scan_lines, vga_font_height = 16;
 static uint16_t vga_reg_port, vga_reg_val;
 static uint8_t vga_video_type;
 static uint8_t vga_cursor_enabled = 1;
-static uint8_t vga_support_color = 0;
 
 int __init vga_setup(struct video_info* video_info){
 	if (!video_info)
@@ -43,7 +42,6 @@ int __init vga_setup(struct video_info* video_info){
 		vga_vram_base = 0xB0000;
 		vga_reg_port = VGA_CRT_IM;
 		vga_reg_val = VGA_CRT_DM;
-		vga_support_color = 0;
 
 		if ((video_info->mode & 0xff) != 0x10) {
 			vga_video_type = VIDEO_TYPE_EGAM;
@@ -59,7 +57,6 @@ int __init vga_setup(struct video_info* video_info){
 		vga_vram_size = 0x8000;
 		vga_reg_port = VGA_CRT_IC;
 		vga_reg_val = VGA_CRT_DC;
-		vga_support_color = 1;
 
 		int mode = video_info->mode;
 
@@ -137,8 +134,6 @@ static uint8_t vga_build_attr(struct vt_data* vt, uint8_t color, enum vt_intensi
 
 	if (intensity == TERMINAL_INTENSITY_BOLD) {
 		fg |= 0x8;
-	} else {
-		fg &= 0x7;
 	}
 
 	attr = (bg << 4) | (fg & 0x0F);

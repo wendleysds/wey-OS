@@ -366,31 +366,28 @@ static int tty_ldisc_signal(struct tty_struct *tty, struct tty_ldisc_data *state
 	return sig > 0;
 }
 
-static void tty_ldisc_echo(struct tty_struct *tty,
-                           struct tty_ldisc_data *state,
-                           unsigned char ch)
-{
+static void tty_ldisc_echo(struct tty_struct *tty, struct tty_ldisc_data *state, unsigned char ch){
 	const struct termios *t = &tty->termios;
 
 	if (!tty->ops || !tty->ops->write)
 		return;
 
-	if ((t->c_lflag & ECHO) || ((t->c_lflag & ECHONL) && ch == '\n')) {
+	if (t->c_lflag & ECHO) {
+		if ((t->c_lflag & ECHOCTL) && ch > 0 && ch < ' ' && ch != '\n' && ch != '\t') {
+			u8 caret_seq[2] = { '^', ch + '@' };
+			tty->ops->write(tty, caret_seq, 2);
+			return;
+		}
+
 		if ((t->c_oflag & OPOST) && (t->c_oflag & ONLCR) && ch == '\n') {
 			u8 crlf[2] = {'\r', '\n'};
 			tty->ops->write(tty, crlf, 2);
 		} else {
 			tty->ops->write(tty, &ch, 1);
 		}
+	} else if ((t->c_lflag & ECHONL) && ch == '\n') {
+		tty->ops->write(tty, (const u8*)"\n", 1);
 	}
-
-	if ((t->c_lflag & ECHOCTL) && ch > 0 && ch < ' ' && ch != '\n' && ch != '\t') {
-        u8 caret_seq[2];
-        caret_seq[0] = '^';
-        caret_seq[1] = ch + '@';
-
-        tty->ops->write(tty, caret_seq, 2);
-    }
 }
 
 static int tty_ldisc_store_char(struct tty_struct* tty, struct tty_ldisc_data* state, unsigned char ch){

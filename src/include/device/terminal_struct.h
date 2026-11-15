@@ -4,6 +4,10 @@
 #include <sync/spinlock.h>
 #include <lib/font.h>
 
+#define VT_MAX_PARAMS 8
+
+enum vt_esc_state { ESnormal, ESesc, EScsi };
+
 struct video_info {
 	uint8_t type;
 
@@ -40,7 +44,7 @@ enum vt_intensity {
 
 struct vt_state{
 	unsigned int x, y;
-	unsigned char color;
+	unsigned char color, reverse;
 	enum vt_intensity intensity;
 };
 
@@ -78,6 +82,14 @@ struct vt_data{
 	spinlock_t lock;
 
 	struct font_info font;
+
+	/* ANSI parser */
+	enum vt_esc_state esc_state;
+	unsigned int esc_params[VT_MAX_PARAMS];
+	unsigned int esc_nparams;      /* índice do parâmetro atual */
+	unsigned char esc_private;     /* '?' depois do CSI */
+	unsigned char cursor_hidden;
+	unsigned char need_wrap;
 };
 
 struct vt {

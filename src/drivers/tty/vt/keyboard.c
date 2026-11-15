@@ -49,7 +49,7 @@ static const keymap_entry_t qwerty_us_map[NR_KEYS] = {
 	[KEY_SLASH]       = {'/', '?'},
 
 	[KEY_SPACE]     = {' ', ' '},
-	[KEY_ENTER]     = {'\n', '\n'},
+	[KEY_ENTER]     = {'\r', '\r'},
 	[KEY_TAB]       = {'\t', '\t'},
 	[KEY_BACKSPACE] = {0x7F, 0x7F},
 
@@ -64,7 +64,7 @@ static const keymap_entry_t qwerty_us_map[NR_KEYS] = {
 	[KEY_KP_ASTERISK] = {'*', '*'},
 	[KEY_KP_MINUS]    = {'-', '-'},
 	[KEY_KP_PLUS]     = {'+', '+'},
-	[KEY_KP_ENTER]    = {'\n', '\n'},
+	[KEY_KP_ENTER]    = {'\r', '\r'},
 };
 
 static bool is_combo(bool alt, bool crtl, bool shift){
@@ -132,6 +132,41 @@ static bool is_fkey(enum input_keycode keycode){
 	return keycode >= KEY_F1 && keycode <= KEY_F24;
 }
 
+static const char* keycode_to_escape_seq(enum input_keycode code) {
+	switch (code) {
+		case KEY_UP:        return "\033[A";
+		case KEY_DOWN:      return "\033[B";
+		case KEY_RIGHT:     return "\033[C";
+		case KEY_LEFT:      return "\033[D";
+		case KEY_HOME:      return "\033[H";
+		case KEY_END:       return "\033[F";
+		case KEY_PAGE_UP:   return "\033[5~";
+		case KEY_PAGE_DOWN: return "\033[6~";
+		case KEY_INSERT:    return "\033[2~";
+		case KEY_DELETE:    return "\033[3~";
+		default:            return NULL;
+	}
+}
+
+static enum input_keycode handle_numpad(enum input_keycode code) {
+	if (kb_state.numlock)
+		return code;
+
+	switch (code) {
+		case KEY_KP_8: return KEY_UP;
+		case KEY_KP_2: return KEY_DOWN;
+		case KEY_KP_4: return KEY_LEFT;
+		case KEY_KP_6: return KEY_RIGHT;
+		case KEY_KP_7: return KEY_HOME;
+		case KEY_KP_1: return KEY_END;
+		case KEY_KP_9: return KEY_PAGE_UP;
+		case KEY_KP_3: return KEY_PAGE_DOWN;
+		case KEY_KP_0: return KEY_INSERT;
+		case KEY_KP_DOT: return KEY_DELETE;
+		default: return code;
+	}
+}
+
 static void key_event(struct input_handler *self, const struct input_event *event){
 	if(event->type != INPUT_EVENT_KEY) return;
 
@@ -145,11 +180,19 @@ static void key_event(struct input_handler *self, const struct input_event *even
 		return;
 	}
 
+	keycode = handle_numpad(keycode);
+
+	struct tty_struct *tty = terminal_get_current()->tty;
+	if (!tty) return;
+
+	const char *seq = keycode_to_escape_seq(keycode);
+	if (seq) {
+		tty_receive_buf(tty, (const u8*)seq, strlen(seq));
+		return;
+	}
+
 	u8 ch = keycode_to_ascii(keycode);
 	if (ch != '\0') {
-		struct tty_struct*tty = terminal_get_current()->tty;
-		if(!tty) return;
-
 		tty_receive_buf(tty, &ch, 1);
 	}
 }
@@ -160,6 +203,7 @@ static struct input_handler keyboard_event_listener =  {
 
 static int __init keyboard_init(void){
 	memset(&kb_state, 0x0, sizeof(kb_state_t));
+	kb_state.numlock = true;
 	return input_register_handler(&keyboard_event_listener);
 }
 
