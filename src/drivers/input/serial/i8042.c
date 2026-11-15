@@ -1,4 +1,5 @@
 #include "kernel/device.h"
+#include "kernel/input/keycodes.h"
 #include <kernel/interrupt.h>
 #include <kernel/init.h>
 #include <kernel/input.h>
@@ -7,6 +8,7 @@
 #include <device/acpi.h>
 #include <io/region.h>
 #include <def/errno.h>
+#include <lib/string.h>
 
 /*
  * Simple PS/2 keyboard driver
@@ -16,10 +18,12 @@ struct ps2_keyboard {
 	io_region_t data_port_region;
 	io_region_t command_port_region;
 	int irq_no;
+	bool extended;
 };
 
 #define _PS2_ENABLE_FIRST_PORT 0xAE
 #define _KEYBOARD_KEY_RELEASED 0x80
+#define _KEYBOARD_SCANCODE_EXTENDED 0xE0
 
 static enum input_keycode _scancode_to_keycode(uint8_t scancode){
 	switch (scancode) {
@@ -112,11 +116,69 @@ static enum input_keycode _scancode_to_keycode(uint8_t scancode){
 	}
 }
 
-static inline void _keyboard_handle_scancode(uint8_t sc){
+static enum input_keycode _extended_scancode_to_keycode(uint8_t scancode){
+	switch (scancode) {
+		case 0x10: return KEY_MULT_PREVIOUS_TRACK;
+		case 0x19: return KEY_MULT_NEXT_TRACK;
+		case 0x1C: return KEY_KP_ENTER;
+		case 0x1D: return KEY_RIGHT_CTRL;
+		case 0x20: return KEY_MULT_MUTE;
+		case 0x21: return KEY_MULT_CALCULATOR;
+		case 0x22: return KEY_MULT_PLAY;
+		case 0x24: return KEY_MULT_STOP;
+		case 0x2E: return KEY_MULT_VOLUME_DOWN;
+		case 0x30: return KEY_MULT_VOLUME_UP;
+		case 0x32: return KEY_MULT_WWW_HOME;
+		case 0x35: return KEY_KP_SLASH;
+		case 0x38: return KEY_RIGHT_ALT;
+		case 0x47: return KEY_HOME;
+		case 0x48: return KEY_UP;
+		case 0x49: return KEY_PAGE_UP;
+		case 0x4B: return KEY_LEFT;
+		case 0x4D: return KEY_RIGHT;
+		case 0x4F: return KEY_END;
+		case 0x50: return KEY_DOWN;
+		case 0x51: return KEY_PAGE_DOWN;
+		case 0x52: return KEY_INSERT;
+		case 0x53: return KEY_DELETE;
+		case 0x5B: return KEY_LEFT_GUI;
+		case 0x5C: return KEY_RIGHT_GUI;
+		case 0x5D: return KEY_MENU;
+		case 0x5E: return KEY_ACPI_POWER;
+		case 0x5F: return KEY_ACPI_SLEEP;
+		case 0x63: return KEY_ACPI_WAKE;
+		case 0x65: return KEY_MULT_WWW_SEARCH;
+		case 0x66: return KEY_MULT_WWW_FAVORITES;
+		case 0x67: return KEY_MULT_WWW_REFRESH;
+		case 0x68: return KEY_MULT_WWW_STOP;
+		case 0x69: return KEY_MULT_WWW_FORWARD;
+		case 0x6A: return KEY_MULT_WWW_BACK;
+		case 0x6B: return KEY_MULT_MY_COMPUTER;
+		case 0x6C: return KEY_MULT_EMAIL;
+		case 0x6D: return KEY_MULT_MEDIA_SELECT;
+		default: return KEY_UNKNOWN;
+	}
+}
+
+static inline void _keyboard_handle_scancode(struct ps2_keyboard *keyboard, uint8_t sc){
+	if (sc == _KEYBOARD_SCANCODE_EXTENDED) {
+		keyboard->extended = true;
+		return;
+	}
+
+	bool is_extended = keyboard->extended;
+	keyboard->extended = false;
+
 	uint8_t release = sc & _KEYBOARD_KEY_RELEASED;
 	uint8_t code = sc & ~_KEYBOARD_KEY_RELEASED;
 
-	enum input_keycode keycode = _scancode_to_keycode(code);
+	if (is_extended && (code == 0x2A || code == 0x36))
+		return;
+
+	enum input_keycode keycode = is_extended
+		? _extended_scancode_to_keycode(code)
+		: _scancode_to_keycode(code);
+
 	if (keycode != KEY_UNKNOWN && keycode != KEY_NONE) {
 		struct input_event event = {0};
 		event.type = INPUT_EVENT_KEY;
@@ -131,7 +193,7 @@ static void _iqr_keyboard_handler(struct irq_info *info){
 
 	while (io_read8(&keyboard->command_port_region, 0) & 0x01) {
 		uint8_t scancode = io_read8(&keyboard->data_port_region, 0);
-		_keyboard_handle_scancode(scancode);
+		_keyboard_handle_scancode(keyboard, scancode);
 	}
 }
 
@@ -144,6 +206,7 @@ static int ps2_keyboard_probe(struct device *dev){
 
 	struct ps2_keyboard *keyboard = kmalloc(sizeof(struct ps2_keyboard));
 	if(!keyboard) return -ENOMEM;
+	memset(keyboard, 0x0, sizeof(struct ps2_keyboard));
 
 	keyboard->data_port_region.pio_base = data_port->io.base;
 	keyboard->data_port_region.type = IO_TYPE_PIO;
