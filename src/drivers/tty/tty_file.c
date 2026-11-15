@@ -1,10 +1,18 @@
 #include <device/tty.h>
 #include <kernel/device.h>
+#include <kernel/uaccess.h>
+#include <kernel/printk.h>
 #include <device/chrdev.h>
 #include <def/errno.h>
 #include <fs/stat.h>
 #include <fs/vfs.h>
-#include <kernel/sched.h>
+
+#include <uapi/sys/ioctls.h>
+
+typedef long (*tty_ioctl_fn_t)(struct tty_struct *, unsigned long arg);
+
+extern const tty_ioctl_fn_t tty_ioctl_table[];
+extern const size_t tty_ioctl_table_count;
 
 static int tty_file_open(struct inode* ino, struct file* file){
 	if(!S_ISCHR(ino->mode) || ino->dev == 0){
@@ -22,14 +30,6 @@ static int tty_file_open(struct inode* ino, struct file* file){
 	struct tty_struct* tty = tty_ensure_created(driver, index);
 	if(IS_ERR(tty)){
 		return PTR_ERR(tty);
-	}
-
-	if(tty->fg_pgrp == 0){
-		tty->fg_pgrp = current->pgid;
-	}
-
-	if(tty->session_sid == 0){
-		tty->session_sid = current->sid;
 	}
 
 	file->private_data = tty;
@@ -68,15 +68,41 @@ static ssize_t tty_file_read(struct file *file, void *buffer, size_t count, off_
 
 	struct tty_struct* tty = file->private_data;
 
-	if(!tty->ldisc || !tty->ldisc->ops->read){
+	if(!tty->ldisc || !tty->ldisc->ops || !tty->ldisc->ops->read){
 		return -ENODEV;
 	}
 
 	return tty->ldisc->ops->read(tty, buffer, count);
 }
 
+static int tty_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
+	struct tty_struct* tty = file->private_data;
+
+	if (_IO_TYPE(cmd) != TTY_IOC_MAGIC){
+		printk("tty_file_ioctl: invalid magic");
+		return -ENOTTY;
+	}
+
+	unsigned int nr = _IO_NR(cmd);
+
+	if (nr >= tty_ioctl_table_count){
+		printk("tty_file_ioctl: invalid command");
+		return -ENOTTY;
+	}
+
+	tty_ioctl_fn_t fn = tty_ioctl_table[nr];
+
+	if (!fn){
+		printk("tty_file_ioctl: invalid command");
+		return -ENOTTY;
+	}
+
+	return fn(tty, arg);
+}
+
 const struct file_operations tty_file_ops = {
 	.open = tty_file_open,
 	.write = tty_file_write,
 	.read = tty_file_read,
+	.ioctl = tty_file_ioctl,
 };
