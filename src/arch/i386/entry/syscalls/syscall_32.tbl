@@ -40,6 +40,8 @@
 39 i386 getsid sys_getsid
 40 i386 truncate sys_truncate
 41 i386 ftruncate sys_ftruncate
+#42 i386 pipe sys_pipe
+#43 i386 pipe2 sys_pipe2
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write

@@ -73,21 +73,21 @@ void context_switch(struct task* prev, struct task* to){
 		return;
 	}
 
-/*	printk("Switching");
+	/*printk("Switching");
 
 	if(prev){
-		printk(" from \"[%d:%s S:%d]\"",
-			prev->pid, prev->name, prev->state
+		printk(" from \"%s(%d)\"",
+			prev->name, prev->pid
 		);
 	}
 
 	if(to){
-		printk(" to \"[%d:%s S:%d]\"",
-			to->pid, to->name, to->state
+		printk(" to \"%s(%d)\"",
+			to->name, to->pid
 		);
 	}
 
-	printk("\n"); */
+	printk("\n");*/
 
 	// TODO: do some checks here, like if the tasks are valid or permissions
 
