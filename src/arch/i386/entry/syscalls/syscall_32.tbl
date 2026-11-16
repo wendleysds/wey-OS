@@ -42,6 +42,16 @@
 41 i386 ftruncate sys_ftruncate
 #42 i386 pipe sys_pipe
 #43 i386 pipe2 sys_pipe2
+#44 i386 socket sys_socket
+#45 i386 bind sys_bind
+#46 i386 connect sys_connect
+#47 i386 listen sys_listen
+#48 i386 accept sys_accept
+#49 i386 socketpair sys_socketpair
+#50 i386 shutdown sys_shutdown
+#51 i386 send sys_send
+#52 i386 recv sys_recv
+#53 i386 fcntl sys_fcntl
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write
