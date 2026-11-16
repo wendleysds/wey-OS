@@ -215,8 +215,8 @@ void __init lapic_init(int frequency, wait_10ms_func_t wait_func){
     uint32_t id = lapic_read(LAPIC_ID) >> 24;
     uint32_t version = lapic_read(LAPIC_VER) & 0xFF;
 
-    printk("LAPIC: ID: %d\n", id);
-    printk("LAPIC: Version: %d\n", version);
+    pr_debug("LAPIC: ID: %d\n", id);
+    pr_debug("LAPIC: Version: %d\n", version);
 }
 
 const struct irq_controller irq_controller_local_apic = {

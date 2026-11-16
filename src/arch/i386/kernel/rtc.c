@@ -183,13 +183,13 @@ static void rtc_sync_kernel_clock(void){
 	if(rtc_read(&tm) == 0){
 		clock_set_realtime_ns(rtc_time_to_unix_ns(&tm));
 
-		printk(
+		pr_info(
 			"RTC: sync clock to %04u-%02u-%02u %02u:%02u:%02u\n",
 			tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second
 		);
 
 	}else{
-		printk("RTC: sync clock failed\n");
+		pr_err("RTC: sync clock failed\n");
 	}
 }
 

@@ -72,7 +72,7 @@ __init void idt_init(){
 	}
 
 	_idt_load(&idtr_ptr);
-	printk("Setup: idt: loaded \"%#lx\".\n", &idtr_ptr);
+	pr_debug("Setup: idt: loaded \"%#lx\".\n", &idtr_ptr);
 }
 
 void interrupts_enable(){
@@ -142,7 +142,7 @@ static __init int lapic_timer_prepare(){
 
 	ret = lapic_prepare_init();
 	if(ret < 0){
-		printk("x86: LAPIC timer prepare failed: %d\n", ret);
+		pr_err("x86: LAPIC timer prepare failed: %d\n", ret);
 		return ret;
 	}
 
@@ -177,7 +177,7 @@ int x86_irqchip_init(struct x86_timer_caps* caps){
 			}
 		}
 
-		printk("x86: APIC setup failed, trying legacy PIC\n");
+		pr_notice("x86: APIC setup failed, trying legacy PIC\n");
 	}
 
 	if (caps->pic_legacy) {
@@ -231,7 +231,7 @@ static __init int x86_clockevent_start(void)
 	if (ret < 0)
 		return ret;
 
-	printk("x86: clockevent started! %s @ %u Hz\n",
+	pr_info("x86: clockevent started! %s @ %u Hz\n",
 		x86_irq_mode == X86_IRQ_MODE_APIC ? "APIC" : "PIC",
 		TIMER_FREQUENCY_HZ
 	);
@@ -255,13 +255,13 @@ int __init interrupt_init(void){
 
 	ret = irqdesc_init(irqdesc_setup);
 	if(ret < 0){
-		printk("x86: irqdesc init failed: %d\n", ret);
+		pr_crit("x86: irqdesc init failed: %d\n", ret);
 		return ret;
 	}
 
 	ret = interrupt_setup_chips();
 	if(ret < 0){
-		printk("x86: interrupt setup failed: %d\n", ret);
+		pr_crit("x86: interrupt setup failed: %d\n", ret);
 		return ret;
 	}
 

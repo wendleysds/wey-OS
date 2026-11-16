@@ -124,29 +124,29 @@ static __init void e820_print_type(enum e820_type type)
 {
 	switch (type) {
 		case E820_TYPE_RAM:	
-			printk(" System RAM");
+			pr_cont(" System RAM");
 			break;
 		case E820_TYPE_RESERVED:
-			printk(" Device reserved");
+			pr_cont(" Device reserved");
 			break;
 		case E820_TYPE_SOFT_RESERVED:
-			printk(" Soft reserved");
+			pr_cont(" Soft reserved");
 			break;
 		case E820_TYPE_ACPI:
-			printk(" ACPI data");
+			pr_cont(" ACPI data");
 			break;
 		case E820_TYPE_NVS:
-			printk(" ACPI NVS");
+			pr_cont(" ACPI NVS");
 			break;
 		case E820_TYPE_UNUSABLE:
-			printk(" Unusable");
+			pr_cont(" Unusable");
 			break;
 		case E820_TYPE_PMEM:
 		case E820_TYPE_PRAM:
-			printk(" Persistent RAM (type %u)", type);
+			pr_cont(" Persistent RAM (type %u)", type);
 			break;
 		default:
-			printk(" Type %u", type);
+			pr_cont(" Type %u", type);
 			break;
 	}
 }
@@ -166,7 +166,7 @@ __init void e820_print(){
 		range_start = entry->base_addr;
 
 		if (entry->length > UINT64_MAX - entry->base_addr) {
-			printk("E820: entry overflow!\n");
+			pr_warning("E820: entry overflow!\n");
 			continue;
 		}
 
@@ -174,17 +174,17 @@ __init void e820_print(){
 
 		/* Out of order E820 maps should not happen: */
 		if (range_start < range_end_prev)
-			printk("E820: out of order E820 entry!\n");
+			pr_warning("E820: out of order E820 entry!\n");
 
 		if (range_start > range_end_prev) {
-			printk("E820:    [gap %#018llx-%#018llx]\n",
+			pr_info("E820:    [gap %#018llx-%#018llx]\n",
 				range_end_prev,
 				range_start-1);
 		}
 
-		printk("E820:    [mem %#018llx-%#018llx] ", range_start, range_end-1);
+		pr_info("E820:    [mem %#018llx-%#018llx] ", range_start, range_end-1);
 		e820_print_type(entry->type);
-		printk("\n");
+		pr_cont("\n");
 
 		range_end_prev = range_end;
 	}
@@ -222,7 +222,7 @@ __init size_t e820_end_directmap_pfn(void) {
 
 	size_t last_pfn = e820_get_max_pfn(limit_pfn, false);
 
-	printk("E820: last_direct_map_pfn = %#lx\n", last_pfn);
+	pr_debug("E820: last_direct_map_pfn = %#lx\n", last_pfn);
 	return last_pfn;
 }
 
@@ -233,6 +233,6 @@ __init size_t e820_end_ram_pfn(size_t limit_pfn) {
 	if (last_pfn > max_arch_pfn)
 		last_pfn = max_arch_pfn;
 
-	printk("E820: last_pfn = %#lx; max_arch_pfn = %#lx\n", last_pfn, max_arch_pfn);
+	pr_debug("E820: last_pfn = %#lx; max_arch_pfn = %#lx\n", last_pfn, max_arch_pfn);
 	return last_pfn;
 }

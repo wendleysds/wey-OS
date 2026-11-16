@@ -22,7 +22,7 @@ __no_return void __assert_fail(
 
 	#define ASSERT_MSG(expr, msg, ...) do { \
 		if (unlikely(!(expr))) { \
-			printk("ASSERTION FAILED: " msg "\n", ##__VA_ARGS__); \
+			pr_emerg("ASSERTION FAILED: " msg "\n", ##__VA_ARGS__); \
 			__assert_fail(#expr, __FILE__, __LINE__, __func__); \
 		} \
 	} while(0)
@@ -43,7 +43,7 @@ __no_return void __assert_fail(
 #define WARN_ON(cond, msg, ...) ({ \
 	int __ret = !!(cond); \
 	if (unlikely(__ret)) { \
-		printk("WARNING: " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
+		pr_err("WARNING: " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
 	} \
 	__ret; \
 })
@@ -53,7 +53,7 @@ __no_return void __assert_fail(
 	int __ret = !!(cond); \
 	if (unlikely(__ret && !__warned)) { \
 		__warned = true; \
-		printk("WARNING (ONCE): " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
+		pr_emerg("WARNING (ONCE): " msg " at %s:%d in %s()\n", ##__VA_ARGS__, __FILE__, __LINE__, __func__); \
 	} \
 	__ret; \
 })

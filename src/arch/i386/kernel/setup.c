@@ -57,7 +57,7 @@ static inline void gdt_set_tss(int cpu, struct tss *tss){
 		GDT_FLAG_32BIT
 	);
 
-	printk("Setup: tss: loaded \"%#lx\" idx %d (%#x).\n", tss, idx, GDT_TSS(idx));
+	pr_debug("Setup: tss: loaded \"%#lx\" idx %d (%#x).\n", tss, idx, GDT_TSS(idx));
 
 	tss_load(GDT_TSS(idx));
 }
@@ -103,7 +103,7 @@ static __init void gdt_setup(){
 
 	gdt_load(&gdt_descriptor);
 
-	printk("Setup: gdt: loaded \"%#lx\".\n", &gdt_descriptor);
+	pr_debug("Setup: gdt: loaded \"%#lx\".\n", &gdt_descriptor);
 }
 
 static __init void setup_swapper(void){
@@ -146,7 +146,7 @@ static __init void setup_acpi(void){
 	struct boot_tag_acpi* acpi = (struct boot_tag_acpi*)boot_find_tag(&boot_header, BOOT_TAG_ACPI);
 	if(!acpi){
 		acpi_rsdp = 0;
-		printk("Setup: No boot_tag_acpi provided!\n");
+		pr_warning("Setup: No boot_tag_acpi provided!\n");
 		return;
 	}
 
@@ -291,7 +291,7 @@ __init void setup_arch(void){
 		e820->entries
 	);
 
-	printk("Setup: E820-provided physical RAM map:\n");
+	pr_info("Setup: E820-provided physical RAM map:\n");
 	e820_print();
 
 	max_pfn = e820_end_ram_pfn(MAX_ARCH_PFN);

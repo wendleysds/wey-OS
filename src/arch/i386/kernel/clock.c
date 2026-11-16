@@ -45,11 +45,11 @@ static __init int x86_clocksource_init(
     if (caps->hpet_available) {
         ret = hpet_init();
         if (ret < 0) {
-            printk("x86: HPET initialization failed: %d\n", ret);
+            pr_warning("x86: HPET initialization failed: %d\n", ret);
         } else {
             ret = clocksource_register(&hpet_clocksource);
             if (ret < 0)
-                printk("x86: HPET clocksource registration failed: %d\n", ret);
+                pr_warning("x86: HPET clocksource registration failed: %d\n", ret);
             else
                 return 0;
         }
@@ -61,13 +61,13 @@ static __init int x86_clocksource_init(
 static __init int x86_early_parse_madt(void){
     int ret;
     if((ret = acpi_load_all_tables()) < 0){
-		printk("x86: Failed to load ACPI tables: %d\n", ret);
+		pr_err("x86: Failed to load ACPI tables: %d\n", ret);
 		return ret;
 	}
 
 	struct acpi_madt* madt = (void*)acpi_find_table(ACPI_MADT_SIGNATURE);
 	if(!madt){
-        printk("x86: MADT not found\n");
+        pr_notice("x86: MADT not found\n");
         return -ENODEV;
     }
 
@@ -79,7 +79,7 @@ extern int x86_irqchip_init(struct x86_timer_caps* caps);
 int __init arch_setup_clock(void){
     int ret = x86_early_parse_madt();
     if(ret < 0){
-        printk("x86: Failed to parse MADT: %d\n", ret);
+        pr_warning("x86: Failed to parse MADT: %d\n", ret);
     }
 
     struct x86_timer_caps caps;
@@ -88,7 +88,7 @@ int __init arch_setup_clock(void){
 
     ret = x86_clocksource_init(&caps);
     if (ret < 0)
-        printk("x86: no hardware clocksource available, using software based\n");
+        pr_notice("x86: no hardware clocksource available, using software based\n");
 
     ret = x86_irqchip_init(&caps);
     if (ret < 0)

@@ -116,12 +116,12 @@ static void parse_mbr_partitions(struct gendisk* disk, uint8_t *sector0){
 		bdev_part->disk = disk;
 		list_add_tail(&bdev_part->list, &disk->blkdevs);
 
-		printk("BLK: found MBR partition \"%s%d\" (major=%u minor=%u)\n", 
+		pr_info("BLK: found MBR partition \"%s%d\" (major=%u minor=%u)\n", 
 			disk->name, bdev_part->minor, bdev_part->major, bdev_part->minor);
 
 		continue;
 parse_fail:
-		printk("BLK-code: parse_mbr_partitions: failted to parse part \"%d\" %d", i+1, res);
+		pr_err("BLK-code: parse_mbr_partitions: failed to parse part \"%d\" %d\n", i+1, res);
 	}
 }
 

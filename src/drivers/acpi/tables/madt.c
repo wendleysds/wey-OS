@@ -25,7 +25,7 @@ static __init void acpi_parse_madt_ioapic(struct acpi_madt_ioapic *entry, struct
 	ioapic->address = (vaddr_t)entry->ioapic_address;
 	ioapic->gsi_base = entry->gsi_base;
 
-	printk("ACPI: Found I/O APIC ID %u with GSI base %u at 0x%lx\n",
+	pr_debug("ACPI: Found I/O APIC ID %u with GSI base %u at 0x%lx\n",
 			ioapic->id, ioapic->gsi_base, (unsigned long)ioapic->address);
 }
 
@@ -35,7 +35,7 @@ static __init void acpi_parse_madt_int_override(struct acpi_madt_int_override *e
 	override->gsi = entry->gsi;
 	override->flags = entry->flags;
 
-	printk("ACPI: Interrupt override for IRQ %u to GSI %u (bus %u, flags 0x%x)\n",
+	pr_debug("ACPI: Interrupt override for IRQ %u to GSI %u (bus %u, flags 0x%x)\n",
 			override->source_irq, override->gsi, override->bus, override->flags);
 }
 
@@ -44,7 +44,7 @@ static __init void acpi_parse_madt_nmi_source(struct acpi_madt_nmi_source *entry
 	nmi->gsi = entry->gsi;
 	nmi->flags = entry->flags;
 
-	printk("ACPI: NMI source for IRQ %u mapping to GSI %u (flags 0x%x)\n",
+	pr_debug("ACPI: NMI source for IRQ %u mapping to GSI %u (flags 0x%x)\n",
 			nmi->source_irq, nmi->gsi, nmi->flags);
 }
 
@@ -54,10 +54,10 @@ static __init void acpi_parse_madt_local_nmi(struct acpi_madt_local_nmi *entry, 
 	nmi->flags = entry->flags;
 
 	if (nmi->acpi_id == MADT_ALL_PROCESSORS) {
-		printk("ACPI: Local APIC NMI for all processors on LINT %u (flags 0x%x)\n",
+		pr_debug("ACPI: Local APIC NMI for all processors on LINT %u (flags 0x%x)\n",
 				nmi->lint, nmi->flags);
 	} else {
-		printk("ACPI: Local APIC NMI for processor %u on LINT %u (flags 0x%x)\n",
+		pr_debug("ACPI: Local APIC NMI for processor %u on LINT %u (flags 0x%x)\n",
 				nmi->acpi_id, nmi->lint, nmi->flags);
 	}
 }
@@ -74,7 +74,7 @@ static __init void acpi_parse_madt_local_x2apic_nmi(struct acpi_madt_local_x2api
 	nmi->lint = entry->local_x2apic_lint;
 	nmi->flags = entry->flags;
 
-	printk("ACPI: Local x2APIC NMI for processor UID %u on LINT %u (flags 0x%x)\n",
+	pr_debug("ACPI: Local x2APIC NMI for processor UID %u on LINT %u (flags 0x%x)\n",
 			nmi->acpi_id, nmi->lint, nmi->flags);
 }
 
@@ -87,14 +87,14 @@ void __init acpi_parse_madt(struct acpi_madt *table) {
 
 	struct acpi_madt_info *info = kzalloc(sizeof(struct acpi_madt_info));
 	if (!info) {
-		printk("ACPI: Failed to allocate memory for MADT info\n");
+		pr_crit("ACPI: Failed to allocate memory for MADT info\n");
 		return;
 	}
 
 	info->local_apic_address = (vaddr_t)table->local_apic_address;
 	info->flags = table->flags;
 
-	printk(
+	pr_debug(
 		"ACPI: Found Local APIC address %#lx (flags %#x)\n",
 		(unsigned long)info->local_apic_address, info->flags
 	);
@@ -193,7 +193,7 @@ void __init acpi_parse_madt(struct acpi_madt *table) {
 				if (len >= sizeof(struct acpi_madt_local_apic_address_override)) {
 					struct acpi_madt_local_apic_address_override *ovr = (struct acpi_madt_local_apic_address_override *)entry;
 					info->local_apic_address = (vaddr_t)ovr->local_apic_address;
-					printk("ACPI: Local APIC address override: 0x%lx\n", (unsigned long)info->local_apic_address);
+					pr_debug("ACPI: Local APIC address override: 0x%lx\n", (unsigned long)info->local_apic_address);
 				}
 				break;
 
@@ -210,7 +210,7 @@ void __init acpi_parse_madt(struct acpi_madt *table) {
 				break;
 
 			default:
-				printk("ACPI: Unknown or unhandled MADT entry type %u (length %u)\n", entry->type, entry->length);
+				pr_warning("ACPI: Unknown or unhandled MADT entry type %u (length %u)\n", entry->type, entry->length);
 				break;
 		}
 
@@ -222,7 +222,7 @@ void __init acpi_parse_madt(struct acpi_madt *table) {
 	return;
 
 out_err:
-	printk("ACPI: Memory allocation failure while parsing MADT\n");
+	pr_crit("ACPI: Memory allocation failure while parsing MADT\n");
 	if (info->cpus) kfree(info->cpus);
 	if (info->ioapics) kfree(info->ioapics);
 	if (info->overrides) kfree(info->overrides);

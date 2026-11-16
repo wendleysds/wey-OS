@@ -26,7 +26,7 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 	{
 		if(!cpio.filesize) continue;
 
-		printk("Initrd: name=%s mode=%#o filesize=%lu\n",
+		pr_debug("Initrd: name=%s mode=%#o filesize=%lu\n",
 			cpio.name ? cpio.name : "(null)",
 			cpio.mode,
 			(unsigned long)cpio.filesize
@@ -34,7 +34,7 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 
 		if(S_ISDIR(cpio.mode)){
 			if((last_err = vfs_mkdir(cpio.name, cpio.mode))){
-				printk("Initrd: mkdir failed: %d\n", last_err);
+				pr_err("Initrd: mkdir failed: %d\n", last_err);
 				return last_err;
 			}
 
@@ -49,13 +49,13 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 			);
 
 			if(IS_ERR(file)){
-				printk("Initrd: open failed: %ld\n", PTR_ERR(file));
+				pr_err("Initrd: open failed: %ld\n", PTR_ERR(file));
 				return PTR_ERR(file);
 			}
 
 			int written = vfs_write(file, cpio.content_ptr, cpio.filesize);
 			if(written < 0){
-				printk("Initrd: write failed: %d\n", written);
+				pr_err("Initrd: write failed: %d\n", written);
 				return written;
 			}
 
@@ -70,7 +70,7 @@ static int __init unpack(const uint8_t* initrd_ptr, size_t initrd_psize){
 				cpio.mode,
 				MKDEV(cpio.devmajor, cpio.devminor)
 			))){
-				printk("Initrd: mknod failed: %d\n", last_err);
+				pr_err("Initrd: mknod failed: %d\n", last_err);
 				return last_err;
 			}
 		}
@@ -83,7 +83,7 @@ static int __init unpack_initrd(void){
 	int res = OK;
 
 	if(__initramfs_size || ramdisk_size){
-		printk("Unpacking initrd ...\n");
+		pr_notice("Unpacking initrd ...\n");
 	}
 
 	if((size_t)__initramfs_size != 0){

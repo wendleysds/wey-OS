@@ -126,7 +126,7 @@ static bool acpi_populate_device(aml_node_t* dev){
 				};
 
 				if (!aml_parse_crs_buffer(&s, &dev->object)) {
-					printk("Failed to parse CRS buffer for device %s\n", dev->name);
+					pr_err("Failed to parse CRS buffer for device %s\n", dev->name);
 				}
 			} else if (child->object.type == AML_OBJ_TYPE_METHOD) {
 				// Not supported
@@ -346,14 +346,14 @@ static int aml_parse_namespace_scope(const uint8_t *aml, size_t length, aml_node
 						result = true;
 						break;
 					default:
-						printk("Unknown opcode: %#x\n", opcode);
+						pr_err("Unknown opcode: %#x\n", opcode);
 						return 1;
 				}
 				break;
 		}
 
 		if (!result){
-			printk("Failed to parse opcode: %#x\n", opcode);
+			pr_err("Failed to parse opcode: %#x\n", opcode);
 			return 1;
 		}
 	}

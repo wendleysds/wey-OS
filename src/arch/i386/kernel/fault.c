@@ -263,7 +263,7 @@ static int fixup_page_fault(pf_info_t* pf){
 
 check_res:
 	if(handle_res != 0){
-		printk("fixup_page_fault: failed with status \"%d\"!\n", handle_res);
+		pr_err("fixup_page_fault: failed with status \"%d\"!\n", handle_res);
 	}
 
 	return handle_res;

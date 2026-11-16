@@ -143,7 +143,7 @@ void __init acpi_parse_fadt(struct acpi_fadt *fadt)
 {
 	acpi_pm = kzalloc(sizeof(struct acpi_pm_info));
 	if(!acpi_pm) {
-		printk("ACPI: Could not allocate memory for PM info");
+		pr_crit("ACPI: Could not allocate memory for PM info");
 		return;
 	}
 

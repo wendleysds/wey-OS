@@ -69,13 +69,13 @@ int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8
 		cur = *cursor;
 
 	if (!cpio_range_valid(cur, end, sizeof(struct cpio_header))){
-		printk("CPIO: range error! \n");
+		pr_err("CPIO: range error! \n");
 		return -EINVAL;
 	}
 
 	const struct cpio_header* header = (const struct cpio_header*)cur;
 	if (memcmp(header->magic, "070701", 6) != 0){
-		printk("CPIO: magic error! expect: %s, got: %s\n",
+		pr_err("CPIO: magic error! expect: %s, got: %s\n",
 			"070701", header->magic
 		);
 		return -EINVAL;
@@ -83,7 +83,7 @@ int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8
 
 	uint32_t namesize = cpio_parse_field(header->namesize);
 	if (namesize == 0){
-		printk("CPIO: failed to parse namesize!\n");
+		pr_err("CPIO: failed to parse namesize!\n");
 		return -EINVAL;
 	}
 
@@ -103,12 +103,12 @@ int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8
 	cur += sizeof(*header);
 
 	if (!cpio_range_valid(cur, end, namesize)){
-		printk("CPIO: namesize overflow! %u bytes needed\n", namesize);
+		pr_err("CPIO: namesize overflow! %u bytes needed\n", namesize);
 		return -EINVAL;
 	}
 
 	if (((char*)cur)[namesize - 1] != '\0'){
-		printk("CPIO: name is not a null terminated string!\n");
+		pr_err("CPIO: name is not a null terminated string!\n");
 		return -EINVAL;
 	}
 
@@ -125,14 +125,14 @@ int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8
 
 	aligned = align4((uintptr_t)cur);
 	if (aligned > (uintptr_t)end){
-		printk("CPIO: file ended unexpectedly!\n");
+		pr_err("CPIO: file ended unexpectedly!\n");
 		return -EINVAL;
 	}
 
 	cur = (uint8_t*)aligned;
 
 	if (!cpio_range_valid(cur, end, filesize)){
-		printk("CPIO: filesize range error!\n");
+		pr_err("CPIO: filesize range error!\n");
 		return -ERANGE;
 	}
 
@@ -154,7 +154,7 @@ int cpio_initramfs_iterate(const uint8_t* initrd_start, size_t size, const uint8
 
 	aligned = align4((uintptr_t)cur);
 	if (aligned > (uintptr_t)end){
-		printk("CPIO: file ended unexpectedly!\n");
+		pr_err("CPIO: file ended unexpectedly!\n");
 		return -EINVAL;
 	}
 

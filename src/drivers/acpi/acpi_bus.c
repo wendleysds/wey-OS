@@ -117,14 +117,14 @@ void acpi_register_device(aml_object_t *obj)
         return;
 
     if (!obj->device.resources) {
-        printk("ACPI: device %s has no \"static\" resources, skipping...\n",
+        pr_notice("ACPI: device %s has no \"static\" resources, skipping...\n",
                obj->device.hid[0] ? obj->device.hid : obj->device.cid);
         return;
     }
 
     struct acpi_device *adev = kzalloc(sizeof(struct acpi_device));
     if (!adev) {
-        printk("ACPI: failed to allocate acpi_device for %s\n",
+        pr_crit("ACPI: failed to allocate acpi_device for %s\n",
                obj->device.hid[0] ? obj->device.hid : obj->device.cid);
         return;
     }
@@ -149,16 +149,16 @@ void acpi_register_device(aml_object_t *obj)
 
     int ret = device_register(&adev->dev);
     if (ret) {
-        printk("ACPI: failed to register device %s (%d)\n", name, ret);
+        pr_err("ACPI: failed to register device %s (%d)\n", name, ret);
         kfree((void *)adev->dev.name);
         kfree(adev);
         return;
     }
 
-    printk("ACPI: registered device %s", name);
+    pr_info("ACPI: registered device %s", name);
     if (adev->cid[0] && strcmp(adev->hid, adev->cid) != 0)
-        printk(" (CID: %s)", adev->cid);
-    printk("\n");
+        pr_cont(" (CID: %s)", adev->cid);
+    pr_cont("\n");
 }
 
 static __init int acpi_bus_init(void)

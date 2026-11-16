@@ -19,40 +19,30 @@ extern struct acpi_pm_info *acpi_pm;
 extern struct acpi_madt_info *acpi_madt_info;
 static bool acpi_tables_loaded __initdata = false;
 
-static __init void acpi_print_sdt(const struct acpi_sdt_header *sdt){
-	printk("ACPI: Table '%.4s' at 0x%lx\n", sdt->signature, (uintptr_t)sdt);
-	printk("    length: 0x%x, revision: 0x%x\n", sdt->length, sdt->revision);
-	printk("    OEM ID: %c%c%c%c%c%c\n", sdt->oemid[0], sdt->oemid[1], sdt->oemid[2], sdt->oemid[3], sdt->oemid[4], sdt->oemid[5]);
-	printk("    OEM Table ID: 0x%llx\n", sdt->oem_table_id);
-	printk("    OEM revision: 0x%x\n", sdt->oem_revision);
-	printk("    Creator ID: 0x%x\n", sdt->creator_id);
-	printk("    Creator revision: 0x%x\n", sdt->creator_revision);
-}
-
 static __init rsdp_descriptor_t *acpi_parse_rsdp(paddr_t paddr) {
 	rsdp_descriptor_t *rsdp = acpi_map(paddr, sizeof(rsdp_descriptor_t));
 	if(!rsdp) return NULL;
 
 	if (memcmp(rsdp->v1.signature, "RSD PTR ", 8) != 0) {
-		printk("ACPI: Invalid RSDP signature\n");
+		pr_err("ACPI: Invalid RSDP signature\n");
 		goto out_invalid;
 	}
 
 	/* ACPI 1.0 checksum */
 	if (!acpi_checksum_ok(rsdp, sizeof(struct rsdp_descriptor_v1))) {
-		printk("ACPI: Invalid RSDP checksum\n");
+		pr_err("ACPI: Invalid RSDP checksum\n");
 		goto out_invalid;
 	}
 
 	/* ACPI 2.0+ extended checksum */
 	if (rsdp->v1.revision >= 2) {
 		if (rsdp->v2.length < sizeof(struct rsdp_descriptor_v2)) {
-			printk("ACPI: Invalid RSDP length\n");
+			pr_err("ACPI: Invalid RSDP length\n");
 			goto out_invalid;
 		}
 
 		if (!acpi_checksum_ok(rsdp, rsdp->v2.length)) {
-			printk("ACPI: Invalid extended RSDP checksum\n");
+			pr_err("ACPI: Invalid extended RSDP checksum\n");
 			goto out_invalid;
 		}
 	}
@@ -88,12 +78,12 @@ static __init int acpi_enable(void){
 	value = io_read16(&acpi_pm->pm1a_cnt, 0);
 
 	if (value & (1 << 0)) {
-		printk("ACPI: SCI already enabled\n");
+		pr_info("ACPI: SCI already enabled\n");
 		return 0;
 	}
 
 	if (acpi_pm->acpi_enable == 0) {
-		printk("ACPI: ACPI_ENABLE command unavailable\n");
+		pr_err("ACPI: ACPI_ENABLE command unavailable\n");
 		return -ENODEV;
 	}
 
@@ -103,14 +93,14 @@ static __init int acpi_enable(void){
 		value = io_read16(&acpi_pm->pm1a_cnt, 0);
 
 		if (value & (1 << 0)) {
-			printk("ACPI: ACPI mode enabled\n");
+			pr_info("ACPI: ACPI mode enabled\n");
 			return 0;
 		}
 
 		ndelay(1000000);
 	}
 
-	printk("ACPI: timeout waiting for SCI_EN\n");
+	pr_err("ACPI: timeout waiting for SCI_EN\n");
 
 	return -ETIMEDOUT;
 }
@@ -179,17 +169,17 @@ static __init int acpi_init(void){
 
 	int res;
 	if((res = acpi_load_all_tables()) != 0){
-		printk("ACPI: failed to load tables\n");
+		pr_err("ACPI: failed to load tables\n");
 		return res;
 	}
 
 	if((res = acpi_parse_tables()) != 0){
-		printk("ACPI: failed to parse tables\n");
+		pr_err("ACPI: failed to parse tables\n");
 		return res;
 	}
 
 	if((res = acpi_enable()) != 0){
-		printk("ACPI: failed to enable ACPI\n");
+		pr_err("ACPI: failed to enable ACPI\n");
 		return res;
 	}
 

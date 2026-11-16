@@ -15,7 +15,7 @@ asmlinkage __no_return void panic(const char* fmt, ...){
 	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
 
-	printk("\nPanic!\n    %s\n", buffer);
+	pr_emerg("\nPanic!\n    %s\n", buffer);
 	dump_stack(NULL);
 
 	while(1){

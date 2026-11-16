@@ -36,7 +36,7 @@ int __init acpi_add_table(paddr_t physaddr){
 
 	struct acpi_table *table = kmalloc(sizeof(struct acpi_table));
 	if(!table){
-		printk("ACPI: allocation failed for table '%.4s'\n", sdt->signature);
+		pr_crit("ACPI: allocation failed for table '%.4s'\n", sdt->signature);
 		acpi_unmap(sdt);
 		return -ENOMEM;
 	}
@@ -46,7 +46,7 @@ int __init acpi_add_table(paddr_t physaddr){
 	INIT_LIST_HEAD(&table->node);
 	list_add(&table->node, &acpi_tables);
 
-	printk("ACPI: Table '%.4s' at 0x%llx\n", sdt->signature, (vaddr_t)sdt);
+	pr_debug("ACPI: Table '%.4s' at 0x%llx\n", sdt->signature, (vaddr_t)sdt);
 
 	return 0;
 }

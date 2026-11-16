@@ -195,7 +195,7 @@ int ioapic_init(uint32_t local_apic_id) {
 
     ioapic_base = (vaddr_t)ioremap(phys_addr, PAGE_SIZE);
     if (!ioapic_base) {
-        printk("IOAPIC: Failed to ioremap base address 0x%lx\n", (unsigned long)phys_addr);
+        pr_crit("IOAPIC: Failed to ioremap base address 0x%lx\n", (unsigned long)phys_addr);
         return -ENOMEM;
     }
 
@@ -204,7 +204,7 @@ int ioapic_init(uint32_t local_apic_id) {
     ioapic_version = ver_reg & 0xFF;
     ioapic_max_entries = ((ver_reg >> 16) & 0xFF) + 1;
 
-    printk("IOAPIC: ID=%u V=%u, Max Redirection Entries %u at 0x%lx (GSI base %u)\n",
+    pr_debug("IOAPIC: ID=%u V=%u, Max Redirection Entries %u at 0x%lx (GSI base %u)\n",
            ioapic_id, ioapic_version, ioapic_max_entries, (unsigned long)phys_addr, gsi_base);
 
     // Initialize default ISA IRQ mappings (0-15)

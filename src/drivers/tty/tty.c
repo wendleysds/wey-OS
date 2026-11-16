@@ -150,7 +150,7 @@ int tty_register_driver(struct tty_driver* driver){
 
 		writed = snprintf(buffer, TTY_MAX_NAME, "%s%d", driver->name, i);
 		if(writed >= TTY_MAX_NAME){
-			printk("TTY: Name for tty \"%s%d\" too long!", driver->name, i);
+			pr_err("TTY: Name for tty \"%s%d\" too long!", driver->name, i);
 			res = -ENAMETOOLONG;
 			goto free_all;
 		}

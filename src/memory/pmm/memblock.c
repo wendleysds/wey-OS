@@ -63,10 +63,10 @@ static __init void memblock_merge(struct memblock_type* type) {
 }
 
 static __init void memblock_dump(struct memblock_type* type){
-	printk("Memblock: %s.count = 0x%lx\n", type->name, type->count);
+	pr_debug("Memblock: %s.count = 0x%lx\n", type->name, type->count);
 
 	for(size_t i = 0; i < type->count; i++){
-		printk(" [%#018llx - %#018llx] %lu bytes\n",
+		pr_debug(" [%#018llx - %#018llx] %lu bytes\n",
 			type->regions[i].base, 
 			type->regions[i].base + type->regions[i].size, 
 			type->regions[i].size
@@ -75,7 +75,7 @@ static __init void memblock_dump(struct memblock_type* type){
 }
 
 void __init memblock_dump_all(void){
-	printk("Memblock: total memory: %#llx; total reserved: %#llx\n",
+	pr_debug("Memblock: total memory: %#llx; total reserved: %#llx\n",
 		memblock.memory.totalmem,
 		memblock.reserved.totalmem
 	);

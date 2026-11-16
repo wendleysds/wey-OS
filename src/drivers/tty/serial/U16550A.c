@@ -215,7 +215,7 @@ static __init int uart_16550A_probe(struct device* dev){
 		return PTR_ERR(tty);
 	}
 
-	printk("UART: Serial ttyS%d initialized\n", idx);
+	pr_info("UART: Serial ttyS%d initialized\n", idx);
 
 	return 0;
 }

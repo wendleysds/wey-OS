@@ -148,7 +148,7 @@ int add_disk(struct gendisk* disk){
 	if(res != SUCCESS){
 		kfree(queue);
 		kfree(bdev);
-		printk("BLK: failed to register disk \"%s\" (major=%u minor=%u) with error %d\n",
+		pr_err("BLK: failed to register disk \"%s\" (major=%u minor=%u) with error %d\n",
 			disk->name, disk->major, disk->first_minor, res);
 		return res;
 	}
@@ -157,12 +157,12 @@ int add_disk(struct gendisk* disk){
 	list_add_tail(&disk->list, &disks[disk->major]);
 	list_add_tail(&bdev->list, &disk->blkdevs);
 
-	printk("BLK: added disk \"%s\" (major=%u minor=%u)\n",
+	pr_info("BLK: added disk \"%s\" (major=%u minor=%u)\n",
 		disk->name, disk->major, disk->first_minor);
 
 	res = blk_scan_partitions(disk);
 	if (IS_ERR_VALUE(res) && res != -ENOENT) {
-		printk("BLK-core: failed to read \"%s\" partitions %d\n",
+		pr_err("BLK-core: failed to read \"%s\" partitions %d\n",
 				disk->name, res);
 	}
 

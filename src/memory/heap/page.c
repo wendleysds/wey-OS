@@ -170,11 +170,11 @@ int __init buddy_init(void){
 		}
 	}
 
-	printk("Buddy: Initialized with %lu managed pages\n",
+	pr_info("Buddy: Initialized with %lu managed pages\n",
 		global_zone.free_pages + global_zone.reserved_pages
 	);
 
-	printk("Buddy: Pages: free=%lu reserved=%lu\n",
+	pr_info("Buddy: Pages: free=%lu reserved=%lu\n",
 		global_zone.free_pages, global_zone.reserved_pages
 	);
 
@@ -328,5 +328,5 @@ void buddy_add_memory(uintptr_t vaddr, size_t size){
         }
     }
 
-	printk("Buddy: Added \"%lx\" pages.\n", pages_freed);
+	pr_info("Buddy: Added \"%lx\" pages.\n", pages_freed);
 }

@@ -81,7 +81,7 @@ void driver_register(struct device_driver *drv){
 				dev->driver = drv;
 				int ret = drv->probe(dev);
 				if (ret != 0) {
-					printk("driver(%s): prob device(%s) fail %d\n", drv->name, dev->name, ret);
+					pr_err("driver(%s): prob device(%s) fail %d\n", drv->name, dev->name, ret);
 					dev->driver = NULL;
 				}
 			}

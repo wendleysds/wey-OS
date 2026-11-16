@@ -236,7 +236,7 @@ static int ps2_keyboard_probe(struct device *dev){
 
 	int err = interrupt_register(irq_no, _iqr_keyboard_handler, keyboard);
 	if(err){
-		printk("PS2: failed to register interrupt %d\n", err);
+		pr_err("PS2: failed to register interrupt %d\n", err);
 		kfree(keyboard);
 		return err;
 	}
@@ -252,7 +252,7 @@ static int ps2_keyboard_remove(struct device *dev){
 
 	int res = interrupt_unregister(keyboard->irq_no, _iqr_keyboard_handler, keyboard);
 	if(res){
-		printk("PS2: failed to unregister interrupt %d\n", res);
+		pr_crit("PS2: failed to unregister interrupt %d\n", res);
 		return res;
 	}
 	

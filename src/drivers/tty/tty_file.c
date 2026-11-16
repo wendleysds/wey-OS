@@ -1,7 +1,6 @@
 #include <device/tty.h>
 #include <kernel/device.h>
 #include <kernel/uaccess.h>
-#include <kernel/printk.h>
 #include <device/chrdev.h>
 #include <def/errno.h>
 #include <fs/stat.h>
@@ -79,21 +78,18 @@ static int tty_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 	struct tty_struct* tty = file->private_data;
 
 	if (_IO_TYPE(cmd) != TTY_IOC_MAGIC){
-		printk("tty_file_ioctl: invalid magic");
 		return -ENOTTY;
 	}
 
 	unsigned int nr = _IO_NR(cmd);
 
 	if (nr >= tty_ioctl_table_count){
-		printk("tty_file_ioctl: invalid command");
 		return -ENOTTY;
 	}
 
 	tty_ioctl_fn_t fn = tty_ioctl_table[nr];
 
 	if (!fn){
-		printk("tty_file_ioctl: invalid command");
 		return -ENOTTY;
 	}
 

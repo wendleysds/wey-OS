@@ -108,7 +108,7 @@ subsys_initcall(pci_init);
 static int test_probe(struct device *dev) {
     struct pci_device *pdev = to_pci_device(dev);
     
-    printk(
+    pr_debug(
         "TEST PCI DRIVER: found %04x:%04x\n",
         pdev->vendor_id,
         pdev->device_id
@@ -136,7 +136,7 @@ static int test_probe(struct device *dev) {
 			size = 0;
 		}
 
-		printk("     Resource %s: %#llx - %#llx\n", type, base, size);
+		pr_debug("     Resource %s: %#llx - %#llx\n", type, base, size);
 		res = res->sibling;
 	}
 

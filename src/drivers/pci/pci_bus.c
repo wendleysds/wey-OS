@@ -49,7 +49,7 @@ static void pci_parse_bar(struct pci_device* dev, struct pci_bar* bars, size_t c
 
 		if (mem_type == PCI_BAR_MEM64) {
 			if (i + 1 >= count) {
-				printk("PCI %04x:%04x: Invalid BAR64 configuration\n", 
+				pr_err("PCI %04x:%04x: Invalid BAR64 configuration\n", 
 					dev->vendor_id, dev->device_id);
 				break;
 			}
@@ -308,7 +308,7 @@ static int pci_parse_device(struct pci_device* dev, uint8_t bus, uint8_t slot, u
 			pci_parse_header_cardbus(dev);
 			break;
 		default: 
-			printk("PCI: %d:%d.%d: unknown header type %d\n",
+			pr_err("PCI: %d:%d.%d: unknown header type %d\n",
 				dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
 				dev->header_type
 			);
@@ -318,7 +318,7 @@ static int pci_parse_device(struct pci_device* dev, uint8_t bus, uint8_t slot, u
 
 	int res = pci_parse_capabilities(dev);
 	if(res){
-		printk("PCI: %d:%d.%d: failed to parse capabilities\n",
+		pr_err("PCI: %d:%d.%d: failed to parse capabilities\n",
 			dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 		return res;
 	}
@@ -342,7 +342,7 @@ static struct pci_device* alloc_pci_device(struct pci_bus *bus) {
 }
 
 static void print_device(struct pci_device *device){
-	printk("PCI: %d:%d.%d: %04x:%04x\n", 
+	pr_info("PCI: %d:%d.%d: %04x:%04x\n", 
 		device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn),
 		device->vendor_id, device->device_id
 	);
@@ -358,7 +358,7 @@ static void print_device(struct pci_device *device){
 		if (bar->type == PCI_BAR_UNUSED || !bar->size)
 			continue;
 
-		printk("PCI:   BAR[%d]: %s: %#llx - %#llx",
+		pr_info("PCI:   BAR[%d]: %s: %#llx - %#llx",
 			i,
 			(bar->type == PCI_BAR_IO) ? "IO" : "MEM",
 			bar->base,
@@ -366,9 +366,9 @@ static void print_device(struct pci_device *device){
 		);
 
 		if (bar->prefetchable)
-			printk(" [prft]");
+			pr_cont(" [prft]");
 
-		printk("\n");
+		pr_cont("\n");
 	}
 }
 
@@ -428,7 +428,7 @@ int pci_scan_bridge(struct pci_bus *parent, struct pci_device *dev){
 	}
 
 	if (pci_find_bus(secondary)) {
-		printk("PCI: %d:%d.%d: secondary bus %d already enumerated\n",
+		pr_info("PCI: %d:%d.%d: secondary bus %d already enumerated\n",
 			dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
 			secondary);
 		return 0;
@@ -442,7 +442,7 @@ int pci_scan_bridge(struct pci_bus *parent, struct pci_device *dev){
 	child->parent = parent;
 	pci_add_bus(child);
 
-	printk("PCI: %d:%d.%d: bridge -> bus %d\n",
+	pr_info("PCI: %d:%d.%d: bridge -> bus %d\n",
 		dev->bus_num, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
 		secondary);
 
@@ -507,11 +507,10 @@ static void pci_build_resources(struct pci_device *pdev)
 }
 
 static int pci_register_parsed_device(struct pci_bus *bus, struct pci_device *device){
-	/* Populate the generic resource list before registering */
 	pci_build_resources(device);
 
 	if (device_register(&device->dev)) {
-		printk("PCI: %d:%d.%d: failed to register device\n",
+		pr_err("PCI: %d:%d.%d: failed to register device\n",
 			device->bus_num, PCI_SLOT(device->devfn), PCI_FUNC(device->devfn));
 		kfree(device);
 		return 0;

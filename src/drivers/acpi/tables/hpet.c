@@ -97,7 +97,7 @@ int hpet_init(void){
 	uint32_t period = (uint32_t)(cap >> 32);
 
 	if(period == 0 || period > HPET_MAX_PERIOD_FS){
-		printk("HPET: invalid period %u fs\n", period);
+		pr_err("HPET: invalid period %u fs\n", period);
 		return -ENODEV;
 	}
 
@@ -118,7 +118,7 @@ int hpet_init(void){
 	config |= HPET_CFG_ENABLE;
 	hpet_write64(HPET_GEN_CONFIG, config);
 
-	printk("HPET: period_fs %u, %s counter, cap %llx, config %llx\n",
+	pr_debug("HPET: period_fs %u, %s counter, cap %llx, config %llx\n",
 		hpet_period_fs, hpet_is_64bit ? "64-bit" : "32-bit", cap, config);
 
 	hpet_initialized = true;

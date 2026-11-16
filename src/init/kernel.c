@@ -36,7 +36,7 @@ static inline void module_load(const char* module_name, int (*func)(void)){
 		panic("\"%s\" module failed with status %d!", module_name, res);
 	}
 
-	printk("Module \"%s\" OK\n", module_name);
+	pr_info("Module \"%s\" OK\n", module_name);
 }
 
 static initcall_entry_t* initcall_levels[] __initdata = {
@@ -81,17 +81,17 @@ static __init void do_initcalls(){
 
 static void print_args(const char** args){
 	for (const char *const *p = args; *p; p++){
-		printk("Init:    [%d]=\"%s\"\n", p - args, *p);
+		pr_info("Init:    [%d]=\"%s\"\n", p - args, *p);
 	}
 }
 
 static int run_init_process(const char *pathname) {
 	argv_init[0] = pathname;
-	printk("Init: Run %s as init process\n", pathname);
-	printk("Init: - with arguments:\n");
+	pr_info("Init: Run %s as init process\n", pathname);
+	pr_info("Init: - with arguments:\n");
 	print_args(argv_init);
 
-	printk("Init: - with environment:\n");
+	pr_info("Init: - with environment:\n");
 	print_args(envp_init);
 
 	return kernel_exec(pathname, argv_init, envp_init);
@@ -101,7 +101,7 @@ static void try_to_run_init_process(const char *pathname) {
 	int ret = run_init_process(pathname);
 
 	if (ret && ret != -ENOENT) {
-		printk("init(%s): failed to execute! (%d)\n", pathname, ret);
+		pr_err("init(%s): failed to execute! (%d)\n", pathname, ret);
 	}
 }
 

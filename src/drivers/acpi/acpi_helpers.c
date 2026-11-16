@@ -33,7 +33,7 @@ int acpi_gas_to_io_region(const struct acpi_generic_address *gas, io_region_t *r
 			return 0;
 
 		default:
-            printk("ACPI: Unsupported address space id %d\n", gas->address_space_id);
+            pr_err("ACPI: Unsupported address space id %d\n", gas->address_space_id);
 			return -EOPNOTSUPP;
 	}
 }
@@ -70,7 +70,7 @@ __init struct acpi_sdt_header* acpi_parse_sdt_header(paddr_t physaddr){
 	if(!sdt) return NULL;
 
 	if(!acpi_checksum_ok(sdt, sdt->length)) {
-		printk("ACPI: Invalid table '%.4s' checksum\n", sdt->signature);
+		pr_err("ACPI: Invalid table '%.4s' checksum\n", sdt->signature);
 		acpi_unmap(sdt);
 		return NULL;
 	}
