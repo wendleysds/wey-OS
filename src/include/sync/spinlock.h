@@ -2,6 +2,7 @@
 #define _SPINLOCK_H
 
 #include <sync/atomic.h>
+#include <stdbool.h>
 
 typedef struct {
     atomic_t locked;
@@ -15,5 +16,8 @@ void spin_unlock(spinlock_t* lock);
 
 void spin_lock_irqsave(spinlock_t* lock, unsigned long* flags);
 void spin_unlock_irqrestore(spinlock_t* lock, unsigned long* flags);
+bool spin_trylock_irqsave(spinlock_t* lock, unsigned long* flags);
+
+void local_irq_restore(unsigned long* flags);
 
 #endif

@@ -81,7 +81,9 @@
 #define EARLY_STACK_ADDR (EARLY_STACK_BOTTOM + EARLY_STACK_SIZE)
 
 /*Printk*/
-#define PRINTK_BUFFER_SIZE KiB(16)
+#define PRINTK_BUFFER_SIZE   KiB(16)
+#define PRINTK_RECORD_COUNT  256
+#define PRINTK_LINE_MAX      1024
 
 /*Files and File System*/
 #define PATH_MAX 128

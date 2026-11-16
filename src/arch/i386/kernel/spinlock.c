@@ -1,6 +1,7 @@
 #include <sync/spinlock.h>
 #include <sync/barrier.h>
 #include <asm/cpuflags.h>
+#include <stdbool.h>
 
 static __always_inline void  local_irq_enable(){
 	__asm__ volatile ("sti" ::: "memory");
@@ -59,5 +60,22 @@ void spin_lock_irqsave(spinlock_t* lock, unsigned long* flags){
 
 void spin_unlock_irqrestore(spinlock_t* lock, unsigned long* flags){
     spin_unlock(lock);
+    local_restore_flags(*flags);
+}
+
+bool spin_trylock_irqsave(spinlock_t* lock, unsigned long* flags){
+    *flags = local_save_flags();
+    local_irq_disable();
+
+    if (atomic_cmpxchg(&lock->locked, 0, 1) != 0) {
+        local_restore_flags(*flags);
+        return false;
+    }
+
+    smp_mb(); // acquire barrier
+    return true;
+}
+
+void local_irq_restore(unsigned long* flags){
     local_restore_flags(*flags);
 }

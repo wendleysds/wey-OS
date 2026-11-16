@@ -1,12 +1,10 @@
 #include <device/terminal.h>
 #include <device/tty.h>
 #include <kernel/init.h>
-#include <kernel/printk.h>
 #include <mm/kheap.h>
 #include <mm/memblock.h>
 #include <def/errno.h>
 #include <def/config.h>
-#include <uapi/headers.h>
 #include <lib/string.h>
 #include <lib/assert.h>
 #include <asm/page.h>
@@ -612,9 +610,6 @@ static int vt_tty_install(struct tty_driver *self, struct tty_struct *new_tty){
 	new_tty->winsize.ws_col = vt->data->vt_cols;
 	new_tty->winsize.ws_xpixel = 0;
 	new_tty->winsize.ws_ypixel = 0;
-
-
-	printk("vt: winsize: %d x %d\n", new_tty->winsize.ws_row, new_tty->winsize.ws_col);
 
 	return OK;
 }
