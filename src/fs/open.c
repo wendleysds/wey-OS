@@ -262,10 +262,12 @@ SYSCALL_DEFINE2(ftruncate, int, fd, off_t, length){
 	}
 
 	if(!(f->flags & (O_WRONLY | O_RDWR))){
+		file_put(f);
 		return -EINVAL;
 	}
 
 	int ret = vfs_ftruncate(f, length);
+
 	file_put(f);
 	return ret;
 }

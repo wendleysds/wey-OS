@@ -8,7 +8,7 @@
 static int check_file_ioctl(struct file *file, unsigned int fd, unsigned int cmd, unsigned long arg) {
     switch (cmd) {
         default:
-            if (S_ISREG(file->inode->mode)) {
+            if (file->inode && S_ISREG(file->inode->mode)) {
             }
             break;
     }
@@ -39,5 +39,6 @@ SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg){
 	if (ret == -ENOIOCTLCMD)
 		ret = vfs_ioctl(file, cmd, arg);
 
+    file_put(file);
     return ret;
 }

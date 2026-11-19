@@ -70,6 +70,7 @@ void context_switch(struct task* prev, struct task* to){
 	struct cpu* cpu = get_cpu();
 
 	if(prev == to || to == cpu->current){
+		to->state = TASK_RUNNING;
 		return;
 	}
 

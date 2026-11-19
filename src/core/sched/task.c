@@ -158,26 +158,34 @@ int task_remove_file(struct task* task, int fd){
 	return file_table_remove_file(task->files, fd);
 }
 
+static void task_free_resources(struct task *task){
+	if(task->cwd.dentry){
+		dentry_put(task->cwd.dentry);
+		task->cwd.dentry = NULL;
+	}
+
+	if(task->kstack){
+		kfree(task->kstack);
+		task->kstack = NULL;
+	}
+
+	if(task->mm){
+		task_destroy_mm(task);
+		task->mm = NULL;
+	}
+
+	if(task->files){
+		file_table_destroy(task->files);
+		task->files = NULL;
+	}
+}
+
 void task_destroy(struct task* task){
 	if(task->state != TASK_ZOMBIE && task->state != TASK_NEW){
 		panic("Attempting to destroy a non-zombie task (pid: %d, name: %s)", task->pid, task->name);
 	}
 
-	if(task->cwd.dentry){
-		dentry_put(task->cwd.dentry);
-	}
-
-	if(task->kstack){
-		kfree(task->kstack);
-	}
-
-	if(task->mm){
-		task_destroy_mm(task);
-	}
-
-	if(task->files){
-		file_table_destroy(task->files);
-	}
+	task_free_resources(task);
 
 	if(task->pid > 0){
 		pid_free(task->pid);
@@ -196,20 +204,7 @@ void asmlinkage task_handle_prev_status(struct task* prev){
 
 	switch (prev->state) {
 		case TASK_ZOMBIE:
-			if(prev->cwd.dentry){
-				dentry_put(prev->cwd.dentry);
-				prev->cwd.dentry = NULL;
-			}
-
-			if(prev->kstack){
-				kfree(prev->kstack);
-				prev->kstack = NULL;
-			}
-
-			if(prev->mm){
-				task_destroy_mm(prev);
-				prev->mm = NULL;
-			}
+			task_free_resources(prev);
 			break;
 		case TASK_RUNNING:
 			prev->state = TASK_READY;
@@ -243,7 +238,7 @@ struct task* task_find_zombie_child(struct task* parent){
 }
 
 SYSCALL_DEFINE1(exit, int, status){
-	task_exit(current, status % 0xFF);
+	task_exit(current, TASK_STATUS_ENCODE_EXIT(status));
 	schedule();
 	unreachable();
 }

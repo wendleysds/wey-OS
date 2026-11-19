@@ -91,37 +91,46 @@ SYSCALL_DEFINE3(write, int, fd, const __user char*, buffer, size_t, count){
 	char tmp[512];
 	size_t total_written = 0;
 
-	while(count > 0){
-		size_t to_copy = (count > sizeof(tmp)) ? sizeof(tmp) : count;
+	while (total_written < count) {
+		size_t remaining = count - total_written;
+		size_t to_copy = remaining > sizeof(tmp)
+					? sizeof(tmp)
+					: remaining;
 
-		int remaining = copy_from_user(tmp, buffer + total_written, to_copy);
-		if(remaining){
-			if(total_written == 0 && remaining == to_copy){
+		int not_copied =
+			copy_from_user(tmp,
+						buffer + total_written,
+						to_copy);
+
+		if (not_copied) {
+			size_t copied = to_copy - not_copied;
+
+			if (copied == 0 && total_written == 0) {
 				file_put(file);
 				return -EFAULT;
 			}
 
-			total_written += to_copy - remaining;
+			total_written += copied;
 			break;
 		}
 
-		int ret = vfs_write(file, tmp, to_copy);
-		if(ret < 0){
+		ssize_t ret = vfs_write(file, tmp, to_copy);
+
+		if (ret < 0) {
+			if (total_written != 0)
+				break;
+
 			file_put(file);
 			return ret;
 		}
 
-		if(ret == 0){
+		if (ret == 0)
 			break;
-		}
 
-		total_written += to_copy;
+		total_written += ret;
 
-		if((size_t)ret != to_copy){
+		if ((size_t)ret < to_copy)
 			break;
-		}
-
-		count -= to_copy;
 	}
 
 	file_put(file);
@@ -147,35 +156,39 @@ SYSCALL_DEFINE3(read, int, fd, __user char*, buffer, size_t, count){
 	char tmp[512];
 	size_t total_read = 0;
 
-	while(count > 0){
-		size_t to_read = (count > sizeof(tmp)) ? sizeof(tmp) : count;
-		int readed = vfs_read(file, tmp, to_read);
-		if(readed < 0){
+	while (total_read < count) {
+		size_t remaining = count - total_read;
+		size_t chunk = remaining > sizeof(tmp)
+					? sizeof(tmp)
+					: remaining;
+
+		ssize_t n = vfs_read(file,
+							tmp,
+							chunk);
+
+		if (n < 0) {
+			if (total_read)
+				break;
+
 			file_put(file);
-			return readed;
+			return n;
 		}
 
-		if(readed == 0){
+		if (n == 0)
 			break;
-		}
 
-		int remaining = copy_to_user(buffer + total_read, tmp, readed);
-		if(remaining){
-			if(total_read == 0 && remaining == readed){
-				file_put(file);
-				return -EFAULT;
-			}
+		size_t not_copied =
+			copy_to_user(buffer + total_read, tmp, n);
 
-			total_read += readed - remaining;
+		size_t copied = n - not_copied;
+
+		total_read += copied;
+
+		if (not_copied)
 			break;
-		}
 
-		total_read += readed;
-		count -= readed;
-
-		if((size_t)readed != to_read){
+		if ((size_t)n < chunk)
 			break;
-		}
 	}
 
 	file_put(file);
