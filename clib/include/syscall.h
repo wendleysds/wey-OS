@@ -42,6 +42,18 @@
 #define SYS_getsid 39
 #define SYS_truncate 40
 #define SYS_ftruncate 41
+#define SYS_pipe 42
+#define SYS_pipe2 43
+#define SYS_socket 44
+#define SYS_bind 45
+#define SYS_connect 46
+#define SYS_listen 47
+#define SYS_accept 48
+#define SYS_socketpair 49
+#define SYS_shutdown 50
+#define SYS_send 51
+#define SYS_recv 52
+#define SYS_fcntl 53
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 

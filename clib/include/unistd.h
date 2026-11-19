@@ -157,7 +157,24 @@ int dup(int oldfd);
  * @param newfd The new file descriptor to use.
  * @return The new file descriptor, or -1 on error.
  */
-int dup2(int oldfd, int newfd)
+int dup2(int oldfd, int newfd);
+
+/**
+ * @brief Create a pipe.
+ * 
+ * @param pipefd Array of two integers to store the file descriptors of the pipe.
+ * @return 0 on success, -1 on error.
+ */
+int pipe(int pipefd[2]);
+
+/**
+ * @brief Create a pipe.
+ * 
+ * @param pipefd Array of two integers to store the file descriptors of the pipe.
+ * @param flags Flags to set on the pipe.
+ * @return 0 on success, -1 on error.
+ */
+int pipe2(int pipefd[2], int flags);
 
 /* man 0p unistd.h
 int          access(const char *, int);
@@ -201,7 +218,6 @@ int          lockf(int, int, off_t);
 int          nice(int);
 long         pathconf(const char *, int);
 int          pause(void);
-int          pipe(int [2]);
 ssize_t      pread(int, void *, size_t, off_t);
 ssize_t      pwrite(int, const void *, size_t, off_t);
 ssize_t      readlink(const char *restrict, char *restrict, size_t);
