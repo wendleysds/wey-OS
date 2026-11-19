@@ -142,6 +142,23 @@ pid_t tcgetpgrp(int fd);
  */
 int tcsetpgrp(int fd, pid_t pgrp);
 
+/**
+ * @brief Duplicate a file descriptor.
+ * 
+ * @param oldfd The file descriptor to duplicate.
+ * @return The new file descriptor, or -1 on error.
+ */
+int dup(int oldfd);
+
+/**
+ * @brief Duplicate a file descriptor.
+ * 
+ * @param oldfd The file descriptor to duplicate.
+ * @param newfd The new file descriptor to use.
+ * @return The new file descriptor, or -1 on error.
+ */
+int dup2(int oldfd, int newfd)
+
 /* man 0p unistd.h
 int          access(const char *, int);
 unsigned     alarm(unsigned);
@@ -149,8 +166,6 @@ int          chdir(const char *);
 int          chown(const char *, uid_t, gid_t);
 size_t       confstr(int, char *, size_t);
 char        *crypt(const char *, const char *);
-int          dup(int);
-int          dup2(int, int);
 void         encrypt(char [64], int);
 int          execl(const char *, const char *, ...);
 int          execle(const char *, const char *, ...);
