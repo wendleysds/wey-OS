@@ -11,54 +11,13 @@
 #include "ramfs_internal.h"
 
 int ramfs_do_truncate(struct inode *inode, size_t new_size){
-	struct ramfs_inode *rino = inode->private_data;
-
 	size_t old_size = inode->size;
-	if(new_size == old_size){
+	if (new_size == old_size)
 		return 0;
-	}
-
-	size_t old_page_count = (old_size + PAGE_SIZE - 1) / PAGE_SIZE;
-	size_t new_page_count = (new_size + PAGE_SIZE - 1) / PAGE_SIZE;
-
-	/* Shrink */
-	if(new_size < old_size){
-		/* If new_size is page-aligned, new_page_count may equal old_page_count; handle partial page zeroing */
-		if(new_page_count < old_page_count){
-
-			if(new_page_count <= rino->page_capacity){
-				/* free surplus pages */
-				for(size_t i = new_page_count; i < old_page_count; i++){
-					if(rino->pages[i]){
-						page_free(rino->pages[i]);
-						rino->pages[i] = NULL;
-					}
-				}
-			}
-		}
-
-		/* Zero out tail of the last page if needed */
-		if(new_size % PAGE_SIZE && new_page_count > 0){
-			struct page *p = rino->pages[new_page_count - 1];
-			if(p){
-				char *ptr = (char*)page_to_virt(p);
-				size_t off = new_size % PAGE_SIZE;
-				memset(ptr + off, 0, PAGE_SIZE - off);
-			}
-		}
-	} else { /* Expand */
-		/* allocate needed pages */
-		if(new_page_count > rino->page_capacity){
-
-			size_t new_cap = rino->page_capacity ? rino->page_capacity * 2 : 4;
-			while(new_cap < new_page_count) new_cap *= 2;
-
-			int res = ramfs_grow_pages_arr(rino, new_cap);
-			if(res) return res;
-		}
-	}
 
 	inode->size = new_size;
+	if (new_size < old_size)
+		truncate_pagecache(inode->i_mapping, (off_t)new_size);
 
 	return 0;
 }
@@ -112,6 +71,7 @@ static int ramfs_create_common(struct inode *dir, struct dentry *dentry, umode_t
 	rino->name = rino_name;
 	rino->parent = rdir;
 	inode->i_op = &ramfs_iops;
+	inode->i_mapping->a_ops = &ramfs_aops;
 	inode->mode = mode;
 	inode->dev = dev;
 

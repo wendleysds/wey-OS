@@ -22,6 +22,9 @@ struct vm_region {
 	off_t file_offset;
 	size_t file_size;
 
+	struct mm_struct *mm;
+	struct list_head shared;
+
 	struct vm_region *next;
 };
 

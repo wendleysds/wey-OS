@@ -5,15 +5,16 @@
 #define PTE_MAX_ENTRIES 1024
 
 // Flags
-#define _PAGE_GLOBAL   0x100
-#define _PAGE_PSIZE    0x80
-#define _PAGE_DIRTY    0x40
-#define _PAGE_ACCESSED 0x20
-#define _PAGE_PCD      0x10
-#define _PAGE_PWT      0x8
-#define _PAGE_US       0x4
-#define _PAGE_RW       0x2
-#define _PAGE_P        0x1
+#define _PAGE_SW_SHARED 0x200
+#define _PAGE_GLOBAL    0x100
+#define _PAGE_PSIZE     0x80
+#define _PAGE_DIRTY     0x40
+#define _PAGE_ACCESSED  0x20
+#define _PAGE_PCD       0x10
+#define _PAGE_PWT       0x8
+#define _PAGE_US        0x4
+#define _PAGE_RW        0x2
+#define _PAGE_P         0x1
 
 #define PAGE_MASK 0xFFFFF000
 #define FLAGS_MASK (~PAGE_MASK)

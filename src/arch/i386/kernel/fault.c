@@ -79,6 +79,53 @@ static inline void show_pf_info(pf_info_t* pf){
 	);
 }
 
+// Missing page fault on shared region: map the page DO CACHE (without copying)
+static int vm_handle_shared(struct vm_region* region, uintptr_t addr, int write)
+{
+	struct paging_ctx *ctx = current->mm->ctx;
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+	struct inode *inode = region->file->inode;
+	off_t off = region->file_offset + (off_t)(page_addr - region->start);
+
+	if (off < 0 || (size_t)off >= inode->size)
+		return -EIO; // TODO: SIGBUS
+
+	struct page *page = pagecache_get_page(inode->i_mapping, (pgoff_t)(off / PAGE_SIZE), true);
+	if (IS_ERR(page))
+		return PTR_ERR(page);
+
+	mem_flags_t flags = region->mem_flags;
+	if (write)
+		set_page_dirty(page);
+	else
+		flags &= ~MEM_WRITE; // map read-only to trap the 1st write (dirty)
+
+	int res = mmu_mmap(ctx, page_to_phys(page), page_addr, PAGE_SIZE, flags);
+	if (IS_ERR_VALUE(res)) {
+		page_put(page);
+		return res;
+	}
+
+	mmu_invlpg(ctx, page_addr);
+	return SUCCESS; // pagecache_get_page ref is passed to PTE
+}
+
+// write on present and read-only shared region: dirty and release the writing (NEVER copy)
+static int vm_handle_shared_wp(struct vm_region* region, uintptr_t addr)
+{
+	struct paging_ctx *ctx = current->mm->ctx;
+	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
+
+	struct page *page = phys_to_page(mmu_translate(ctx, page_addr));
+	if (!page)
+		return -ENOENT;
+
+	set_page_dirty(page);
+	mmu_set_flags(ctx, page_addr, region->mem_flags);
+	mmu_invlpg(ctx, page_addr);
+	return SUCCESS;
+}
+
 static int vm_handle_file(struct vm_region* region, uintptr_t addr) {
 	uintptr_t page_addr = PAGE_ALIGN_DOWN(addr);
 	off_t file_offset = region->file_offset + (page_addr - region->start);
@@ -244,22 +291,25 @@ static int fixup_page_fault(pf_info_t* pf){
 	if (pf->exec && !(region->mem_flags & MEM_EXEC))
 		return -EFAULT;
 
+	const int shared = region->file && (region->mem_flags & MEM_SHARED);
+
 	if(pf->present){
 		if(pf->write && (region->mem_flags & MEM_WRITE)){
-			handle_res = vm_handle_cow(region, pf->addr);
+			handle_res = shared ? vm_handle_shared_wp(region, pf->addr)
+								: vm_handle_cow(region, pf->addr);
 			goto check_res;
 		}
-
 		return -EFAULT;
 	}
 
-	if(region->mem_flags & MEM_GROWSDOWN) {
+	if(shared)
+		handle_res = vm_handle_shared(region, pf->addr, pf->write);
+	else if(region->mem_flags & MEM_GROWSDOWN)
 		handle_res = vm_handle_stack(region, pf->addr);
-	} else if(region->file) {
+	else if(region->file)
 		handle_res = vm_handle_file(region, pf->addr);
-	} else {
+	else
 		handle_res = vm_handle_anon(region, pf->addr);
-	}
 
 check_res:
 	if(handle_res != 0){

@@ -7,6 +7,23 @@
 #define ALIGN_DOWN(v,a) ((v) & ~((a)-1))
 #define ALIGN_UP(v,a)  (((v) + (a) - 1) & ~((a)-1))
 
+static inline bool vma_is_shared_file(const struct vm_region *r)
+{
+	return r->file && (r->mem_flags & MEM_SHARED);
+}
+
+static void vma_link_mapping(struct vm_region *r)
+{
+	if (vma_is_shared_file(r))
+		i_mmap_add(r->file->inode->i_mapping, r);
+}
+
+static void vma_unlink_mapping(struct vm_region *r)
+{
+	if (vma_is_shared_file(r))
+		i_mmap_remove(r->file->inode->i_mapping, r);
+}
+
 struct vm_region *vma_alloc(mem_flags_t mem_flags, prot_flags_t prot_flags,
                             struct file *file, off_t file_offset, size_t file_size)
 {
@@ -16,9 +33,11 @@ struct vm_region *vma_alloc(mem_flags_t mem_flags, prot_flags_t prot_flags,
 
 	r->mem_flags   = mem_flags;
 	r->prot_flags  = prot_flags;
-	r->file        = file;        /* a referência é tomada em __vma_insert */
+	r->file        = file; // the reference is taken in __vma_insert
 	r->file_offset = file_offset;
 	r->file_size   = file_size;
+	INIT_LIST_HEAD(&r->shared);
+
 	return r;
 }
 
@@ -49,6 +68,9 @@ int __vma_insert(struct mm_struct *mm, struct vm_region *region)
 
 	if (region->file)
 		file_get(region->file);
+
+	region->mm = mm;
+	vma_link_mapping(region);
 
 	return SUCCESS;
 }
@@ -134,6 +156,8 @@ int vma_remove(struct mm_struct* mm, uintptr_t virtaddr) {
 
 		if (virtaddr >= entry->start && virtaddr < entry->end) {
 			*curr = entry->next;
+
+			vma_unlink_mapping(entry);
 
 			if (entry->file) {
 				file_put(entry->file);
@@ -228,6 +252,10 @@ int __vma_unlink_range(struct mm_struct *mm, uintptr_t start, uintptr_t end,
 				file_get(curr->file);
 			}
 
+			INIT_LIST_HEAD(&tail->shared);
+			tail->mm = mm;
+			vma_link_mapping(tail);
+
 			tail->next = next;
 			curr->end  = start;
 			curr->next = tail;
@@ -245,6 +273,7 @@ void __vma_free_list(struct vm_region *list)
 {
 	while (list) {
 		struct vm_region *next = list->next;
+		vma_unlink_mapping(list);
 		if (list->file)
 			file_put(list->file);
 		kfree(list);

@@ -1,6 +1,7 @@
 #include <fs/vfs.h>
 #include <mm/page.h>
-#include <mm/kheap.h>
+#include <mm/kmap.h>
+#include <mm/pagecache.h>
 #include <def/errno.h>
 #include <def/config.h>
 #include <lib/string.h>
@@ -8,141 +9,120 @@
 
 #include "ramfs_internal.h"
 
-static ssize_t ramfs_read(struct file *file, void *buffer, size_t count, off_t *offset) {
-	struct inode *inode = file->inode;
-	struct ramfs_inode *rino = inode->private_data;
-
-	spin_lock(&inode->lock);
-	
-	if (*offset >= (off_t)inode->size) {
-		spin_unlock(&inode->lock);
-		return 0;
-	}
-
-	size_t cursor = *offset;
-	size_t cur_page_index = cursor / PAGE_SIZE;
-	size_t page_offset = cursor % PAGE_SIZE;
-	size_t total_readed = 0;
-	size_t available = inode->size - cursor;
-
-	if (count > available) {
-		count = available;
-	}
-
-	size_t remaining = count;
-	while (remaining > 0) {
-		if (cur_page_index >= rino->page_capacity) {
-			break;
-		}
-
-		struct page* page = rino->pages[cur_page_index];
-		size_t available_in_page = PAGE_SIZE - page_offset;
-		size_t to_read = (remaining < available_in_page) ? remaining : available_in_page;
-
-		if (page) {
-			char* page_ptr = (char*)page_to_virt(page);
-			memcpy((char*)buffer + total_readed, page_ptr + page_offset, to_read);
-		} else {
-			memset((char*)buffer + total_readed, 0, to_read);
-		}
-
-		remaining -= to_read;
-		total_readed += to_read;
-		page_offset = 0;
-		cur_page_index++;
-	}
-
-	spin_unlock(&inode->lock);
-
-	*offset += total_readed;
-	return total_readed;
+/* ramfs doesn't have backing store: new page = zeros */
+static int ramfs_readpage(struct address_space *m, struct page *page)
+{
+	pagecache_zero(page, 0, PAGE_SIZE);
+	return 0;
 }
 
-static ssize_t ramfs_write(struct file *file, const void *buffer, size_t count, off_t *offset) {
-	struct inode *inode = file->inode;
-	struct ramfs_inode *rino = inode->private_data;
+const struct address_space_operations ramfs_aops = {
+	.readpage = ramfs_readpage,
+	.writepage = NULL,
+};
 
-	if (count == 0) {
+static ssize_t ramfs_read(struct file *file, void *buffer, size_t count, off_t *offset)
+{
+	struct inode *inode = file->inode;
+	struct address_space *m = inode->i_mapping;
+
+	if (*offset < 0 || (size_t)*offset >= inode->size)
 		return 0;
+
+	size_t cursor = (size_t)*offset;
+	size_t avail = inode->size - cursor;
+	if (count > avail)
+		count = avail;
+
+	size_t done = 0;
+	while (done < count) {
+		size_t poff = cursor % PAGE_SIZE;
+		size_t n = PAGE_SIZE - poff;
+		if (n > count - done)
+			n = count - done;
+
+		/* create=false: holes (never written pages) read as zero without using RAM */
+		struct page *page = pagecache_get_page(m, cursor / PAGE_SIZE, false);
+		if (page) {
+			void *v = kmap(page);
+			if (!v) {
+				page_put(page);
+				if (done) break;
+				return -ENOMEM;
+			}
+			memcpy((char *)buffer + done, (char *)v + poff, n);
+			kunmap(page);
+			page_put(page);
+		} else {
+			memset((char *)buffer + done, 0, n);
+		}
+
+		done += n;
+		cursor += n;
 	}
 
-	size_t cursor = *offset;
-	size_t end_pos = cursor + count;
-	size_t target_max_page_index = (end_pos - 1) / PAGE_SIZE;
+	*offset = (off_t)cursor;
+	return (ssize_t)done;
+}
 
-	spin_lock(&inode->lock);
-	if (target_max_page_index >= rino->page_capacity) {
-		size_t new_cap = rino->page_capacity ? rino->page_capacity : 4;
-		while (target_max_page_index >= new_cap) {
-			new_cap *= 2;
+static ssize_t ramfs_write(struct file *file, const void *buffer, size_t count, off_t *offset)
+{
+	struct inode *inode = file->inode;
+	struct address_space *m = inode->i_mapping;
+
+	if (count == 0)
+		return 0;
+	if (*offset < 0)
+		return -EINVAL;
+
+	size_t cursor = (size_t)*offset;
+	if (cursor + count < cursor)
+		return -EFBIG;
+
+	size_t done = 0;
+	while (done < count) {
+		size_t poff = cursor % PAGE_SIZE;
+		size_t n = PAGE_SIZE - poff;
+		if (n > count - done)
+			n = count - done;
+
+		struct page *page = pagecache_get_page(m, cursor / PAGE_SIZE, true);
+		if (IS_ERR(page)) {
+			if (done) break;
+			return PTR_ERR(page);
 		}
-		
-		int res = ramfs_grow_pages_arr(rino, new_cap);
-		if (res) {
-			spin_unlock(&inode->lock);
+
+		void *v = kmap(page);
+		if (!v) {
+			page_put(page);
+			if (done) break;
 			return -ENOMEM;
 		}
-	}
-	spin_unlock(&inode->lock);
 
-	size_t cur_page_index = cursor / PAGE_SIZE;
-	size_t page_offset = cursor % PAGE_SIZE;
-	size_t remaining = count;
-	size_t total_written = 0;
+		memcpy((char *)v + poff, (const char *)buffer + done, n);
+		kunmap(page);
+		set_page_dirty(page);
+		page_put(page);
 
-	while (remaining > 0) {
-		spin_lock(&inode->lock);
-		struct page *page = rino->pages[cur_page_index];
-		spin_unlock(&inode->lock);
-
-		if (!page) {
-			struct page *new_page = page_alloc(0, PG_KERNEL);
-			if (!new_page) {
-				return total_written ? (ssize_t)total_written : -ENOMEM;
-			}
-			memset((void*)page_to_virt(new_page), 0, PAGE_SIZE);
-
-			spin_lock(&inode->lock);
-			if (!rino->pages[cur_page_index]) {
-				rino->pages[cur_page_index] = new_page;
-				page = new_page;
-			} else {
-				page = rino->pages[cur_page_index];
-				page_free(new_page);
-			}
-			spin_unlock(&inode->lock);
-		}
-
-		char *page_ptr = (char*)page_to_virt(page);
-		size_t available_in_page = PAGE_SIZE - page_offset;
-		size_t to_write = (remaining < available_in_page) ? remaining : available_in_page;
-
-		memcpy(page_ptr + page_offset, (const char*)buffer + total_written, to_write);
-
-		remaining -= to_write;
-		total_written += to_write;
-		page_offset = 0;
-		cur_page_index++;
+		done += n;
+		cursor += n;
 	}
 
 	spin_lock(&inode->lock);
-	cursor += total_written;
-	if (cursor > inode->size) {
+	if (cursor > inode->size)
 		inode->size = cursor;
-	}
 	spin_unlock(&inode->lock);
 
-	*offset = cursor;
-
-	return total_written;
+	*offset = (off_t)cursor;
+	return (ssize_t)done;
 }
 
-
-off_t ramfs_lseek(struct file *file, off_t offset, int whence){
+off_t ramfs_lseek(struct file *file, off_t offset, int whence)
+{
 	size_t filesize = file->inode->size;
 
 	off_t target;
-	switch(whence){
+	switch (whence) {
 		case SEEK_SET:
 			target = offset;
 			break;
@@ -156,15 +136,13 @@ off_t ramfs_lseek(struct file *file, off_t offset, int whence){
 			return -EINVAL;
 	}
 
-	if(target < 0){
+	if (target < 0)
 		return -EINVAL;
-	}
 
-	if(target > (off_t)filesize){
+	if (target > (off_t)filesize) {
 		int res = ramfs_do_truncate(file->inode, target);
-		if(IS_ERR_VALUE(res)){
+		if (IS_ERR_VALUE(res))
 			return res;
-		}
 	}
 
 	file->pos = (size_t)target;

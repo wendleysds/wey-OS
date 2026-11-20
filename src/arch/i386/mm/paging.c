@@ -86,6 +86,9 @@ int mmu_flags_arch(mem_flags_t flags){
 	if(flags & MEM_USER)
 		f |= _PAGE_US;
 
+	if (flags & MEM_SHARED)
+		f |= _PAGE_SW_SHARED;
+
 	if(flags & MEM_GLOBAL)
 		f |= _PAGE_GLOBAL;
 
@@ -109,6 +112,9 @@ mem_flags_t arch_mmu_flags(int flags){
 
 	if(flags & _PAGE_RW)
 		f |= MEM_WRITE;
+
+	if (flags & _PAGE_SW_SHARED)
+		f |= MEM_SHARED;
 
 	if (flags & (_PAGE_PCD | _PAGE_PWT))
 		f |= MEM_DEVICE;

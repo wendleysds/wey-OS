@@ -226,6 +226,8 @@ struct page* page_alloc(uint8_t order, uint16_t flags) {
 		page->flags = flags;
 		page->order = order;
 		page->private = 0;
+		page->mapping = NULL;
+		page->index = 0;
 
 		atomic_set(&page->refcount, 1);
 		global_zone.free_pages -= (1UL << order);
@@ -266,6 +268,7 @@ int page_free(struct page *page){
 	uint8_t orig_order = order;
 
 	page->flags = PG_BUDDY;
+	page->mapping = NULL;
 	atomic_set(&page->refcount, 0);
 
 	while (order < MAX_ORDER - 1) {

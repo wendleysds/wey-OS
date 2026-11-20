@@ -52,6 +52,7 @@
 #51 i386 send sys_send
 #52 i386 recv sys_recv
 #53 i386 fcntl sys_fcntl
+#54 i386 stat sys_stat
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write

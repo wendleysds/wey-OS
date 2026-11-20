@@ -1,2 +1,2 @@
 obj-y += vmm/ pmm/ heap/
-obj-y += init.o
+obj-y += init.o pagecache.o

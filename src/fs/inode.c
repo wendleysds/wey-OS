@@ -24,6 +24,9 @@ struct inode* inode_new(struct super_block *sb){
 		spinlock_init(&inode->lock);
 		atomic_set(&inode->refcount, 1);
 
+		inode->i_mapping = &inode->i_data;
+		address_space_init(&inode->i_data, inode, NULL);
+
 		spin_lock(&sb->s_inode_lock);
 		list_add(&inode->i_sb_list, &sb->s_inodes);
 		spin_unlock(&sb->s_inode_lock);
@@ -38,6 +41,10 @@ void inode_destroy(struct inode* inode){
 		spin_lock(&inode->i_sb->s_inode_lock);
 		list_remove(&inode->i_sb_list);
 		spin_unlock(&inode->i_sb->s_inode_lock);
+
+		if (inode->i_mapping)
+			pagecache_destroy(inode->i_mapping);
+
 		ops->destroy_inode(inode);
 	}else{
 		panic("inode_destroy(): No destroy operation on %s!", inode->i_sb->fs_type->name);

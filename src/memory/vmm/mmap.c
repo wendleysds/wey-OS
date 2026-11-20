@@ -69,14 +69,22 @@ static long mmap_check_args(vaddr_t addr, size_t len, int prot, int flags,
 	return 0;
 }
 
-static long mmap_check_file(struct file *file)
+static long mmap_check_file(struct file *file, int prot, int flags)
 {
 	if (!file->inode || !S_ISREG(file->inode->mode))
 		return -ENODEV;
-	if (!file->f_op || !file->f_op->read)
-		return -ENODEV;
 	if ((file->flags & O_WRONLY) && !(file->flags & O_RDWR))
 		return -EACCES;
+
+	if (flags & MAP_SHARED) {
+		struct address_space *m = file->inode->i_mapping;
+		if (!m || !m->a_ops || !m->a_ops->readpage)
+			return -ENODEV;
+		if ((prot & PROT_WRITE) && !(file->flags & O_RDWR))
+			return -EACCES;
+	} else if (!file->f_op || !file->f_op->read) {
+		return -ENODEV;
+	}
 	return 0;
 }
 
@@ -209,23 +217,28 @@ SYSCALL_DEFINE6(mmap,
 	if (err)
 		return err;
 
-	/* TODO: MAP_SHARED need page cache peer inode (address_space). */
-	if (flags & MAP_SHARED)
-		return -ENOTSUP;
-
-	if (flags & MAP_ANONYMOUS){
+	if (flags & MAP_ANONYMOUS) {
 		offset = 0;
+		if (flags & MAP_SHARED) {
+			file = shmem_file_setup(alen);
+			if (IS_ERR(file))
+				return PTR_ERR(file);
+		}
 	} else {
 		file = file_table_get_file(current->files, fd);
 		if (!file)
 			return -EBADF;
-
-		err = mmap_check_file(file);
+		err = mmap_check_file(file, prot, flags);
 		if (err)
 			goto out;
 	}
 
-	region = vma_alloc(prot_to_mem_flags(prot), map_to_prot_flags(flags), file, offset, file ? len : 0);
+	mem_flags_t mf = prot_to_mem_flags(prot);
+	if (flags & MAP_SHARED)
+		mf |= MEM_SHARED;
+
+	region = vma_alloc(mf, map_to_prot_flags(flags), file, offset, file ? len : 0);
+
 	spare  = kzalloc(sizeof(struct vm_region));
 	if (!region || !spare) {
 		err = -ENOMEM;
@@ -262,7 +275,7 @@ SYSCALL_DEFINE6(mmap,
 	struct vm_region *mapped = region;
 	region = NULL;
 
-	if (flags & MAP_POPULATE) {
+	if ((flags & MAP_POPULATE) && !(flags & MAP_SHARED)) {
 		err = do_mmap_populate(mm, mapped);
 		if (err < 0) {
 			vma_remove(mm, map_addr);

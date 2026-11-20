@@ -1,4 +1,3 @@
-#include "asm-generic/paging_fmt.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <mm/mmu.h>
@@ -412,7 +411,7 @@ static void* clone_level(
 
 			pte_t new_pte = pte_val;
 
-			if ((flags & MEM_WRITE) && (flags & MEM_USER)) {
+			if ((flags & MEM_WRITE) && (flags & MEM_USER) && !(flags & MEM_SHARED)) {
 				new_pte = src->ops->mk_pte(
 					phys, mmu_flags_arch(flags & ~MEM_WRITE)
 				);

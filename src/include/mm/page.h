@@ -25,6 +25,9 @@
 #define PG_LOCKED     (1U << 9)
 #define PG_REFERENCED (1U << 10)
 #define PG_WRITEBACK  (1U << 11)
+#define PG_UPTODATE   (1U << 12)
+
+typedef unsigned long pgoff_t;
 
 struct page {
 	uint8_t order;
@@ -34,6 +37,9 @@ struct page {
 	atomic_t refcount;
 
 	void* private;
+
+	struct address_space *mapping;
+	pgoff_t index;
 
 	struct list_head list;
 } __aligned(32);

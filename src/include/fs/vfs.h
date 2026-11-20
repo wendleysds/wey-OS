@@ -4,6 +4,7 @@
 #include <sync/spinlock.h>
 #include <lib/list.h>
 #include <mm/kheap.h>
+#include <mm/pagecache.h>
 
 #define FMODE_READ   (1 << 0)
 #define FMODE_WRITE  (1 << 2)
@@ -58,6 +59,9 @@ struct inode {
 
 	void *private_data;
 	struct mount *mounted_here;
+
+	struct address_space i_data;
+	struct address_space *i_mapping;
 
 	struct super_block* i_sb;
 	const struct inode_operations *i_op;
@@ -264,6 +268,8 @@ static inline void file_put(struct file* file){
 		kfree(file);
 	}
 }
+
+struct file *shmem_file_setup(size_t size);
 
 int kernel_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 
