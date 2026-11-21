@@ -83,7 +83,7 @@ static int __init unpack_initrd(void){
 	int res = OK;
 
 	if(__initramfs_size || ramdisk_size){
-		pr_notice("Unpacking initrd ...\n");
+		pr_info("Initrd: Unpacking initrd ...\n");
 	}
 
 	if((size_t)__initramfs_size != 0){

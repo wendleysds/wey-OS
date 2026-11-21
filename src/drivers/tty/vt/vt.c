@@ -12,7 +12,7 @@
 #define FIRST_VT_INDEX 0
 
 static struct vt terminals[TERMINALS_MAX];
-static spinlock_t console_lock;
+static DEFINE_SPINLOCK(console_lock);
 static struct tty_driver* driver = NULL;
 
 static const uint8_t ansi_to_color[8] = { 0, 4, 2, 6, 1, 5, 3, 7 };
@@ -671,9 +671,4 @@ static int __init vt_tty_init(void){
 	return SUCCESS;
 }
 
-static int __init vt_init(void){
-	spinlock_init(&console_lock);
-	return vt_tty_init();
-}
-
-device_initcall(vt_init);
+device_initcall(vt_tty_init);

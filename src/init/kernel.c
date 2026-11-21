@@ -59,12 +59,12 @@ static __init void _do_initcall_level(int level){
 		if(IS_ERR_VALUE(res)){
 			const char* name = NULL;
 			kallsyms_lookup_symbol(
-				(uintptr_t)initcall, 
-				&name, 
+				(uintptr_t)initcall,
+				&name,
 				NULL
 			);
 
-			panic("initcall<%d>(%s): failed \"%d\"\n", 
+			pr_err("initcall<%d>(%s): failed \"%d\"\n", 
 				level,
 				name ? name : "???",
 				res

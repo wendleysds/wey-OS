@@ -4,7 +4,7 @@
 #include <def/errno.h>
 
 static LIST_HEAD(handlers);
-static spinlock_t lock;
+static DEFINE_SPINLOCK(lock);
 
 int input_register_handler(struct input_handler *handler){
 	spin_lock(&lock);
@@ -31,11 +31,3 @@ void input_report(const struct input_event *event){
 
 	spin_unlock(&lock);
 }
-
-static __init int input_init(void){
-	INIT_LIST_HEAD(&handlers);
-	spinlock_init(&lock);
-	return OK;
-}
-
-subsys_initcall(input_init);

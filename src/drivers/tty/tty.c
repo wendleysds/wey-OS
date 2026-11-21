@@ -208,10 +208,3 @@ struct tty_struct* tty_find_with_session(pid_t sid, struct tty_struct *exclude){
 
 	return NULL;
 }
-
-static int __init tty_init(void){
-	INIT_LIST_HEAD(&drivers);
-	return SUCCESS;
-}
-
-fs_initcall(tty_init);

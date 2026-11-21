@@ -241,10 +241,3 @@ struct resource *device_get_resource(
 	}
 	return NULL;
 }
-
-static int __init device_init(){
-	INIT_LIST_HEAD(&devices);
-	return SUCCESS;
-}
-
-core_initcall(device_init);

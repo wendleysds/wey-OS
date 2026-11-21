@@ -167,23 +167,20 @@ static __init int acpi_parse_tables(void) {
 static __init int acpi_init(void){
 	if(!acpi_rsdp) return 0;
 
-	int res;
-	if((res = acpi_load_all_tables()) != 0){
-		pr_err("ACPI: failed to load tables\n");
-		return res;
+	int last_err = 0;
+	if((last_err = acpi_load_all_tables()) != 0){
+		pr_err("ACPI: failed to load all tables %d\n", last_err);
 	}
 
-	if((res = acpi_parse_tables()) != 0){
-		pr_err("ACPI: failed to parse tables\n");
-		return res;
+	if((last_err = acpi_parse_tables()) != 0){
+		pr_err("ACPI: failed to parse tables %d\n", last_err);
 	}
 
-	if((res = acpi_enable()) != 0){
-		pr_err("ACPI: failed to enable ACPI\n");
-		return res;
+	if((last_err = acpi_enable()) != 0){
+		pr_err("ACPI: failed to enable ACPI %d\n", last_err);
 	}
 
-	return 0;
+	return last_err;
 }
 
 subsys_initcall(acpi_init);

@@ -149,7 +149,7 @@ static __init int lapic_timer_prepare(){
     return 0;
 }
 
-int x86_irqchip_init(struct x86_timer_caps* caps){
+int __init x86_irqchip_init(struct x86_timer_caps* caps){
 	int ret;
 
 	bool has_lapic = caps->lapic_available && lapic_supporte();

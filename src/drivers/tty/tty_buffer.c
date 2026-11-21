@@ -6,7 +6,7 @@
 #include <mm/kheap.h>
 
 static struct tty_buffer *buffers_cache = NULL;
-static spinlock_t lock;
+static DEFINE_SPINLOCK(lock);
 
 static struct tty_buffer *tty_alloc_buffer(void) {
 	struct tty_buffer *buffer;
@@ -169,11 +169,3 @@ int tty_receive_buf(struct tty_struct* tty, const u8* buffer, size_t len){
 
 	return written;
 }
-
-static int __init tty_buffer_init(void) {
-	buffers_cache = NULL;
-	spinlock_init(&lock);
-	return OK;
-}
-
-fs_initcall(tty_buffer_init);
