@@ -96,6 +96,7 @@ void context_switch(struct task* prev, struct task* to){
 		mmu_context_switch(to->mm->ctx);
 	}
 
+	fpu_switch_to(to);
 	to->state = TASK_RUNNING;
 	_switch_to(prev, to);
 }

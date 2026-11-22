@@ -41,6 +41,7 @@ static struct task *copy_process() {
 	}
 
 	copy_thread(cur, child, NULL, NULL);
+	fpu_copy(child, cur);
 
 	struct mm_struct *c_mm = mm_dup(cur->mm);
 	if (!c_mm) {

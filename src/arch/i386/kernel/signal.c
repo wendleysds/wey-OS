@@ -15,6 +15,8 @@ struct sigframe {
     int sig;
     struct registers saved_regs;
     sigset_t old_mask;
+    struct fpu_state fpu;
+    int fpu_used;
 };
 
 int arch_setup_signal_frame(int sig, const struct sigaction *act, struct registers *regs) {
@@ -29,9 +31,15 @@ int arch_setup_signal_frame(int sig, const struct sigaction *act, struct registe
     frame.saved_regs = *regs;
     frame.old_mask = cur->sig_blocked;
 
+    fpu_flush(cur);
+    frame.fpu = cur->fpu;
+    frame.fpu_used = cur->fpu_used;
+
     if (copy_to_user((void*)sp, &frame, sizeof(frame)) != 0) {
         return -EFAULT;
     }
+
+    fpu_reset(cur);
 
     regs->sp = sp;
     regs->ip = (uintptr_t)act->sa_handler;
@@ -51,6 +59,7 @@ SYSCALL_DEFINE0(sigreturn) {
 
     current->regs = frame.saved_regs;
     current->sig_blocked = frame.old_mask & ~SIG_UNBLOCKABLE;
+    fpu_set_state(current, &frame.fpu, frame.fpu_used != 0);
 
     regs->cs = GDT_USER_CODE;
     regs->ss = GDT_USER_DATA;

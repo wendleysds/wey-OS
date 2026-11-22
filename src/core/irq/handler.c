@@ -44,26 +44,19 @@ int generic_handle_irq(struct irq_info* info) {
 		handler = handler->next;
 	}
 
-	if (info->cpu.exception) {
+	if (info->cpu.exception && !handled) {
 		uint32_t interrupt = info->hwirq;
 		uintptr_t ip = regs_get_instruction_pointer(info->cpu.regs);
 		const char* name = info->cpu.exception_name;
 
-		if (handled) {
-			printk(
-				"Received trap %d <0x%x>: '%s' at 0x%x\n",
-				interrupt, interrupt, name, ip
-			);
-		} else {
-			printk(
-				"Unhandled Exception %d <0x%x>: '%s' at 0x%x\n",
-				interrupt, interrupt, name, ip
-			);
+		printk(
+			"Unhandled Exception %d <0x%x>: '%s' at 0x%x\n",
+			interrupt, interrupt, name, ip
+		);
 
-			dump_regs(info->cpu.regs);
+		dump_regs(info->cpu.regs);
 
-			panic("System Halted");
-		}
+		panic("System Halted");
 	}
 
 	if (info->needs_eoi && desc->controller && desc->controller->eoi) {

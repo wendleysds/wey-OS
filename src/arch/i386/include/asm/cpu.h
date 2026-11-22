@@ -30,7 +30,8 @@ struct cpu {
 	int id;
 	struct tss tss;
 	struct task *current;
-struct cpu_caps caps;
+	struct task *fpu_owner;
+	struct cpu_caps caps;
 };
 
 static inline void cpu_relax(void) {

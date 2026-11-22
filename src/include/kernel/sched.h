@@ -3,6 +3,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/process.h>
+#include <asm/fpu.h>
 #include <kernel/pid.h>
 #include <kernel/signal.h>
 #include <def/config.h>
@@ -66,6 +67,9 @@ struct task {
 	pid_t pgid;
 	pid_t sid;
 	bool did_exec;
+
+	struct fpu_state fpu;
+	bool fpu_used;
 
 	struct list_head children;
 	struct list_head sibling;

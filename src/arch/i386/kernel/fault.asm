@@ -1,3 +1,5 @@
+bits 32
+
 global page_fault_entry
 
 extern page_fault_handler

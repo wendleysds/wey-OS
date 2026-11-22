@@ -9,6 +9,9 @@
 #include <def/errno.h>
 #include <mm/vma.h>
 
+#include <uapi/sys/wait.h>
+
+
 struct task* init_task;
 
 static LIST_HEAD(tasks_global);
@@ -122,7 +125,7 @@ void task_reparent_children(struct task* task, struct task* new_parent){
 
 void task_exit(struct task* task, int status){
 	if(unlikely(task->pid == 1)){
-		panic("Attempting to exit init process! (%d)", status);
+		panic("Attempting to exit init process! status=%d sig=%d", WEXITSTATUS(status), WTERMSIG(status));
 	}
 
 	task->exit_code = status;
@@ -178,6 +181,8 @@ static void task_free_resources(struct task *task){
 		file_table_destroy(task->files);
 		task->files = NULL;
 	}
+
+	fpu_release(task);
 }
 
 void task_destroy(struct task* task){
