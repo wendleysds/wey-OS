@@ -6,6 +6,8 @@
 #include <sync/atomic.h>
 #include <stdbool.h>
 
+#define RAW_IRQ_UNMASK  (1U << 0)
+
 struct registers;
 struct irq_desc;
 struct irq_domain;
@@ -109,6 +111,9 @@ int interrupt_init(void);
 int generic_handle_irq(struct irq_info* info);
 
 // Interrupt registration
+int raw_interrupt_register(unsigned int hwirq, interrupt_handler_t handler, void *dev, unsigned int flags);
+int raw_interrupt_unregister(unsigned int hwirq, interrupt_handler_t handler, void *dev);
+
 int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev);
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev);
 

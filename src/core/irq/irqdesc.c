@@ -29,81 +29,109 @@ struct irq_desc* irq_to_desc(int irq) {
 		}
 	}
 
-	if (irq >= 0 && irq < TOTAL_INTERRUPTS) {
-		return &irq_table[irq];
-	}
-
-	return NULL;
+	return &irq_table[irq];
 }
 
 struct irq_desc* irq_desc_get(int interrupt) {
-	if (interrupt >= 0x20 && interrupt < TOTAL_INTERRUPTS) {
-		return &irq_table[interrupt];
-	}
 	return irq_to_desc(interrupt);
 }
 
-int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev) {
-	struct irq_desc *desc = irq_to_desc(interrupt);
-	if (!desc) {
-		return -EINVAL;
-	}
-
-	struct irq_handler_node *node = kmalloc(sizeof(struct irq_handler_node));
-	if (!node) {
+static int irq_desc_add_handler(struct irq_desc *desc, interrupt_handler_t handler, void *dev) {
+	struct irq_handler_node *node = kmalloc(sizeof(*node));
+	if (!node)
 		return -ENOMEM;
-	}
-
-	desc->irq = interrupt;
-	desc->masked = false;
 
 	node->handler = handler;
 	node->device = dev;
 	node->next = desc->handlers;
-
 	desc->handlers = node;
+	return OK;
+}
 
-	// If chip has unmask, unmask the IRQ
-	if (desc->chip && desc->chip->unmask) {
-		desc->chip->unmask(desc);
+static int irq_desc_remove_handler(struct irq_desc *desc, interrupt_handler_t handler, void *dev) {
+	struct irq_handler_node *cur = desc->handlers, *prev = NULL;
+
+	while (cur) {
+		if (cur->device == dev && cur->handler == handler) {
+			if (prev) prev->next = cur->next;
+			else      desc->handlers = cur->next;
+			kfree(cur);
+			return OK;
+		}
+		prev = cur;
+		cur = cur->next;
 	}
+	return -ENOENT;
+}
+
+int interrupt_register(int interrupt, interrupt_handler_t handler, void *dev) {
+	struct irq_desc *desc = irq_to_desc(interrupt);
+	if (!desc)
+		return -EINVAL;
+
+	int ret = irq_desc_add_handler(desc, handler, dev);
+	if (ret)
+		return ret;
+
+	desc->irq = interrupt;
+	desc->masked = false;
+	if (desc->chip && desc->chip->unmask)
+		desc->chip->unmask(desc);
 
 	return OK;
 }
 
 int interrupt_unregister(int interrupt, interrupt_handler_t handler, void *dev) {
 	struct irq_desc *desc = irq_to_desc(interrupt);
-	if (!desc) {
+	if (!desc)
 		return -EINVAL;
+
+	int ret = irq_desc_remove_handler(desc, handler, dev);
+	if (ret)
+		return ret;
+
+	if (!desc->handlers && desc->chip && desc->chip->mask) {
+		desc->masked = true;
+		desc->chip->mask(desc);
 	}
+	return OK;
+}
 
-	struct irq_handler_node *cur = desc->handlers;
-	struct irq_handler_node *prev = NULL;
+int raw_interrupt_register(unsigned int hwirq, interrupt_handler_t handler, void *dev, unsigned int flags) {
+	struct irq_desc *desc = irq_desc_get_by_hwirq((int)hwirq);
+	if (!desc || !handler)
+		return -EINVAL;
 
-	while (cur) {
-		if (cur->device == dev && cur->handler == handler) {
-			if (prev) {
-				prev->next = cur->next;
-			} else {
-				desc->handlers = cur->next;
-			}
+	if ((flags & RAW_IRQ_UNMASK) && hwirq < 0x20)
+		return -EINVAL;
 
-			kfree(cur);
+	int ret = irq_desc_add_handler(desc, handler, dev);
+	if (ret)
+		return ret;
 
-			// If no more handlers, mask the IRQ
-			if (!desc->handlers && desc->chip && desc->chip->mask) {
-				desc->masked = true;
-				desc->chip->mask(desc);
-			}
-
-			return OK;
-		}
-
-		prev = cur;
-		cur = cur->next;
+	if (flags & RAW_IRQ_UNMASK) {
+		desc->masked = false;
+		if (desc->chip && desc->chip->unmask)
+			desc->chip->unmask(desc);
 	}
+	return OK;
+}
 
-	return -ENOENT;
+int raw_interrupt_unregister(unsigned int hwirq, interrupt_handler_t handler, void *dev) {
+	struct irq_desc *desc = irq_desc_get_by_hwirq((int)hwirq);
+	if (!desc)
+		return -EINVAL;
+
+	int ret = irq_desc_remove_handler(desc, handler, dev);
+	if (ret)
+		return ret;
+
+	if (hwirq >= 0x20 && !desc->handlers && !desc->masked &&
+	    desc->chip && desc->chip->mask) {
+		desc->masked = true;
+		desc->chip->mask(desc);
+	}
+	return OK;
 }
 
 int __init irqdesc_init(void (*callback)(int hwirq, struct irq_desc* desc)) {
