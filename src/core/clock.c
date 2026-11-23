@@ -2,6 +2,8 @@
 #include <kernel/syscall.h>
 #include <kernel/uaccess.h>
 #include <kernel/init.h>
+#include <kernel/sched.h>
+#include <kernel/signal.h>
 #include <def/errno.h>
 #include <lib/div64.h>
 #include <lib/list.h>
@@ -30,6 +32,16 @@ static uint32_t clock_hz;
 static spinlock_t clockevent_lock;
 static spinlock_t clocksource_lock;
 
+struct sleep_timer {
+	struct task* task;
+	time_ns_t expires_ns;
+	struct list_head list;
+	volatile bool expired;
+};
+
+static LIST_HEAD(sleep_timers);
+static DEFINE_SPINLOCK(sleep_timers_lock);
+
 struct clockevent_listener {
 	void (*handler)(void* data);
 	void* data;
@@ -53,7 +65,6 @@ static const struct clocksource default_clocksource = {
 int __init clock_init(void){
 	spinlock_init(&clockevent_lock);
 	spinlock_init(&clocksource_lock);
-	INIT_LIST_HEAD(&clockevent_listeners);
 
 	clock_tick_ns = NSEC_PER_SEC;
 	clock_tick_ns_remainder = do_div(clock_tick_ns, TIMER_FREQUENCY_HZ);
@@ -181,10 +192,26 @@ int clockevent_register_listener(void (*handler)(void* data), void* data){
 	return SUCCESS;
 }
 
+static void sleep_timers_check(void){
+	time_ns_t now = clock_get_monotonic_ns();
+	struct sleep_timer *st, *tmp;
+
+	spin_lock(&sleep_timers_lock);
+	list_for_each_entry_safe(st, tmp, &sleep_timers, list){
+		if(now >= st->expires_ns){
+			st->expired = true;
+			list_remove(&st->list);
+			task_wakeup(st->task);
+		}
+	}
+	spin_unlock(&sleep_timers_lock);
+}
+
 void clockevent_fire(void){
 	struct list_head *pos, *next;
 
 	clock_tick();
+	sleep_timers_check();
 
 	spin_lock(&clockevent_lock);
 	for(pos = clockevent_listeners.next; pos != &clockevent_listeners; pos = next){
@@ -265,4 +292,80 @@ SYSCALL_DEFINE2(clock_settime, clockid_t, clockid, __user const struct timespec 
 
     clock_set_realtime_ns(ns);
     return 0;
+}
+
+SYSCALL_DEFINE2(nanosleep, __user const struct timespec *, duration, __user struct timespec *, rem){
+	struct timespec kreq;
+
+	if(!duration)
+		return -EFAULT;
+
+	if(copy_from_user(&kreq, duration, sizeof(kreq)) != 0)
+		return -EFAULT;
+
+	if(kreq.tv_sec < 0 || kreq.tv_nsec < 0 || kreq.tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
+	if((uint64_t)kreq.tv_sec > CLOCK_SET_MAX_SEC)
+		return -EINVAL;
+
+	if(kreq.tv_sec == 0 && kreq.tv_nsec == 0)
+		return 0;
+
+	time_ns_t duration_ns = (time_ns_t)kreq.tv_sec * NSEC_PER_SEC + (time_ns_t)kreq.tv_nsec;
+	time_ns_t now = clock_get_monotonic_ns();
+	time_ns_t expires_ns = now + duration_ns;
+	if(expires_ns < now)
+		expires_ns = UINT64_MAX;
+
+	struct sleep_timer st = {
+		.task = current,
+		.expires_ns = expires_ns,
+		.expired = false,
+	};
+	INIT_LIST_HEAD(&st.list);
+
+	unsigned long flags;
+
+	spin_lock_irqsave(&sleep_timers_lock, &flags);
+	list_add_tail(&st.list, &sleep_timers);
+	spin_unlock_irqrestore(&sleep_timers_lock, &flags);
+
+	while(true){
+		spin_lock_irqsave(&sleep_timers_lock, &flags);
+		if(st.expired || has_signal_pending(current)){
+			spin_unlock_irqrestore(&sleep_timers_lock, &flags);
+			break;
+		}
+		task_sleep_interruptible(current);
+		spin_unlock_irqrestore(&sleep_timers_lock, &flags);
+		schedule();
+	}
+
+	spin_lock_irqsave(&sleep_timers_lock, &flags);
+	bool expired = st.expired;
+	if(!expired)
+		list_remove(&st.list);
+	spin_unlock_irqrestore(&sleep_timers_lock, &flags);
+
+	if(!expired && has_signal_pending(current)){
+		if(rem){
+			time_ns_t cur_ns = clock_get_monotonic_ns();
+			time_ns_t remaining_ns = (cur_ns < expires_ns) ? (expires_ns - cur_ns) : 0;
+			uint32_t rem_nsec = do_div(remaining_ns, NSEC_PER_SEC);
+
+			struct timespec krem = {
+				.tv_sec = (time_t)remaining_ns,
+				.tv_nsec = (long)rem_nsec,
+			};
+
+			if(copy_to_user(rem, &krem, sizeof(krem)) != 0){
+				return -EINTR;
+			}
+		}
+
+		return -EINTR;
+	}
+
+	return 0;
 }
