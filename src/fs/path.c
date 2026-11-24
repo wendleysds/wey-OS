@@ -163,7 +163,8 @@ int vfs_walk_path(const char *path, struct path *res) {
 }
 
 struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailing_slash) {
-	if(!root_mount) return ERR_PTR(-EINVAL);
+	if (!root_mount) return ERR_PTR(-EINVAL);
+	if (!path || *path == '\0') return ERR_PTR(-ENOENT);
 
 	struct dentry *cur;
 	if (path[0] == '/') {
@@ -179,12 +180,12 @@ struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailin
 	const char* cursor = path;
 	int has_slash = 0;
 
-	while(path_iterate(&cursor, &comp, &has_slash)){
+	while (path_iterate(&cursor, &comp, &has_slash)) {
 		const char* tmp = cursor;
 		struct qstr next;
 		int next_has_slash = 0;
 
-		if(!path_iterate(&tmp, &next, &next_has_slash)){
+		if (!path_iterate(&tmp, &next, &next_has_slash)) {
 			*last = comp;
 			if (trailing_slash) {
 				*trailing_slash = has_slash;
@@ -197,10 +198,7 @@ struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailin
 		}
 
 		if (comp.len == 2 && comp.name[0] == '.' && comp.name[1] == '.') {
-			if (cur == root_mount->mnt_root) {
-				continue;
-			}
-			if (cur == cur->parent) {
+			if (cur == root_mount->mnt_root || cur == cur->parent) {
 				continue;
 			}
 			struct dentry *parent = dentry_get(cur->parent);
@@ -229,7 +227,7 @@ struct dentry* vfs_walk_parent(const char *path, struct qstr *last, int *trailin
 	}
 
 	dentry_put(cur);
-	return ERR_PTR(-EINVAL);
+	return ERR_PTR(-ENOENT);
 }
 
 struct dentry* vfs_walk(const char *path){

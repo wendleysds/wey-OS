@@ -10,6 +10,15 @@
 
 #include "ramfs_internal.h"
 
+static struct ramfs_inode *ramfs_find_child(struct ramfs_inode *dir, const struct qstr *n) {
+	struct ramfs_inode *r;
+	list_for_each_entry(r, &dir->children, sibling) {
+		if (strlen(r->name) == n->len && strncmp(r->name, n->name, n->len) == 0)
+			return r;
+	}
+	return NULL;
+}
+
 int ramfs_do_truncate(struct inode *inode, size_t new_size){
 	size_t old_size = inode->size;
 	if (new_size == old_size)
@@ -28,13 +37,11 @@ struct inode* ramfs_lookup(struct inode *dir, struct dentry *dentry){
 
 	spin_lock(&rdir->spinlock);
 
-	struct ramfs_inode* rino;
-	list_for_each_entry(rino, &rdir->children, sibling){
-		if(strlen(rino->name) == name->len && strncmp(rino->name, name->name, name->len) == 0){
-			inode_get(rino->ino);
-			spin_unlock(&rdir->spinlock);
-			return rino->ino;
-		}
+	struct ramfs_inode* rino = ramfs_find_child(rdir, name);
+	if(rino){
+		inode_get(rino->ino);
+		spin_unlock(&rdir->spinlock);
+		return rino->ino;
 	}
 
 	spin_unlock(&rdir->spinlock);
@@ -141,6 +148,59 @@ static int ramfs_rmdir(struct inode *dir, struct dentry *dentry){
 	return ramfs_remove_common(dir, dentry, 0);
 }
 
+static int ramfs_rename(
+	struct inode *old_dir, struct dentry *old_dentry,
+	struct inode *new_dir, struct dentry *new_dentry
+){
+	struct ramfs_inode *old_rdir = old_dir->private_data;
+	struct ramfs_inode *new_rdir = new_dir->private_data;
+	struct ramfs_inode *src, *dst;
+	struct inode *victim = NULL;
+	int err = 0;
+
+	char *name = kmalloc(new_dentry->name.len + 1);
+	if (!name) return -ENOMEM;
+	memcpy(name, new_dentry->name.name, new_dentry->name.len);
+	name[new_dentry->name.len] = '\0';
+
+	struct ramfs_inode *a = old_rdir, *b = new_rdir;
+	if (a > b) { struct ramfs_inode *t = a; a = b; b = t; }
+	spin_lock(&a->spinlock);
+	if (a != b) spin_lock(&b->spinlock);
+
+	src = ramfs_find_child(old_rdir, &old_dentry->name);
+	if (!src) { err = -ENOENT; goto out; }
+
+	dst = ramfs_find_child(new_rdir, &new_dentry->name);
+	if (dst == src) goto out;
+
+	if (dst) {
+		bool sd = S_ISDIR(src->ino->mode), dd = S_ISDIR(dst->ino->mode);
+		if (sd && !dd)                    { err = -ENOTDIR;   goto out; }
+		if (!sd && dd)                    { err = -EISDIR;    goto out; }
+		if (dd && !list_empty(&dst->children)) { err = -ENOTEMPTY; goto out; }
+		list_remove(&dst->sibling);
+		victim = dst->ino;
+	}
+
+	char *old = src->name;
+	src->name = name;
+	name = old;
+
+	if (old_rdir != new_rdir) {
+		list_remove(&src->sibling);
+		list_add(&src->sibling, &new_rdir->children);
+		src->parent = new_rdir;
+	}
+
+out:
+	if (a != b) spin_unlock(&b->spinlock);
+	spin_unlock(&a->spinlock);
+	kfree(name);
+	if (victim) inode_put(victim);
+	return err;
+}
+
 static int ramfs_getattr(struct inode *ino, struct stat* restrict statbuf){
 	statbuf->ino = ino->ino;
 	statbuf->mode = ino->mode;
@@ -183,6 +243,7 @@ static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
 const struct inode_operations ramfs_iops = {
 	.lookup = ramfs_lookup,
 	.create = ramfs_create,
+	.rename = ramfs_rename,
 	.unlink = ramfs_unlink,
 	.mkdir = ramfs_mkdir,
 	.rmdir = ramfs_rmdir,

@@ -124,6 +124,7 @@ struct file_operations {
 struct inode_operations {
 	struct inode* (*lookup)(struct inode *dir, struct dentry *dentry);
 	int (*create)(struct inode *dir, struct dentry *dentry, umode_t mode);
+	int (*rename)(struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry);
 	int (*unlink)(struct inode *dir, struct dentry *dentry);
 	int (*mkdir)(struct inode *dir, struct dentry *dentry, umode_t mode);
 	int (*rmdir)(struct inode *dir, struct dentry *dentry);
@@ -199,6 +200,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode);
 
 int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev);
 int vfs_create(const char *restrict path, umode_t mode);
+int vfs_rename(const char *restrict oldpath, const char *restrict newpath);
 int vfs_unlink(const char *restrict path);
 int vfs_mkdir(const char *restrict path, umode_t mode);
 int vfs_rmdir(const char *restrict path);

@@ -110,6 +110,47 @@ void dentry_put(struct dentry *dentry) {
     }
 }
 
+void d_drop(struct dentry *d) {
+    spin_lock(&dcache_lock);
+    list_remove(&d->hash);
+    spin_unlock(&dcache_lock);
+}
+
+void d_move(struct dentry *d, struct dentry *new_parent, const struct qstr *name) {
+    char *nn = kmalloc(name->len + 1);
+    if (!nn) {
+        d_drop(d);
+        return;
+    }
+
+    memcpy(nn, name->name, name->len); 
+    nn[name->len] = '\0';
+
+    struct dentry *old_parent = d->parent;
+    char *old_name = (char*)d->name.name;
+    dentry_get(new_parent);
+
+    spin_lock(&dcache_lock);
+
+    list_remove(&d->hash);
+    list_remove(&d->siblings);
+
+    d->name.name = nn; d->name.len = name->len;
+    d->parent = new_parent;
+
+    list_add_tail(&d->siblings, &new_parent->childs);
+    list_add(&d->hash,
+        &dcache_hash_table[
+            dcache_hash(new_parent, nn, name->len) % DCACHE_NR_HASHES
+        ]
+    );
+
+    spin_unlock(&dcache_lock);
+
+    dentry_put(old_parent);
+    kfree(old_name);
+}
+
 static __init int dcache_init(void) {
     for (size_t i = 0; i < DCACHE_NR_HASHES; i++) {
         INIT_LIST_HEAD(&dcache_hash_table[i]);

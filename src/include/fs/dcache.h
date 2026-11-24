@@ -24,5 +24,7 @@ struct dentry *dcache_lookup(struct dentry *parent, const struct qstr *name);
 struct dentry *dcache_add(struct dentry *parent, const struct qstr *name, struct inode *inode);
 struct dentry* dentry_get(struct dentry *dentry);
 void dentry_put(struct dentry *dentry);
+void d_drop(struct dentry *d);
+void d_move(struct dentry *d, struct dentry *new_parent, const struct qstr *name);
 
 #endif
