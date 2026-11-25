@@ -1,5 +1,6 @@
 #include <stdio.h>
+#include <syscall.h>
 
 int rename(const char *oldpath, const char *newpath) {
-    return -1;
+    return syscall(SYS_rename, oldpath, newpath);
 }
