@@ -1,10 +1,14 @@
 #ifndef _VIRTUAL_FILE_SYSTEM_H
 #define _VIRTUAL_FILE_SYSTEM_H
 
-#include <sync/spinlock.h>
 #include <lib/list.h>
+#include <def/bits.h>
 #include <mm/kheap.h>
 #include <mm/pagecache.h>
+#include <sync/spinlock.h>
+#include <sys/time.h>
+
+struct stat;
 
 #define FMODE_READ   (1 << 0)
 #define FMODE_WRITE  (1 << 2)
@@ -35,24 +39,24 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
-#define ATTR_MODE  (1 << 0)
-#define ATTR_SIZE  (1 << 1)
-#define ATTR_DEV   (1 << 2)
-#define ATTR_ATIME (1 << 3)
-#define ATTR_MTIME (1 << 4)
-#define ATTR_CTIME (1 << 5)
+#define ATTR_MODE  BIT(0)
+#define ATTR_SIZE  BIT(1)
+#define ATTR_ATIME BIT(2)
+#define ATTR_MTIME BIT(3)
+#define ATTR_CTIME BIT(4)
 
 struct mount;
 struct dentry;
 
 struct inode {
-	uint64_t ino;
-
-	umode_t mode;
-
+	ino_t ino;
+	off_t size;
+	blkcnt_t blocks;
+	
 	dev_t dev;
-
-	size_t size;
+	nlink_t nlink;
+	
+	umode_t mode;
 
 	atomic_t refcount;
 	spinlock_t lock;
@@ -67,9 +71,9 @@ struct inode {
 	const struct inode_operations *i_op;
 	const struct file_operations *i_fop;
 
-	timespan atime_sec;
-	timespan mtime_sec;
-	timespan ctime_sec;
+	time_t access_time_sec;
+	time_t modify_time_sec;
+	time_t create_time_sec;
 	atomic_t version;
 
 	struct list_head i_sb_list;
@@ -87,23 +91,14 @@ struct file {
 	const struct file_operations *f_op;
 };
 
-struct stat {
-	uint64_t ino;
-	umode_t mode;
-
-	dev_t rdev;
-	dev_t dev;
-
-	size_t size;
-
-	timespan atime;
-	timespan mtime;
-	timespan ctime;
-};
-
 struct iattr {
-	uint32_t valid;
-	struct stat stat;
+	unsigned int valid;
+	umode_t mode;
+	off_t size;
+
+	struct timespec atim;
+	struct timespec mtim;
+	struct timespec ctim;
 };
 
 struct qstr {

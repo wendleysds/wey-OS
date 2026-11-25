@@ -128,7 +128,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 
 		struct iattr attr = {
 			.valid = ATTR_SIZE,
-			.stat.size = 0,
+			.size = 0,
 		};
 
 		int ret = ino->i_op->setattr(ino, &attr);
@@ -199,7 +199,7 @@ static int truncate_inode(struct inode *ino, off_t length){
 
 	struct iattr attr = {
 		.valid = ATTR_SIZE,
-		.stat.size = length,
+		.size = length,
 	};
 
 	int ret = ino->i_op->setattr(ino, &attr);

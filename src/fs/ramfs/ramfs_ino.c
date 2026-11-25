@@ -8,6 +8,8 @@
 #include <def/config.h>
 #include <mm/page.h>	
 
+#include <uapi/sys/stat.h>
+
 #include "ramfs_internal.h"
 
 static struct ramfs_inode *ramfs_find_child(struct ramfs_inode *dir, const struct qstr *n) {
@@ -203,39 +205,37 @@ out:
 
 static int ramfs_getattr(struct inode *ino, struct stat* restrict statbuf){
 	statbuf->ino = ino->ino;
+	statbuf->size = ino->size;
+	statbuf->blocks = ino->blocks;
+
+	statbuf->dev = ino->dev;
+	statbuf->nlink = ino->nlink;
+
 	statbuf->mode = ino->mode;
 
-	statbuf->size = ino->size;
-	statbuf->dev = ino->dev;
-
-	statbuf->atime = ino->atime_sec;
-	statbuf->ctime = ino->ctime_sec;
-	statbuf->mtime = ino->mtime_sec;
+	statbuf->atim.tv_sec = ino->access_time_sec;
+	statbuf->ctim.tv_sec = ino->create_time_sec;
+	statbuf->mtim.tv_sec = ino->modify_time_sec;
 
 	return OK;
 }
 
 static int ramfs_setarrt(struct inode *ino, struct iattr* attr){
-	struct stat* st = &attr->stat;
-
 	if(attr->valid & ATTR_MODE)
-		ino->mode = st->mode;
+		ino->mode = attr->mode;
 
 	if(attr->valid & ATTR_SIZE){
-		ramfs_do_truncate(ino, st->size);
+		ramfs_do_truncate(ino, attr->size);
 	}
 
-	if(attr->valid & ATTR_DEV)
-		ino->dev = st->dev;
-
 	if(attr->valid & ATTR_ATIME)
-		ino->mtime_sec = st->mtime;
+		ino->modify_time_sec = attr->mtim.tv_sec;
 
 	if(attr->valid & ATTR_MTIME)
-		ino->atime_sec = st->atime;
+		ino->access_time_sec = attr->atim.tv_sec;
 
 	if(attr->valid & ATTR_CTIME)
-		ino->ctime_sec = st->ctime;
+		ino->create_time_sec = attr->ctim.tv_sec;
 
 	return OK;
 }

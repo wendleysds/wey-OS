@@ -6,7 +6,7 @@
 #define CLOCK_PROCESS_CPUTIME_ID 2
 #define CLOCK_THREAD_CPUTIME_ID 3
 
-#include "types.h"
+#include <sys/types.h>
 
 struct timespec {
 	time_t    tv_sec;
