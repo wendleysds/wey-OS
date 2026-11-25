@@ -10,40 +10,10 @@
 extern struct mount *root_mount;
 static DEFINE_SPINLOCK(rename_lock);
 
-int vfs_create(const char *restrict path, umode_t mode){
-	if(!root_mount) return -EINVAL;
-
-	struct qstr name;
-	int trailing_slash = 0;
-	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
-	if(IS_ERR_OR_NULL(parent_dentry)){
-		return PTR_ERR(parent_dentry);
-	}
-
-	struct inode* parent = parent_dentry->inode;
-	inode_get(parent);
-
-	if(!parent->i_op || !parent->i_op->create){
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -ENOSYS;
-	}
-
-	struct dentry dentry = {
-		.parent = parent_dentry,
-		.name = name,
-	};
-
-	int res = parent->i_op->create(parent, &dentry, mode);
-	inode_put(parent);
-	dentry_put(parent_dentry);
-	
-	return res;
-}
-
 int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 	if(!root_mount) return -EINVAL;
 
+	int res;
 	struct qstr name;
 	int trailing_slash = 0;
 	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
@@ -55,9 +25,8 @@ int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 	inode_get(parent);
 
 	if(!parent->i_op || !parent->i_op->mknod){
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -ENOSYS;
+		res = -ENOSYS;
+		goto put_parent;
 	}
 
 	struct dentry dentry = {
@@ -65,15 +34,18 @@ int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 		.name = name,
 	};
 
-	int res = parent->i_op->mknod(parent, &dentry, mode, dev);
+	res = parent->i_op->mknod(parent, &dentry, mode, dev);
+
+put_parent:
 	inode_put(parent);
 	dentry_put(parent_dentry);
-	
 	return res;
 }
 
 int vfs_unlink(const char *restrict path){
 	if(!root_mount) return -EINVAL;
+
+	int res;
 
 	struct qstr name;
 	int trailing_slash = 0;
@@ -86,15 +58,13 @@ int vfs_unlink(const char *restrict path){
 	inode_get(parent);
 
 	if(trailing_slash){
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -ENOTDIR;
+		res = -ENOTDIR;
+		goto put_parent;
 	}
 
 	if(!parent->i_op || !parent->i_op->unlink){
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -ENOSYS;
+		res = -ENOSYS;
+		goto put_parent;
 	}
 
 	struct dentry dentry = {
@@ -102,16 +72,18 @@ int vfs_unlink(const char *restrict path){
 		.name = name,
 	};
 	
-	int res = parent->i_op->unlink(parent, &dentry);
+	res = parent->i_op->unlink(parent, &dentry);
+
+put_parent:
 	inode_put(parent);
 	dentry_put(parent_dentry);
-
 	return res;
 }
 
 int vfs_mkdir(const char *restrict path, umode_t mode){
 	if(!root_mount) return -EINVAL;
 
+	int res;
 	struct qstr name;
 	struct dentry *parent_dentry = vfs_walk_parent(path, &name, NULL);
 	if(IS_ERR_OR_NULL(parent_dentry)){
@@ -123,15 +95,13 @@ int vfs_mkdir(const char *restrict path, umode_t mode){
 
 	if ((name.len == 1 && name.name[0] == '.') || 
 		(name.len == 2 && name.name[0] == '.' && name.name[1] == '.')) {
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -EEXIST;
+		res = -EEXIST;
+		goto put_parent;
 	}
 
 	if (!parent->i_op || !parent->i_op->mkdir || !parent->i_op->lookup) {
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -ENOSYS;
+		res = -ENOSYS;
+		goto put_parent;
 	}
 
 	struct dentry dentry = {
@@ -142,21 +112,20 @@ int vfs_mkdir(const char *restrict path, umode_t mode){
 	struct inode *child = parent->i_op->lookup(parent, &dentry);
 	if (child) {
 		if (IS_ERR(child)) {
-			inode_put(parent);
-			dentry_put(parent_dentry);
-			return PTR_ERR(child);
+			res = PTR_ERR(child);
+			goto put_parent;
 		}
-
 		inode_put(child);
-		inode_put(parent);
-		dentry_put(parent_dentry);
-		return -EEXIST;
+
+		res = -EEXIST;
+		goto put_parent;
 	}
 	
-	int res = parent->i_op->mkdir(parent, &dentry, mode);
+	res = parent->i_op->mkdir(parent, &dentry, mode);
+
+put_parent:
 	inode_put(parent);
 	dentry_put(parent_dentry);
-
 	return res;
 }
 
