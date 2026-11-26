@@ -7,12 +7,15 @@
 #include <fs/stat.h>
 #include <fs/dcache.h>
 
-extern struct mount *root_mount;
 static DEFINE_SPINLOCK(rename_lock);
 
-int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
-	if(!root_mount) return -EINVAL;
+static inline bool is_dot(const struct qstr *n) {
+	return
+		(n->len == 1 && n->name[0] == '.') ||
+		(n->len == 2 && n->name[0] == '.' && n->name[1] == '.');
+}
 
+int vfs_mknod(const char *restrict path, umode_t mode, dev_t dev){
 	int res;
 	struct qstr name;
 	int trailing_slash = 0;
@@ -42,37 +45,82 @@ put_parent:
 	return res;
 }
 
-int vfs_unlink(const char *restrict path){
-	if(!root_mount) return -EINVAL;
+int vfs_link(const char *restrict oldpath, const char *restrict newpath){
+	struct dentry *old_d = vfs_walk(oldpath);
+	if (IS_ERR(old_d)) return PTR_ERR(old_d);
 
 	int res;
-
-	struct qstr name;
-	int trailing_slash = 0;
-	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
-	if(IS_ERR_OR_NULL(parent_dentry)){
-		return PTR_ERR(parent_dentry);
+	if (S_ISDIR(old_d->inode->mode)) {
+		res = -EPERM;
+		goto out_old;
 	}
 
-	struct inode* parent = parent_dentry->inode;
+	struct qstr name; int slash = 0;
+	struct dentry *new_parent = vfs_walk_parent(newpath, &name, &slash);
+	if (IS_ERR(new_parent)) {
+		res = PTR_ERR(new_parent);
+		goto out_old;
+	}
+
+	struct inode *dir = new_parent->inode;
+	if (slash || is_dot(&name)) {
+		res = -ENOENT;
+	} else if (dir->i_sb != old_d->inode->i_sb) {
+		res = -EXDEV;
+	} else if (!dir->i_op || !dir->i_op->link) {
+		res = -EPERM;
+	} else {
+		struct dentry new_stack = {
+			.parent = new_parent,
+			.name = name
+		};
+
+		res = dir->i_op->link(old_d, dir, &new_stack);
+	}
+
+	dentry_put(new_parent);
+out_old:
+	dentry_put(old_d);
+	return res;
+}
+
+int vfs_unlink(const char *restrict path){
+	struct qstr name; int trailing_slash = 0, res;
+	struct dentry *parent_dentry = vfs_walk_parent(path, &name, &trailing_slash);
+	if (IS_ERR(parent_dentry)) return PTR_ERR(parent_dentry);
+
+	struct inode *parent = parent_dentry->inode;
 	inode_get(parent);
 
-	if(trailing_slash){
+	if (trailing_slash) {
 		res = -ENOTDIR;
 		goto put_parent;
 	}
 
-	if(!parent->i_op || !parent->i_op->unlink){
+	if (is_dot(&name)) {
+		res = -EISDIR;
+		goto put_parent;
+	}
+
+	if (!parent->i_op || !parent->i_op->unlink) {
 		res = -ENOSYS;
 		goto put_parent;
 	}
 
-	struct dentry dentry = {
-		.parent = parent_dentry,
-		.name = name,
-	};
-	
-	res = parent->i_op->unlink(parent, &dentry);
+	struct path target;
+	res = vfs_lookup_path(parent_dentry, &name, &target);
+	if (res) goto put_parent;
+
+	if (target.mount) {
+		res = -EBUSY;
+	} else if (S_ISDIR(target.dentry->inode->mode)) {
+		res = -EISDIR;
+	} else {
+		res = parent->i_op->unlink(parent, target.dentry);
+		if (!res) d_drop(target.dentry);
+	}
+
+	dentry_put(target.dentry);
 
 put_parent:
 	inode_put(parent);
@@ -81,8 +129,6 @@ put_parent:
 }
 
 int vfs_mkdir(const char *restrict path, umode_t mode){
-	if(!root_mount) return -EINVAL;
-
 	int res;
 	struct qstr name;
 	struct dentry *parent_dentry = vfs_walk_parent(path, &name, NULL);
@@ -130,8 +176,6 @@ put_parent:
 }
 
 int vfs_rmdir(const char *restrict path){
-	if(!root_mount) return -EINVAL;
-
 	int res;
 	struct qstr name;
 	int trailing_slash = 0;
@@ -189,15 +233,7 @@ put_parent:
 	return res;
 }
 
-static inline bool is_dot(const struct qstr *n) {
-	return
-		(n->len == 1 && n->name[0] == '.') ||
-		(n->len == 2 && n->name[0] == '.' && n->name[1] == '.');
-}
-
 int vfs_rename(const char *oldpath, const char *newpath) {
-	if (!root_mount) return -EINVAL;
-
 	struct qstr old_name, new_name;
 	struct path src = {0}, dst = {0};
 
@@ -325,9 +361,7 @@ SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
 	char kpath[PATH_MAX];
 
 	int len = path_copy(kpath, path, PATH_MAX);
-	if(IS_ERR_VALUE(len)){
-		return len;
-	}
+	if(len < 0) return len;
 
 	return vfs_mkdir(kpath, mode);
 }
@@ -336,9 +370,7 @@ SYSCALL_DEFINE1(rmdir, __user const char*, path){
 	char kpath[PATH_MAX];
 
 	int len = path_copy(kpath, path, PATH_MAX);
-	if(IS_ERR_VALUE(len)){
-		return len;
-	}
+	if(len < 0) return len;
 
 	return vfs_rmdir(kpath);
 }
@@ -348,10 +380,10 @@ SYSCALL_DEFINE2(rename, __user const char*, oldpath, __user const char*, newpath
     char knewpath[PATH_MAX];
 
     int res = path_copy(koldpath, oldpath, PATH_MAX);
-    if (IS_ERR_VALUE(res)) return res;
+    if (res < 0) return res;
 
     res = path_copy(knewpath, newpath, PATH_MAX);
-    if (IS_ERR_VALUE(res)) return res;
+    if (res < 0) return res;
 
     return vfs_rename(koldpath, knewpath);
 }

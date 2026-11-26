@@ -1,6 +1,8 @@
 #include <kernel/panic.h>
+#include <kernel/clock.h>
 #include <fs/vfs.h>
 #include <fs/stat.h>
+#include <lib/div64.h>
 
 struct inode* inode_alloc(struct super_block* sb){
 	struct inode* inode = NULL;
@@ -19,10 +21,13 @@ struct inode* inode_new(struct super_block *sb){
 	struct inode* inode = inode_alloc(sb);
 	if (inode){
 		inode->i_sb = sb;
+		inode->nlink = 1;
+
 		INIT_LIST_HEAD(&inode->i_sb_list);
 
 		spinlock_init(&inode->lock);
 		atomic_set(&inode->refcount, 1);
+		atomic_set(&inode->version, 1);
 
 		inode->i_mapping = &inode->i_data;
 		address_space_init(&inode->i_data, inode, NULL);
@@ -30,6 +35,11 @@ struct inode* inode_new(struct super_block *sb){
 		spin_lock(&sb->s_inode_lock);
 		list_add(&inode->i_sb_list, &sb->s_inodes);
 		spin_unlock(&sb->s_inode_lock);
+
+		u64 now_secs = clock_get_realtime_ns();
+		do_div(now_secs, 1000000000);
+
+		inode->create_time_sec = (time_t)now_secs;
 	}
 
 	return inode;
