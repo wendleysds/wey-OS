@@ -15,7 +15,7 @@
 #14 i386 getdents sys_getdents
 15 i386 chdir sys_chdir
 16 i386 getcwd sys_getcwd
-#17 i386 unlink sys_unlink
+17 i386 unlink sys_unlink
 18 i386 mkdir sys_mkdir
 19 i386 rmdir sys_rmdir
 20 i386 ioctl sys_ioctl
@@ -53,6 +53,7 @@
 #52 i386 recv sys_recv
 #53 i386 fcntl sys_fcntl
 #54 i386 stat sys_stat
+55 i386 link sys_link
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write

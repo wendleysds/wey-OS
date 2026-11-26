@@ -357,6 +357,27 @@ static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
 	return -ENAMETOOLONG;
 }
 
+SYSCALL_DEFINE1(unlink, __user const char*, path){
+	char kpath[PATH_MAX];
+
+	int len = path_copy(kpath, path, PATH_MAX);
+	if (len < 0) return len;
+
+	return vfs_unlink(kpath);
+}
+
+SYSCALL_DEFINE2(link, __user const char*, oldpath, __user const char*, newpath){
+	char kold[PATH_MAX], knew[PATH_MAX];
+
+	int res = path_copy(kold, oldpath, PATH_MAX);
+	if (res < 0) return res;
+
+	res = path_copy(knew, newpath, PATH_MAX);
+	if (res < 0) return res;
+
+	return vfs_link(kold, knew);
+}
+
 SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
 	char kpath[PATH_MAX];
 
