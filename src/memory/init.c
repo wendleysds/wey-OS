@@ -184,10 +184,6 @@ int __init memory_init(void) {
 
 	map_direct_ram();
 
-	if(IS_ERR_VALUE(res = mmu_init())){
-		return res;
-	}
-
 	if(IS_ERR_VALUE(res = vmemmap_sections_init())){
 		return res;
 	}

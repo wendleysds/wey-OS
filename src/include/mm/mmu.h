@@ -29,7 +29,7 @@ extern mem_flags_t arch_mmu_flags(int flags);
 
 int mmu_early_mmap(struct paging_ctx *ctx, uintptr_t vaddr, uintptr_t paddr, size_t	size, mem_flags_t flags);
 
-int mmu_init(void);
+void mmu_mark_ro(void);
 
 int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t size, mem_flags_t mem_flags);
 void mmu_munmap(struct paging_ctx *ctx, uintptr_t vaddr, size_t size);

@@ -16,6 +16,7 @@
 #include <mm/memory.h>
 #include <mm/memblock.h>
 #include <mm/page.h>
+#include <mm/mmu.h>
 
 #include <asm/page.h>
 
@@ -129,6 +130,8 @@ static __init int rest_init(void* unused){
 	init_task->sid = 1;
 
 	do_initcalls();
+
+	mmu_mark_ro();
 
 	int res = vfs_mknod("/tty", 00755 | S_IFCHR, MKDEV(4, 0));
 	if(res) return res;

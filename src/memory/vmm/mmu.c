@@ -462,7 +462,7 @@ static inline pte_t* walk(const struct paging_ctx *restrict ctx, uintptr_t vaddr
 	return walker(ctx, vaddr, stop_level, 0, 0, 0, NULL);
 }
 
-int __init mmu_init(){
+void __init mmu_mark_ro(){
 	mmu_set_flags_range(
 		&kernel_ctx,
 		(uintptr_t)__kernel_text_start,
@@ -478,8 +478,6 @@ int __init mmu_init(){
 	);
 
 	kernel_ctx.ops->flush_all();
-
-	return OK;
 }
 
 int mmu_mmap(struct paging_ctx *ctx, uintptr_t paddr, uintptr_t vaddr, size_t size, mem_flags_t mem_flags){

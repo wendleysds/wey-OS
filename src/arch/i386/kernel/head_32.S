@@ -72,6 +72,10 @@ enable_paging:
 l1:
 	add esp, PAGE_OFFSET
 
+	mov eax, cr0
+	or eax, (1 << 16)  ; CR0.WP
+	mov cr0, eax
+
 	mov eax, [pa(boot_hdr_ptr)]
 	call i386_start_kernel
 
