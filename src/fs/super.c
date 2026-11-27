@@ -40,6 +40,38 @@ static const struct file_system_type *find_fs_by_name(const char *name) {
 	return fs;
 }
 
+static unsigned int inode_owned_refs(const struct super_block *sb, const struct inode *ino)
+{
+	if (ino == sb->root_inode)
+		return 1;
+	if (sb->flags & SB_PIN_BY_NLINK)
+		return ino->nlink;
+	return 0;
+}
+
+static bool sb_has_busy_inodes(struct mount *mnt)
+{
+	struct super_block *sb = mnt->mnt_sb;
+	struct inode *ino;
+	bool busy = false;
+
+	spin_lock(&sb->s_inode_lock);
+	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
+		int expected = inode_owned_refs(sb, ino);
+
+		if (ino == sb->root_inode)
+			expected++;
+
+		if (atomic_read(&ino->refcount) > expected) {
+			busy = true;
+			break;
+		}
+	}
+	spin_unlock(&sb->s_inode_lock);
+
+	return busy;
+}
+
 struct super_block *super_alloc() {
 	struct super_block *sb = (struct super_block*)kzalloc(sizeof(struct super_block));
 	if (sb) {
@@ -54,51 +86,42 @@ void super_destroy(struct super_block *sb) {
 	kfree(sb); 
 }
 
-static int do_umount(struct mount* mount){
-	struct super_block *sb;
+static int do_umount(struct mount *mount)
+{
+	struct super_block *sb = mount->mnt_sb;
 	struct inode *ino, *tmp;
 
-	int ret = SUCCESS;
+	if (!list_empty(&mount->children))
+		return -EBUSY;
 
-	if (!list_empty(&mount->children)) {
-		ret = -EBUSY;
-		goto out_unlock;
-	}
+	if (mount->mnt_root && atomic_read(&mount->mnt_root->refcount) > 1)
+		return -EBUSY;
+
+	if (sb_has_busy_inodes(mount))
+		return -EBUSY;
 
 	if (mount->mnt_root) {
-        dentry_put(mount->mnt_root);
-        mount->mnt_root = NULL;
-    }
-
-	sb = mount->mnt_sb;
-	list_for_each_entry(ino, &sb->s_inodes, i_sb_list) {
-		if (atomic_read(&ino->refcount) > 1) {
-			ret = -EBUSY;
-			goto out_unlock;
-		}
+		dentry_put(mount->mnt_root);
+		mount->mnt_root = NULL;
 	}
 
 	list_for_each_entry_safe(ino, tmp, &sb->s_inodes, i_sb_list) {
+		ino->nlink = 0;
 		inode_destroy(ino);
 	}
 
-	if (sb->fs_type->unmount) {
+	if (sb->fs_type->unmount)
 		sb->fs_type->unmount(sb);
-	}
 
-	if (mount->parent) {
+	if (mount->parent)
 		list_remove(&mount->sibling);
-	}
 
-	if (mount == root_mount) {
+	if (mount == root_mount)
 		root_mount = NULL;
-	}
 
 	kfree(mount);
 	super_destroy(sb);
-
-out_unlock:
-	return ret;
+	return SUCCESS;
 }
 
 struct dentry *d_make_root(struct inode *root_inode) {
@@ -214,8 +237,8 @@ int vfs_umount(const char *mountpoint) {
 		point->mounted_here = mnt;
 		spin_unlock(&point->lock);
 	} else if (point) {
-		dentry_put(point);
 		spin_unlock(&point->lock);
+		dentry_put(point);
 	}
 
 	spin_unlock(&mount_lock);

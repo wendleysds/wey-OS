@@ -45,6 +45,8 @@ struct stat;
 #define ATTR_MTIME BIT(3)
 #define ATTR_CTIME BIT(4)
 
+#define SB_PIN_BY_NLINK  BIT(0)
+
 struct mount;
 struct dentry;
 
