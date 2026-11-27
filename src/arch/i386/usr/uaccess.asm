@@ -5,6 +5,9 @@ section .text
 
 ; int __buffer_copy(void* to, const void* from, size_t size);
 __buffer_copy:
+	push edi
+	push esi
+
 	mov edi, [esp + 4]  ; dest
 	mov esi, [esp + 8]  ; src
 	mov ecx, [esp + 12] ; size
@@ -14,7 +17,12 @@ __buffer_copy:
 
 .fault:
 	mov eax, ecx
-    ret
+
+	pop esi
+	pop edi
+	cld
+
+	ret
 
 ; int raw_copy_from_user(void* to, const void __user* from, size_t size);
 raw_copy_from_user:
