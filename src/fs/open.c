@@ -22,6 +22,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	struct dentry *parent_dentry = NULL;
 
 	struct inode *ino = NULL;
+	struct inode *parent_ino = NULL;
 
 	struct qstr last;
 	int trailing_slash = 0;
@@ -63,6 +64,8 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 				return ERR_CAST(ino);
 			}
 
+			parent_ino = inode_get(parent);
+
 			if (ino == NULL) {
 				if (!parent->i_op->create) {
 					inode_put(parent);
@@ -96,9 +99,16 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 		if (IS_ERR(ino_dentry)) return ERR_CAST(ino_dentry);
 
 		ino = ino_dentry->inode;
+		parent_ino = ino_dentry->parent 
+			? inode_get(ino_dentry->parent->inode) 
+			: NULL;
+
 		inode_get(ino);
 		dentry_put(ino_dentry);
 	}
+
+	ino_t ino_parent_ino = parent_ino ? parent_ino->ino : ino->ino;
+	if(parent_ino) inode_put(parent_ino);
 
 	if ((flags & O_DIRECTORY) && !S_ISDIR(ino->mode)) {
 		inode_put(ino);
@@ -145,6 +155,7 @@ struct file* vfs_open(const char *restrict path, int flags, umode_t mode) {
 	}
 
 	f->inode = ino;
+	f->parent_ino = ino_parent_ino;
 	f->pos = 0;
 	f->flags = flags;
 	f->private_data = NULL;

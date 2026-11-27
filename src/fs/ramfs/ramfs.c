@@ -81,7 +81,7 @@ static struct dentry* ramfs_mount(const struct file_system_type* self, const cha
 
 	root_inode->mode = S_IFDIR;
 	root_inode->i_op = &ramfs_iops;
-	root_inode->i_fop = &ramfs_file_fops;
+	root_inode->i_fop = &ramfs_dir_fops;
 	root_inode->i_mapping->a_ops = &ramfs_aops;
 	sb->root_inode = root_inode;
 	sb->flags |= SB_PIN_BY_NLINK;

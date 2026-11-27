@@ -84,7 +84,9 @@ static int ramfs_create_common(struct inode *dir, struct dentry *dentry, umode_t
 	inode->mode = mode;
 	inode->dev = dev;
 
-	if (S_ISREG(mode) || S_ISDIR(mode))
+	if (S_ISDIR(mode))
+		inode->i_fop = &ramfs_dir_fops;
+	else if (S_ISREG(mode))
 		inode->i_fop = &ramfs_file_fops;
 	else
 		inode_init_special(inode, mode, dev);

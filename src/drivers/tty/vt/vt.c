@@ -316,6 +316,12 @@ static void vt_csi_dispatch(struct vt_data *vt, char final)
 	}
 }
 
+#include <io/ports.h>
+static void serial_putchar(int ch){
+	while(!(inb(0x3f8 + 5) & 0x20));
+	outb(0x3f8, ch);
+}
+
 static void vt_putc(struct vt_data *vt, char ch){
 	if(!vt->vt_sw->putc){
 		return;
@@ -326,6 +332,8 @@ static void vt_putc(struct vt_data *vt, char ch){
 			return;
 		}
 	}
+
+	serial_putchar(ch);
 
 	switch (ch) {
 		case '\a':

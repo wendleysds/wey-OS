@@ -1,4 +1,4 @@
-obj-y += inode.o namei.o path.o stat.o
+obj-y += inode.o namei.o path.o stat.o readdir.o
 obj-y += open.o read_write.o exec.o ioctl.o
 obj-y += chrdev.o super.o fdtable.o
 obj-y += dcache.o pipe.o

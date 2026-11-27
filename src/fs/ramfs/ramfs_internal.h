@@ -25,6 +25,7 @@ struct ramfs_inode {
 
 extern const struct inode_operations ramfs_iops;
 extern const struct file_operations ramfs_file_fops;
+extern const struct file_operations ramfs_dir_fops;
 extern const struct address_space_operations ramfs_aops;
 
 int ramfs_do_truncate(struct inode *inode, size_t new_size);

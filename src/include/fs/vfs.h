@@ -8,7 +8,7 @@
 #include <sync/spinlock.h>
 #include <sys/time.h>
 
-struct stat;
+#include <uapi/dirent.h>
 
 #define FMODE_READ   (1 << 0)
 #define FMODE_WRITE  (1 << 2)
@@ -49,6 +49,8 @@ struct stat;
 
 struct mount;
 struct dentry;
+struct dirent;
+struct stat;
 
 struct inode {
 	ino_t ino;
@@ -85,9 +87,10 @@ struct file {
 	spinlock_t lock;
 	atomic_t refcount;
 
+	ino_t parent_ino;
 	struct inode *inode;
 	void *private_data;
-
+	
 	off_t pos;
 	unsigned int flags;
 	const struct file_operations *f_op;
@@ -108,6 +111,11 @@ struct qstr {
     size_t len;
 };
 
+struct dir_context {
+	int (*fill)(struct dir_context *ctx, const char* name, size_t len, ino_t ino, off_t off, char type);
+	off_t pos;
+};
+
 struct file_operations {
 	ssize_t (*read)(struct file *file, void *buffer, size_t count, off_t *offset);
 	ssize_t (*write)(struct file *file, const void *buffer, size_t count, off_t *offset);
@@ -116,6 +124,7 @@ struct file_operations {
 	int (*close)(struct file *file);
 	int (*release) (struct inode *ino, struct file *file);
 	int (*ioctl) (struct file *file, unsigned int cmd, unsigned long arg);
+	int (*iterate) (struct file *file, struct dir_context *ctx);
 };
 
 struct inode_operations {
@@ -267,6 +276,32 @@ static inline void file_put(struct file* file){
 
 		kfree(file);
 	}
+}
+
+static inline int dir_emit(struct dir_context *ctx, const char *name, size_t len, ino_t ino, char type) {
+	return ctx->fill(ctx, name, len, ino, ctx->pos + 1, type);
+}
+
+static inline int dir_emit_dot(struct file *file, struct dir_context *ctx) {
+	return dir_emit(ctx, ".", 1, file->inode->ino, WEY_DT_DIR);
+}
+
+static inline int dir_emit_dotdot(struct file *file, struct dir_context *ctx) {
+    return dir_emit(ctx, "..", 2, file->parent_ino, WEY_DT_DIR);
+}
+
+static inline int dir_emit_dots(struct file *file, struct dir_context *ctx) {
+	if (ctx->pos == 0) {
+		if (dir_emit_dot(file, ctx) != 0)
+			return 0;
+		ctx->pos++;
+	}
+	if (ctx->pos == 1) {
+		if (dir_emit_dotdot(file, ctx) != 0)
+			return 0;
+		ctx->pos++;
+	}
+	return 1;
 }
 
 struct file *shmem_file_setup(size_t size);
