@@ -8,7 +8,8 @@ typedef struct {
     atomic_t locked;
 } spinlock_t;
 
-#define DEFINE_SPINLOCK(name) spinlock_t name = { .locked = { 0 } }
+#define SPINLOCK_INIT(lock) { .locked = ATOMIC_INIT(lock) }
+#define DEFINE_SPINLOCK(name) spinlock_t name = SPINLOCK_INIT(0)
 
 void spinlock_init(spinlock_t* lock);
 void spin_lock(spinlock_t* lock);

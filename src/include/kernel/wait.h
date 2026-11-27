@@ -19,6 +19,14 @@ struct wait_queue_head {
 	struct list_head entries;
 };
 
+#define WAIT_QUEUE_HEAD_INIT(name) { \
+        .lock   = SPINLOCK_INIT(0), \
+        .entries = LIST_HEAD_INIT(name.entries) \
+    }
+
+#define WAIT_QUEUE_HEAD(name) \
+    struct wait_queue_head name = WAIT_QUEUE_HEAD_INIT(name)
+
 static inline void wait_queue_head_init(struct wait_queue_head *head) {
     spinlock_init(&head->lock);
     INIT_LIST_HEAD(&head->entries);

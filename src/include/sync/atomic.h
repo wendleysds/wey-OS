@@ -3,6 +3,8 @@
 
 #include <asm/atomic.h>
 
+#define ATOMIC_INIT(i) { i }
+
 int atomic_read(const atomic_t* v);
 void atomic_set(atomic_t* v, int val);
 int atomic_fetch_add(atomic_t* v, int inc);
