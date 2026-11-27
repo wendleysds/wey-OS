@@ -6,6 +6,7 @@
 #include <fs/stat.h>
 #include <fs/dcache.h>
 #include <lib/string.h>
+#include <lib/assert.h>
 
 #include "ramfs_internal.h"
 
@@ -17,39 +18,38 @@ static struct inode* ramfs_alloc_inode(struct super_block *sb) {
 	struct ramfs_sb *rsb = sb->private_data;
 
 	struct inode *inode = kzalloc(sizeof(struct inode));
-	if(inode){
-		struct ramfs_inode *rino = kzalloc(sizeof(struct ramfs_inode));
-		if(!rino){
-			kfree(inode);
-			return NULL;
-		}
+	if (!inode)
+		return NULL;
 
-		spinlock_init(&rino->spinlock);
-		INIT_LIST_HEAD(&rino->children);
-		INIT_LIST_HEAD(&rino->sibling);
-
-		inode->ino = rsb->next_ino++;
-		inode->private_data = rino;
-		rino->ino = inode;
-		inode->i_sb = sb;
+	struct ramfs_inode *rino = kzalloc(sizeof(struct ramfs_inode));
+	if (!rino) {
+		kfree(inode);
+		return NULL;
 	}
 
+	spinlock_init(&rino->spinlock);
+	INIT_LIST_HEAD(&rino->children);
+
+	inode->ino = rsb->next_ino++;
+	inode->private_data = rino;
+	rino->ino = inode;
+	inode->i_sb = sb;
 	return inode;
 }
 
-/* as páginas do arquivo já foram devolvidas por inode_destroy() -> pagecache_destroy() */
 static void ramfs_destroy_inode(struct inode *inode) {
-	if(inode->private_data){
-		struct ramfs_inode *rino = inode->private_data;
+	struct ramfs_inode *rino = inode->private_data;
 
-		if(rino->name) {
-			kfree(rino->name);
-			rino->name = NULL;
-		}
+	WARN_ON(inode->nlink, "ramfs: destroyed inode with nlink > 0");
 
-		kfree(rino);
+	struct ramfs_dirent *de, *tmp;
+	list_for_each_entry_safe(de, tmp, &rino->children, sibling) {
+		list_remove(&de->sibling);
+		kfree(de->name);
+		kfree(de);
 	}
 
+	kfree(rino);
 	kfree(inode);
 }
 
@@ -81,9 +81,10 @@ static struct dentry* ramfs_mount(const struct file_system_type* self, const cha
 
 	root_inode->mode = S_IFDIR;
 	root_inode->i_op = &ramfs_iops;
-	root_inode->i_fop = &ramfs_fops;
+	root_inode->i_fop = &ramfs_file_fops;
 	root_inode->i_mapping->a_ops = &ramfs_aops;
 	sb->root_inode = root_inode;
+	sb->flags |= SB_PIN_BY_NLINK;
 
 	struct dentry *root = d_make_root(root_inode);
 	if (!root) {
@@ -107,12 +108,6 @@ static struct file_system_type ramfs = {
 	.unmount = ramfs_unmount
 };
 
-/*
- * Arquivo anônimo em memória (equivalente ao shmem_file_setup do Linux), usado por
- * mmap(MAP_SHARED | MAP_ANONYMOUS). Não tem nome em diretório algum: o inode nasce
- * com 1 referência, que passa a ser da `struct file`; quando a última VMA/fd solta
- * o arquivo, o inode morre e o page cache devolve as páginas.
- */
 static struct super_block *shmem_sb;
 
 struct file *shmem_file_setup(size_t size)
@@ -141,7 +136,7 @@ struct file *shmem_file_setup(size_t size)
 
 	inode->mode = S_IFREG | 0600;
 	inode->i_op = &ramfs_iops;
-	inode->i_fop = &ramfs_fops;
+	inode->i_fop = &ramfs_file_fops;
 	inode->i_mapping->a_ops = &ramfs_aops;
 	inode->size = size;
 

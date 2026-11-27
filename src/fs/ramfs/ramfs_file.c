@@ -149,7 +149,7 @@ off_t ramfs_lseek(struct file *file, off_t offset, int whence)
 	return target;
 }
 
-const struct file_operations ramfs_fops = {
+const struct file_operations ramfs_file_fops = {
 	.read = ramfs_read,
 	.write = ramfs_write,
 	.lseek = ramfs_lseek,
