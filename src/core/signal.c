@@ -23,6 +23,7 @@ static bool default_is_ignore(int sig) {
         case SIGCHLD:
         case SIGURG:
         case SIGWINCH:
+        case SIGCONT:
             return true;
         default:
             return false;
