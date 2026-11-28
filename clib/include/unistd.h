@@ -93,6 +93,18 @@ pid_t getpgid(pid_t);
 int setpgid(pid_t, pid_t);
 
 /**
+ * @brief Get the process group ID of the current process.
+ * @return The process group ID of the current process, or -1 on error.
+ */
+pid_t getpgrp(void);
+
+/**
+ * @brief Create a new process group.
+ * @return The process group ID of the new process group, or -1 on error.
+ */
+pid_t setpgrp(void);
+
+/**
  * @brief Get the Session ID (SID) of a process.
  * 
  * @param pid The process ID.
@@ -222,7 +234,6 @@ int          gethostname(char *, size_t);
 char        *getlogin(void);
 int          getlogin_r(char *, size_t);
 int          getopt(int, char * const [], const char *);
-pid_t        getpgrp(void);
 pid_t        getppid(void);
 uid_t        getuid(void);
 int          isatty(int);
@@ -241,7 +252,6 @@ int          rmdir(const char *);
 int          setegid(gid_t);
 int          seteuid(uid_t);
 int          setgid(gid_t);
-pid_t        setpgrp(void);
 int          setregid(gid_t, gid_t);
 int          setreuid(uid_t, uid_t);
 int          setuid(uid_t);
