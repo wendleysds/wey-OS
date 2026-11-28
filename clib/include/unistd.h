@@ -7,6 +7,11 @@
 #define STDOUT_FILENO (1)
 #define STDERR_FILENO (2)
 
+#define F_OK 0
+#define X_OK 1
+#define W_OK 2
+#define R_OK 4
+
 /**
  * @brief Reads up to count bytes from the file descriptor fd.
  * 
@@ -213,8 +218,16 @@ char* getcwd(char *buf, size_t size);
  */
 int isatty(int fd);
 
+/**
+ * @brief Check if the calling process has the specified access mode to the file.
+ * 
+ * @param path Path to the file.
+ * @param mode Access mode to check (F_OK, X_OK, W_OK, R_OK).
+ * @return 0 on success, -1 on error.
+ */
+int access(const char *path, int mode);
+
 /* man 0p unistd.h
-int          access(const char *, int);
 unsigned     alarm(unsigned);
 int          chown(const char *, uid_t, gid_t);
 size_t       confstr(int, char *, size_t);

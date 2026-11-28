@@ -56,6 +56,7 @@
 #define SYS_fcntl 53
 #define SYS_stat 54
 #define SYS_link 55
+#define SYS_access 56
 
 #define syscall(no, ...) do_syscall(no, ##__VA_ARGS__)
 
