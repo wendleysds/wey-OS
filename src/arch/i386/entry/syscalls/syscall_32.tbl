@@ -52,7 +52,7 @@
 #51 i386 send sys_send
 #52 i386 recv sys_recv
 #53 i386 fcntl sys_fcntl
-#54 i386 stat sys_stat
+54 i386 stat sys_stat
 55 i386 link sys_link
 
 # tmp
