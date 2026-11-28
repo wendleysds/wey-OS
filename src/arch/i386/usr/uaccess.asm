@@ -1,3 +1,5 @@
+bits 32
+
 global raw_copy_from_user
 global raw_copy_to_user
 
@@ -8,9 +10,9 @@ __buffer_copy:
 	push edi
 	push esi
 
-	mov edi, [esp + 4]  ; dest
-	mov esi, [esp + 8]  ; src
-	mov ecx, [esp + 12] ; size
+	mov edi, [esp + 12] ; dest
+	mov esi, [esp + 16] ; src
+	mov ecx, [esp + 20] ; size
 
 .copy:
 	rep movsb
