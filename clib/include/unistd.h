@@ -176,10 +176,26 @@ int pipe(int pipefd[2]);
  */
 int pipe2(int pipefd[2], int flags);
 
+/**
+ * @brief Change the current working directory.
+ * 
+ * @param path The path to the new current working directory.
+ * @return 0 on success, -1 on error.
+ */
+int chdir(const char *path);
+
+/**
+ * @brief Get the current working directory.
+ * 
+ * @param buf Buffer to store the current working directory.
+ * @param size Size of the buffer.
+ * @return Pointer to the current working directory, or NULL on error.
+ */
+char* getcwd(char *buf, size_t size);
+
 /* man 0p unistd.h
 int          access(const char *, int);
 unsigned     alarm(unsigned);
-int          chdir(const char *);
 int          chown(const char *, uid_t, gid_t);
 size_t       confstr(int, char *, size_t);
 char        *crypt(const char *, const char *);
@@ -197,7 +213,6 @@ int          fdatasync(int);
 int          fexecve(int, char *const [], char *const []);
 long         fpathconf(int, int);
 int          fsync(int);
-char        *getcwd(char *, size_t);
 gid_t        getegid(void);
 uid_t        geteuid(void);
 gid_t        getgid(void);
