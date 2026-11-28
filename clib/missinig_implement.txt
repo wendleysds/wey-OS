@@ -2,5 +2,4 @@ stdio.h
   remove
 
 stdlib.h
-  getenv
   system

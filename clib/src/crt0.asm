@@ -3,6 +3,7 @@ bits 32
 global _start
 
 extern main
+extern libc_main
 extern exit
 
 _start:
@@ -17,6 +18,8 @@ _start:
 	push esi
 	push edx
 	push ecx
+
+	call libc_main
 
 	call main
 

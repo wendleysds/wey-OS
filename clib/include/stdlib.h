@@ -69,6 +69,23 @@ int atexit(void (*func)(void));
 char *getenv(const char *name);
 
 /**
+ * @brief Set the value of an environment variable.
+ * 
+ * @param name The name of the environment variable to set.
+ * @param value The value of the environment variable.
+ * @return 0 if successful, non-zero otherwise.
+ */
+int setenv(const char *name, const char *value, int overwrite);
+
+/**
+ * @brief Remove an environment variable.
+ * 
+ * @param name The name of the environment variable to remove.
+ * @return 0 if successful, non-zero otherwise.
+ */
+int unsetenv(const char *name);
+
+/**
  * @brief Execute a command by means of a command processor.
  * 
  * @param command The command to execute.
