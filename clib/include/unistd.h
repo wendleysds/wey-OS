@@ -205,6 +205,14 @@ int chdir(const char *path);
  */
 char* getcwd(char *buf, size_t size);
 
+/**
+ * @brief Check if a file descriptor is a terminal.
+ * 
+ * @param fd The file descriptor to check.
+ * @return 1 if the file descriptor is a terminal, 0 otherwise.
+ */
+int isatty(int fd);
+
 /* man 0p unistd.h
 int          access(const char *, int);
 unsigned     alarm(unsigned);
@@ -236,7 +244,6 @@ int          getlogin_r(char *, size_t);
 int          getopt(int, char * const [], const char *);
 pid_t        getppid(void);
 uid_t        getuid(void);
-int          isatty(int);
 int          lchown(const char *, uid_t, gid_t);
 int          link(const char *, const char *);
 int          linkat(int, const char *, int, const char *, int);
