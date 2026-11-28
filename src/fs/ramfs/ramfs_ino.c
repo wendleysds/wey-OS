@@ -235,18 +235,17 @@ out:
 }
 
 static int ramfs_getattr(struct inode *ino, struct stat* restrict statbuf){
-	statbuf->ino = ino->ino;
-	statbuf->size = ino->size;
-	statbuf->blocks = ino->blocks;
+	statbuf->st_ino = ino->ino;
+	statbuf->st_size = ino->size;
+	statbuf->st_blocks = ino->blocks;
 
-	statbuf->dev = ino->dev;
-	statbuf->nlink = ino->nlink;
+	statbuf->st_dev = ino->dev;
+	statbuf->st_nlink = ino->nlink;
+	statbuf->st_mode = ino->mode;
 
-	statbuf->mode = ino->mode;
-
-	statbuf->atim.tv_sec = ino->access_time_sec;
-	statbuf->ctim.tv_sec = ino->create_time_sec;
-	statbuf->mtim.tv_sec = ino->modify_time_sec;
+	statbuf->st_atim.tv_sec = ino->access_time_sec;
+	statbuf->st_ctim.tv_sec = ino->create_time_sec;
+	statbuf->st_mtim.tv_sec = ino->modify_time_sec;
 
 	return OK;
 }

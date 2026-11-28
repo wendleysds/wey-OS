@@ -40,20 +40,20 @@
 #define S_IXOTH 00001
 
 struct stat {
-    dev_t     dev;
-    ino_t     ino;
-    mode_t    mode;
-    nlink_t   nlink;
-    uid_t     uid;
-    gid_t     gid;
-    dev_t     rdev;
-    off_t     size;
-    blksize_t blksize;
-    blkcnt_t  blocks;
+    dev_t     st_dev;
+    ino_t     st_ino;
+    mode_t    st_mode;
+    nlink_t   st_nlink;
+    uid_t     st_uid;
+    gid_t     st_gid;
+    dev_t     st_rdev;
+    off_t     st_size;
+    blksize_t st_blksize;
+    blkcnt_t  st_blocks;
 
-    struct timespec atim;
-    struct timespec mtim;
-    struct timespec ctim;
+    struct timespec st_atim;
+    struct timespec st_mtim;
+    struct timespec st_ctim;
 };
 
 #endif /* _UAPI_SYS_STAT_H */
