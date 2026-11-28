@@ -1,34 +1,34 @@
 #include <string.h>
 
+char *strtok_r(char *restrict s, const char *restrict delim, char **restrict saveptr) {
+    char *end;
 
-char* strtok(char* s, const char* delimiters){
-    static char* last;
-    char* token;
-
-    if(s == NULL){
-        s = last;
+    if (s == NULL) {
+        s = *saveptr;
     }
 
-    while(*s && strchr(delimiters, *s)){
-        s++;
-    }
-
-    if(!*s){
-        last = NULL;
+    if (s == NULL) {
         return NULL;
     }
 
-    token = s;
-    while(*s && !strchr(delimiters, *s)){
-        s++;
+    s += strspn(s, delim);
+    if (*s == '\0') {
+        *saveptr = NULL;
+        return NULL;
     }
 
-    if(*s){
-        *s = '\0';
-        last = s + 1;
-    }else{
-        last = NULL;
+    end = s + strcspn(s, delim);
+    if (*end == '\0') {
+        *saveptr = NULL;
+        return s;
     }
 
-    return token;
+    *end = '\0';
+    *saveptr = end + 1;
+    return s;
+}
+
+char *strtok(char *restrict s, const char *restrict delimiters) {
+    static char *last = NULL;
+    return strtok_r(s, delimiters, &last);
 }

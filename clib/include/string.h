@@ -156,7 +156,18 @@ char* strstr(const char* haystack, const char* needle);
  * @param delimiters The characters to use as delimiters.
  * @return Pointer to the first token, or NULL if no tokens are found.
  */
-char* strtok(char* s, const char* delimiters);
+char* strtok(char* restrict s, const char* restrict delimiters);
+
+/** 
+ * @brief Breaks the string s into a sequence of tokens in a reentrant manner.
+ * 
+ * @param s The string to tokenize.
+ * @param delimiters The characters to use as delimiters.
+ * @param saveptr A pointer to a pointer that will be used to store the state of the tokenizer.
+ * @return Pointer to the first token, or NULL if no tokens are found.
+ */
+char *strtok_r(char *restrict s, const char *restrict delim, char **restrict saveptr);
+
 /**
  * @brief Transforms the string src into a string that can be used for comparison.
  * 
@@ -208,5 +219,14 @@ int strcoll(const char *str, const char *str2);
  * @return Pointer to the duplicated string, or NULL if insufficient memory was available.
  */
 char* strdup(const char *s);
+
+/**
+ * @brief Duplicates the string s, up to a maximum of n characters.
+ * 
+ * @param s The string to duplicate.
+ * @param n The maximum number of characters to duplicate.
+ * @return Pointer to the duplicated string, or NULL if insufficient memory was available.
+ */
+char* strndup(const char *s, size_t n);
 
 #endif
