@@ -54,6 +54,7 @@
 #53 i386 fcntl sys_fcntl
 54 i386 stat sys_stat
 55 i386 link sys_link
+56 i386 access sys_access
 
 # tmp
 100 i386 tmp_vt_write sys_tmp_vt_write

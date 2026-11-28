@@ -7,6 +7,11 @@
 #include <fs/stat.h>
 #include <fs/dcache.h>
 
+#define F_OK 0
+#define X_OK 1
+#define W_OK 2
+#define R_OK 4
+
 static DEFINE_SPINLOCK(rename_lock);
 
 static inline bool is_dot(const struct qstr *n) {
@@ -394,4 +399,29 @@ SYSCALL_DEFINE2(rename, __user const char*, oldpath, __user const char*, newpath
     if (ret < 0) return ret;
 
     return vfs_rename(koldpath, knewpath);
+}
+
+SYSCALL_DEFINE2(access, __user const char*, path, int, mode){
+	char kpath[PATH_MAX];
+
+	if (mode & ~(R_OK | W_OK | X_OK))
+		return -EINVAL;
+
+	int len = path_copy_from_user(kpath, path, PATH_MAX);
+	if (len < 0) return len;
+
+	struct dentry *d = vfs_walk(kpath);
+	if (IS_ERR(d)) return PTR_ERR(d);
+
+	struct inode *ino = d->inode;
+	int res = 0;
+
+	if (
+		(mode & X_OK) && 
+		!S_ISDIR(ino->mode) &&
+	    !(ino->mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+	) res = -EACCES;
+
+	dentry_put(d);
+	return res;
 }
