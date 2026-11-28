@@ -8,7 +8,10 @@
 #define WIFSTOPPED(s)   (((s) & 0xFF) == 0x7F)
 #define WSTOPSIG(s)     (((s) >> 8) & 0xFF)
 #define WCOREDUMP(s)    (((s) & 0x80) != 0)
+#define WIFCONTINUED(s) ((s) == 0xFFFF)
 
-#define WNOHANG 0x1
+#define WNOHANG    0x1
+#define WUNTRACED  0x2
+#define WCONTINUED 0x8
 
 #endif /*_UAPI_SYS_WAIT_H*/

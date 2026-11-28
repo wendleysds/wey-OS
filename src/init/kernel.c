@@ -102,7 +102,7 @@ static void try_to_run_init_process(const char *pathname) {
 	int ret = run_init_process(pathname);
 
 	if (ret && ret != -ENOENT) {
-		pr_err("init(%s): failed to execute! (%d)\n", pathname, ret);
+		pr_err("init: (%s): failed to execute! (%d)\n", pathname, ret);
 	}
 }
 

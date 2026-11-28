@@ -6,6 +6,7 @@
 #include <asm/fpu.h>
 #include <kernel/pid.h>
 #include <kernel/signal.h>
+#include <kernel/wait.h>
 #include <def/config.h>
 #include <kernel/init.h>
 #include <lib/list.h>
@@ -15,6 +16,7 @@
 #define TASK_EXIT_CODE_CORE_MASK   0x0080
 #define TASK_EXIT_CODE_STATUS_MASK 0xFF00
 #define TASK_EXIT_CODE_STOPPED_MASK 0xFF00
+#define TASK_EXIT_CODE_CONTINUED 0xFFFF
 
 #define TASK_STATUS_ENCODE_EXIT(exit_code) \
     (((uint16_t)((exit_code) & 0xFF)) << 8)
@@ -36,6 +38,7 @@ typedef enum {
 	TASK_READY,
 	TASK_RUNNING,
 	TASK_ZOMBIE,
+	TASK_STOPPED,
 	TASK_INTERRUPTIBLE,
 	TASK_BLOCKED,
 } task_state_t;
@@ -68,8 +71,14 @@ struct task {
 	pid_t sid;
 	bool did_exec;
 
+	bool stop_reported;
+	bool continued;
+	int stop_sig;
+
 	struct fpu_state fpu;
 	bool fpu_used;
+
+	struct wait_queue_head child_wait;
 
 	struct list_head children;
 	struct list_head sibling;

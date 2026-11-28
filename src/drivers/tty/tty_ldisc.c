@@ -73,6 +73,30 @@ static int tty_ldisc_close(struct tty_struct* tty){
 	return 0;
 }
 
+static int tty_check_background_common(struct tty_struct *tty, int sig, int blocked_err){
+	struct task *cur = current;
+
+	if (cur->sid != tty->session_sid || cur->pgid == tty->fg_pgrp)
+		return 0;
+
+	if (cur->sig_actions[sig].sa_handler == SIG_IGN ||
+	    (cur->sig_blocked & SIGMASK(sig)))
+		return blocked_err;
+
+	// TODO: orphan group handling -> -EIO
+
+	send_signal_to_process_group(cur->pgid, sig);
+	return -EINTR;
+}
+
+static inline int tty_check_background_read(struct tty_struct *tty) {
+	return tty_check_background_common(tty, SIGTTIN, -EIO);
+}
+
+static inline int tty_check_background_write(struct tty_struct *tty) {
+	return tty_check_background_common(tty, SIGTTOU, 0);
+}
+
 static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 	if(!tty || !buffer || len == 0){
 		return 0;
@@ -82,8 +106,12 @@ static int tty_ldisc_read(struct tty_struct* tty, u8 *buffer, size_t len){
 		return -ENODEV;
 	}
 
+	int bg = tty_check_background_read(tty);  
+	if (bg) return bg;		
+
 	struct tty_ldisc_data* state = tty->ldisc_data;
 	const struct termios *t = &tty->termios;
+
 	struct wait_queue_entry wait;
 	wait_queue_entry_init(&wait, current, task_default_wakeup);
 
@@ -177,6 +205,11 @@ static int tty_ldisc_write(struct tty_struct* tty, const u8 *buffer, size_t len)
 	}
 
 	const struct termios *t = &tty->termios;
+
+	if(t->c_lflag & TOSTOP){
+		int bg = tty_check_background_write(tty);
+		if(bg) return bg;
+	}
 
 	/* Output processing (OPOST & ONLCR) */
 	if ((t->c_oflag & OPOST) && (t->c_oflag & ONLCR)) {

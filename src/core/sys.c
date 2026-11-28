@@ -6,7 +6,7 @@ SYSCALL_DEFINE0(setsid){
     if (current->pgid == current->pid)
         return -EPERM;
 
-    if (current->pgid == current->pid || task_find_first_with_pgid(current->pid))
+    if (task_find_first_with_pgid(current->pid))
         return -EPERM;
 
     current->sid = current->pid;

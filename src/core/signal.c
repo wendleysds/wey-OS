@@ -6,6 +6,18 @@
 #include <lib/assert.h>
 #include <asm/signal.h>
 
+#define STOP_MASK (SIGMASK(SIGSTOP)|SIGMASK(SIGTSTP)|SIGMASK(SIGTTIN)|SIGMASK(SIGTTOU))
+
+static void notify_parent(struct task *t, bool jobctl) {
+	struct task *p = t->parent;
+	if (!p) return;
+
+	if (!(jobctl && (p->sig_actions[SIGCHLD].sa_flags & SA_NOCLDSTOP)))
+		send_signal(p, SIGCHLD);
+
+	wake_up_all(&p->child_wait);
+}
+
 static bool default_is_ignore(int sig) {
     switch(sig){
         case SIGCHLD:
@@ -38,6 +50,8 @@ static bool default_is_stop(int sig){
     switch(sig){
         case SIGSTOP:
         case SIGTSTP:
+        case SIGTTIN:
+        case SIGTTOU:
             return true;
         default:
             return false;
@@ -48,53 +62,76 @@ bool has_signal_pending(struct task *task){
 	return task->sig_pending & ~task->sig_blocked;
 }
 
+static __no_return void die_by_signal(struct task *t, int sig) {
+	task_exit(t, TASK_STATUS_ENCODE_SIGNAL(sig, default_is_core_dump(sig)));
+	schedule();
+	unreachable();
+}
+
 asmlinkage void do_signal(struct registers *regs) {
-    if(!regs_is_user_mode(regs)) return;
-    struct task* cur = current;
+	if (!regs_is_user_mode(regs)) return;
+	struct task *cur = current;
 
-    int status = 0;
-    bool core_dump = false;
+	for (;;) {
+		sigset_t ready = cur->sig_pending & ~cur->sig_blocked;
+		if (!ready) return;
 
-    sigset_t ready = cur->sig_pending & ~cur->sig_blocked;
-    if (!ready) return;
+		int signo = __builtin_ctz(ready) + 1;
+		cur->sig_pending &= ~SIGMASK(signo);
 
-    for (int bit = 0; bit < 31; bit++) {
-        if (BIT_CHECK(ready, bit)) {
-            cur->sig_pending = BIT_CLEAR(cur->sig_pending, bit);
-            int signo = bit + 1;
+		struct sigaction *act = &cur->sig_actions[signo];
 
-            struct sigaction *act = &cur->sig_actions[signo];
-            if (act->sa_handler == SIG_IGN) return;
+		if (act->sa_handler == SIG_IGN) continue;
 
-            if (act->sa_handler == SIG_DFL) {
-                if (cur->pid == 1 || default_is_ignore(signo)) continue;
-                status = signo;
-                goto exit_task;
-            }
+		if (act->sa_handler == SIG_DFL) {
+			if (default_is_ignore(signo)) continue;
 
-            if (arch_setup_signal_frame(signo, act, regs) < 0) {
-                status = SIGSEGV;
-                goto exit_task;
-            }
+			if (default_is_stop(signo)) {
+				if (cur->pid == 1) continue;
 
-            cur->sig_blocked |= act->sa_mask;
-            if (!(act->sa_flags & SA_NODEFER)) {
-                cur->sig_blocked |= SIGMASK(signo);
-            }
+				cur->stop_sig = signo;
+                cur->stop_reported = false;
+                cur->continued = false; 
+				cur->state = TASK_STOPPED;
 
-            return;
-        }
-    }
+				notify_parent(cur, true);
+				schedule();
+				continue;
+			}
 
-exit_task:
-    task_exit(cur, TASK_STATUS_ENCODE_SIGNAL(status, core_dump));
-    schedule();
-    unreachable();
+			die_by_signal(cur, signo);
+		}
+
+		if (arch_setup_signal_frame(signo, act, regs) < 0)
+			die_by_signal(cur, SIGSEGV);
+
+		cur->sig_blocked |= act->sa_mask;
+		if (!(act->sa_flags & SA_NODEFER))
+			cur->sig_blocked |= SIGMASK(signo);
+		return;
+	}
 }
 
 int send_signal(struct task *task, int sig) {
     if (sig < 0 || sig >= NSIG) return -EINVAL;
     if (sig == 0 || task->state == TASK_ZOMBIE) return 0;
+
+    if (sig == SIGCONT) {
+        task->sig_pending &= ~STOP_MASK;
+        if (task->state == TASK_STOPPED) {
+            task->state = TASK_READY;
+            task->continued = true;
+            scheduler_add(task);
+            notify_parent(task, true);
+        }
+    } else if (STOP_MASK & SIGMASK(sig)) {
+        task->sig_pending &= ~SIGMASK(SIGCONT);
+    }
+
+    if (sig == SIGKILL && task->state == TASK_STOPPED) {
+        task->state = TASK_READY;
+        scheduler_add(task);
+    }
 
 	sighandler_t handler = task->sig_actions[sig].sa_handler;
 	if (sig != SIGKILL && (handler == SIG_IGN || (handler == SIG_DFL && default_is_ignore(sig))))
@@ -116,6 +153,7 @@ SYSCALL_DEFINE3(sigaction,
 
     if (signum < 0 || signum >= NSIG) return -EINVAL;
     if (signum == 0) return -EINVAL;
+    if (signum == SIGKILL || signum == SIGSTOP) return -EINVAL;
 
     if (oldact) {
         if (copy_to_user(oldact, &cur->sig_actions[signum], sizeof(struct sigaction))) {

@@ -65,6 +65,7 @@ struct task* task_create(const char* name, int priority){
 		strncpy(new_task->name, name, PROC_NAME_MAX); 
 		new_task->priority = priority; 
 		new_task->state = TASK_NEW;
+		wait_queue_head_init(&new_task->child_wait);
 		INIT_LIST_HEAD(&new_task->tasks); 
 		INIT_LIST_HEAD(&new_task->queue); 
 		INIT_LIST_HEAD(&new_task->children);
@@ -115,11 +116,18 @@ void task_reparent_children(struct task* task, struct task* new_parent){
 	struct task* child;
 	struct task* tmp;
 
+	bool zombie = false;
 	list_for_each_entry_safe(child, tmp, &task->children, sibling){
 		child->parent = new_parent;
+		if (child->state == TASK_ZOMBIE) zombie = true;
 
 		list_remove(&child->sibling);
 		list_add(&child->sibling, &new_parent->children);
+	}
+
+	if (zombie) {
+		send_signal(new_parent, SIGCHLD);
+		wake_up_all(&new_parent->child_wait);
 	}
 }
 
@@ -133,8 +141,10 @@ void task_exit(struct task* task, int status){
 
 	task_reparent_children(task, init_task);
 
-	if(task->parent){
-		task_wakeup(task->parent);
+	struct task *parent = task->parent;
+	if(parent){
+		send_signal(parent, SIGCHLD);
+		wake_up_all(&parent->child_wait);
 	}
 }
 
@@ -215,6 +225,9 @@ void asmlinkage task_handle_prev_status(struct task* prev){
 			prev->state = TASK_READY;
 			scheduler_add(prev); 
 			return;
+		case TASK_STOPPED:
+			// no-op
+			return;
 		default: return;
 	}
 }
@@ -293,6 +306,9 @@ SYSCALL_DEFINE2(kill, pid_t, pid, int, signum){
 		struct task *tmp;
 		spin_lock(&tasks_lock);
 		list_for_each_entry(tmp, &tasks_global, tasks){
+			if(tmp->pid == 1) continue;
+			if(tmp == current) continue;
+
 			send_signal(tmp, signum);
 			sended = true;
 		}

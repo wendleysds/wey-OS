@@ -3,6 +3,7 @@
 #include <errno.h>
 
 static const char *const sys_errlist[] = {
+    [0]               =  "Success",
     [EPERM]           =  "Operation not permitted",
     [ENOENT]          =  "No such file or directory",
     [ESRCH]           =  "No such process",
