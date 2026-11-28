@@ -225,25 +225,11 @@ int vfs_ftruncate(struct file *file, off_t length){
 	return truncate_inode(file->inode, length);
 }
 
-static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
-	for(size_t i = 0; i < maxlen; i++){
-		if(copy_from_user(kpath + i, upath + i, 1)){
-			return -EFAULT;
-		}
-
-		if(!kpath[i]){
-			return i+1;
-		}
-	}
-	return -ENAMETOOLONG;
-}
-
 SYSCALL_DEFINE3(open, __user const char *restrict, path, int, flags, umode_t, mode){
 	char kpath[PATH_MAX];
-	size_t len = path_copy(kpath, path, PATH_MAX);
-	if(IS_ERR_VALUE(len)){
-		return len;
-	}
+
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if(ret < 0) return ret;
 
 	struct file* f = vfs_open(kpath, flags, mode);
 	if(IS_ERR(f)){
@@ -285,17 +271,16 @@ SYSCALL_DEFINE2(ftruncate, int, fd, off_t, length){
 
 SYSCALL_DEFINE2(truncate, __user const char *restrict, path, off_t, length){
 	char kpath[PATH_MAX];
-	size_t len = path_copy(kpath, path, PATH_MAX);
-	if(IS_ERR_VALUE(len)){
-		return len;
-	}
+
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if(ret < 0) return ret;
 
 	struct dentry *dentry = vfs_walk(kpath);
 	if(IS_ERR(dentry)){
 		return PTR_ERR(dentry);
 	}
 
-	int ret = truncate_inode(dentry->inode, length);
+	ret = truncate_inode(dentry->inode, length);
 
 	dentry_put(dentry);
 	return ret;

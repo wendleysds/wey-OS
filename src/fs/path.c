@@ -264,7 +264,7 @@ int vfs_chdir(const char *path) {
 	return SUCCESS;
 }
 
-static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
+int path_copy_from_user(char* kpath, __user const char* upath, size_t maxlen){
 	for(size_t i = 0; i < maxlen; i++){
 		if(copy_from_user(kpath + i, upath + i, 1)){
 			return -EFAULT;
@@ -281,10 +281,9 @@ SYSCALL_DEFINE1(chdir, __user const char*, path){
 	if(!root_mount) return -EINVAL;
 
 	char kpath[PATH_MAX];
-	size_t len = path_copy(kpath, path, PATH_MAX);
-	if(IS_ERR_VALUE(len)){
-		return len;
-	}
+
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if(ret < 0) return ret;
 	
 	struct path p;
 	int err = vfs_walk_path(kpath, &p);

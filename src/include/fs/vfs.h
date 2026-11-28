@@ -306,6 +306,7 @@ static inline int dir_emit_dots(struct file *file, struct dir_context *ctx) {
 
 struct file *shmem_file_setup(size_t size);
 
+int path_copy_from_user(char* kpath, const char* upath, size_t maxlen);
 int kernel_exec(const char* pathname, const char* const argv[], const char* const envp[]);
 
 #endif

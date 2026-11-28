@@ -344,24 +344,11 @@ out_unlock:
 	return res;
 }
 
-static int path_copy(char* kpath, __user const char* upath, size_t maxlen){
-	for(size_t i = 0; i < maxlen; i++){
-		if(copy_from_user(kpath + i, upath + i, 1)){
-			return -EFAULT;
-		}
-
-		if(!kpath[i]){
-			return i+1;
-		}
-	}
-	return -ENAMETOOLONG;
-}
-
 SYSCALL_DEFINE1(unlink, __user const char*, path){
 	char kpath[PATH_MAX];
 
-	int len = path_copy(kpath, path, PATH_MAX);
-	if (len < 0) return len;
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if (ret < 0) return ret;
 
 	return vfs_unlink(kpath);
 }
@@ -369,11 +356,11 @@ SYSCALL_DEFINE1(unlink, __user const char*, path){
 SYSCALL_DEFINE2(link, __user const char*, oldpath, __user const char*, newpath){
 	char kold[PATH_MAX], knew[PATH_MAX];
 
-	int res = path_copy(kold, oldpath, PATH_MAX);
-	if (res < 0) return res;
+	int ret = path_copy_from_user(kold, oldpath, PATH_MAX);
+	if (ret < 0) return ret;
 
-	res = path_copy(knew, newpath, PATH_MAX);
-	if (res < 0) return res;
+	ret = path_copy_from_user(knew, newpath, PATH_MAX);
+	if (ret < 0) return ret;
 
 	return vfs_link(kold, knew);
 }
@@ -381,8 +368,8 @@ SYSCALL_DEFINE2(link, __user const char*, oldpath, __user const char*, newpath){
 SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
 	char kpath[PATH_MAX];
 
-	int len = path_copy(kpath, path, PATH_MAX);
-	if(len < 0) return len;
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if(ret < 0) return ret;
 
 	return vfs_mkdir(kpath, mode);
 }
@@ -390,8 +377,8 @@ SYSCALL_DEFINE2(mkdir, __user const char*, path, umode_t, mode){
 SYSCALL_DEFINE1(rmdir, __user const char*, path){
 	char kpath[PATH_MAX];
 
-	int len = path_copy(kpath, path, PATH_MAX);
-	if(len < 0) return len;
+	int ret = path_copy_from_user(kpath, path, PATH_MAX);
+	if(ret < 0) return ret;
 
 	return vfs_rmdir(kpath);
 }
@@ -400,11 +387,11 @@ SYSCALL_DEFINE2(rename, __user const char*, oldpath, __user const char*, newpath
     char koldpath[PATH_MAX];
     char knewpath[PATH_MAX];
 
-    int res = path_copy(koldpath, oldpath, PATH_MAX);
-    if (res < 0) return res;
+    int ret = path_copy_from_user(koldpath, oldpath, PATH_MAX);
+    if (ret < 0) return ret;
 
-    res = path_copy(knewpath, newpath, PATH_MAX);
-    if (res < 0) return res;
+    ret = path_copy_from_user(knewpath, newpath, PATH_MAX);
+    if (ret < 0) return ret;
 
     return vfs_rename(koldpath, knewpath);
 }
