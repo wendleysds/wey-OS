@@ -1,5 +1,5 @@
-#ifndef _SYS_MMAN_H
-#define _SYS_MMAN_H
+#ifndef _CLIB_SYS_MMAN_H
+#define _CLIB_SYS_MMAN_H
 
 #include_next <sys/mman.h>
 

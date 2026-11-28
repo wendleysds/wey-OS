@@ -1,5 +1,5 @@
-#ifndef _SYS_WAIT_H
-#define _SYS_WAIT_H
+#ifndef _CLIB_SYS_WAIT_H
+#define _CLIB_SYS_WAIT_H
 
 #include_next <sys/wait.h>
 
